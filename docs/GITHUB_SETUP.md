@@ -46,7 +46,9 @@ GitHub Free 비공개 저장소에서는 PR과 Actions를 사용할 수 있지�
 - 전역 Git 사용자 정보와 인증 helper는 유지했다. 이 저장소의 GitHub HTTPS helper만 `gh auth git-credential`로 연결했다.
 - Wiki는 비활성화했고 프로젝트 문서는 저장소의 docs에서 관리한다. Issues와 PR은 사용할 수 있다.
 - `.gitignore`의 환경변수·산출물·DB 백업 제외, lock 파일·Wrapper·migration 추적 가능 상태와 줄바꿈 속성을 확인했다.
-- 첫 commit과 push 결과는 완료 시 이 항목에 추가한다.
+- 첫 commit [10868bb](https://github.com/developer-sw/jeongeum-band-scheduler/commit/10868bba8a68aa0736922294033a29aea749f1da)에 설계 문서와 Git 설정 파일 15개를 기록하고 `main`으로 push했다.
+- `main`은 `origin/main`을 추적한다. 원격 기본 브랜치 `main`, 비공개 상태와 첫 commit의 로컬·원격 SHA 일치를 확인했다.
+- staged diff의 공백 오류 검사와 인증 키 패턴 검사를 통과했다. 애플리케이션 코드가 없어 앱 테스트와 CI 실행은 아직 수행하지 않았다.
 - GitHub 인증을 받기 위해 비밀번호나 장기 token을 채팅에 제출하지 않는다. 브라우저에서 직접 인증한다.
 
 ## 다음 단계
