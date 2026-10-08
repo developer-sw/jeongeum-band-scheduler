@@ -7,7 +7,8 @@
 - 2026-10-09: 사용자가 설계 문서 정리 작업을 승인했다.
 - 초기 설계 문서 11개를 작성하고 정책·권한·ERD·API·알림의 정합성을 검토했다. 내부 파일 링크와 JSON 예제 검사도 수행했다.
 - GitHub 재인증, 로컬 main 초기화, [비공개 저장소](https://github.com/developer-sw/jeongeum-band-scheduler) 생성, origin 연결과 첫 commit·push를 완료했다. 원격 기본 브랜치와 커밋 일치도 확인했으며 결과는 [GitHub 설정 기록](docs/GITHUB_SETUP.md)에 남겼다.
-- 설계 문서와 Git 기본 설정을 준비했다. 애플리케이션, migration, Docker/CI 실행 설정은 아직 없다.
+- Docker Linux 엔진을 정상화하고 localhost 전용 PostgreSQL Compose와 독립 Java 환경 검증 도구를 준비했다. 실행 및 확인 결과는 [로컬 개발환경](docs/DEV_ENVIRONMENT.md)에 기록한다.
+- 애플리케이션, migration, CI 실행 설정은 아직 없다.
 - 도메인 구매와 서버 생성은 아직 수행하지 않았다.
 - 문서의 **사용자 확정 정책**과 **기술 설계 권고안**을 구분한다. 문서 작성 완료를 구현 승인으로 취급하지 않는다.
 
@@ -55,6 +56,7 @@
 | [TEST_PLAN](docs/TEST_PLAN.md) | 기능·동시성·실기기·운영 검증 기준 |
 | [DEPLOYMENT](docs/DEPLOYMENT.md) | 개발 준비, 배포, 비용, 백업과 종료 |
 | [GITHUB_SETUP](docs/GITHUB_SETUP.md) | 비공개 저장소, 인증, 브랜치·PR와 초기 설정 기록 |
+| [DEV_ENVIRONMENT](docs/DEV_ENVIRONMENT.md) | Docker·PostgreSQL·JDK·Node, 실행 명령과 환경 검증 결과 |
 
 ## 운영 목표
 
@@ -69,9 +71,9 @@
 
 ## 구현 전 준비
 
-2026-10-09 읽기 전용 점검 결과, Git·JDK 21·Node.js·npm·Docker CLI·GitHub CLI는 설치되어 있다. GitHub 재인증은 이번 단계에서 완료했다. 초기 점검에서 Docker Linux 엔진 연결은 실패했으며 Docker 실행 확인이 남아 있다.
+GitHub 재인증·독립 저장소 연결을 완료했다. JDK 21과 Node.js/npm 실행을 확인했고 Docker Desktop의 WSL 2 Linux 엔진을 정상화했다. 개발용 PostgreSQL 인증·SQL 트랜잭션·컨테이너 재생성 후 데이터 유지와 Java Testcontainers 환경 검증 1건도 통과했다.
 
-GitHub와 독립 저장소 연결을 완료했다. 다음 단계에서 개발환경·프로젝트 생성·로컬 실행과 CI를 차례로 준비한다. 아직 실행 가능한 애플리케이션 명령이나 배포 명령은 제공하지 않는다.
+개발 DB 실행은 [DEV_ENVIRONMENT](docs/DEV_ENVIRONMENT.md)의 명령을 사용한다. 다음 단계에서 backend/frontend 초기 구성·로컬 앱 실행과 CI를 준비한다. 애플리케이션 기동과 배포는 아직 검증하지 않았다.
 
 ## 참고 프로젝트 원칙
 

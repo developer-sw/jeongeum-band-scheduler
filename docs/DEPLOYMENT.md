@@ -4,24 +4,24 @@
 
 ## 1. 범위와 현재 상태
 
-이 문서는 약 45명이 실제 사용하는 정음 예약 서비스의 개발환경 준비와 저비용 운영 계획이다. 설계 문서를 작성했고, 사용자가 요청한 GitHub 재인증·비공개 저장소 초기 설정을 진행한다. 진행 결과는 [GITHUB_SETUP.md](GITHUB_SETUP.md)에 기록한다. 애플리케이션 생성, Docker/CI 실행 설정, 도메인 구매, 서버 생성과 배포는 이번 단계에 포함하지 않는다.
+이 문서는 약 45명이 실제 사용하는 정음 예약 서비스의 개발환경 준비와 저비용 운영 계획이다. GitHub 재인증·비공개 저장소 초기 설정을 완료했으며 결과는 [GITHUB_SETUP.md](GITHUB_SETUP.md)에 기록한다. 사용자가 요청한 Docker 정상화·로컬 개발환경 설정 결과는 [DEV_ENVIRONMENT.md](DEV_ENVIRONMENT.md)에 기록한다. 애플리케이션·CI·도메인 구매·서버 생성과 배포는 아직 수행하지 않았다.
 
 확정 운영 정책은 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), 기술 구조는 [ARCHITECTURE.md](ARCHITECTURE.md)를 따른다. 이 문서의 금액은 **견적 비교**, 서버·백업·로그 설정은 **기술 설계안**이다. 도메인 구매 가능성·서버 재고·성능을 확인한 배포 완료 상태를 뜻하지 않는다.
 
-문서 작성 전 루트에서 읽기 전용으로 확인한 상태는 다음과 같다.
+초기 점검 이후 GitHub·로컬 개발환경 준비를 반영한 상태는 다음과 같다.
 
 | 항목 | 점검 결과 | 다음 단계 |
 |---|---|---|
-| 프로젝트 루트 | 기존 프로젝트 파일 및 Git 저장소가 없었음 | 문서 검토 후 저장소·구현 준비 |
-| Git | 2.55 설치 | 별도 저장소 연결은 아직 안 함 |
-| Java | 21.0.11 설치 | JAVA_HOME·javac 일치 확인 후 사용 |
-| Node.js / npm | 24.18 / 11.16 설치 | 선택할 Next.js와 호환성 확인 |
-| GitHub CLI | 인증이 유효하지 않음 | 사용자 로그인 단계에서 해결 |
-| Docker | engine 연결에 실패함 | Docker Desktop·WSL 2·Linux engine 동작 확인 |
+| 프로젝트 루트 | 독립 Git 저장소와 설계·개발환경 파일 준비 | backend/frontend 초기 구성 |
+| Git | 2.55 설치, 비공개 origin·main 연결 완료 | 기능별 브랜치·PR 사용 |
+| Java | 21.0.11 실행, JAVA_HOME·javac 경로 일치 확인 | 앱 생성 시 기존 JDK 21 사용 |
+| Node.js / npm | 24.18 / 11.16 실행 확인 | Next.js 패키지·lockfile·build 검증 |
+| GitHub CLI | developer-sw 재인증 완료 | 기존 인증 사용 |
+| Docker / PostgreSQL | WSL 2 Linux engine, PostgreSQL 17.11 healthy, SQL·데이터 유지·Testcontainers 검증 통과 | backend/frontend 초기 구성 |
 | 도메인 | bandjeongeum.cloud 미구매 | 구매 시 이름 가용성·가격 확인 |
 | 클라우드 서버·R2 | 생성·연결하지 않음 | 배포 후보 선택 후 별도 준비 |
 
-도구가 설치되어 있다는 사실과 Docker daemon·GitHub 인증이 동작한다는 사실을 구분한다. 이 점검에서 설치·로그인 문제를 자동으로 해결한 것은 아니다.
+도구 설치, 로컬 실행 검증과 실제 애플리케이션·운영 준비를 구분한다. 현재 DB 환경 검증을 운영 성능·업무 기능 검증으로 간주하지 않는다.
 
 ## 2. 일정과 운영 기간
 
