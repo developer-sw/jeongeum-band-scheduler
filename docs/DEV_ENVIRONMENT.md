@@ -66,7 +66,7 @@ Java Testcontainers 검증 명령은 다음과 같다.
 ```powershell
 Push-Location ./tools/environment-check
 try {
-    ./gradlew.bat --gradle-user-home ./.gradle/user-home --no-daemon test
+    ./gradlew.bat --gradle-user-home ./.gradle/user-home --no-daemon test --rerun-tasks
 } finally {
     Pop-Location
 }
