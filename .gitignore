@@ -1,0 +1,47 @@
+# Java / Gradle
+.gradle/
+build/
+*.class
+
+# Node.js / Next.js
+node_modules/
+.next/
+out/
+dist/
+coverage/
+*.tsbuildinfo
+
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+!.env.*.example
+/secrets/
+/.local/
+*.pem
+*.key
+*.p12
+*.pfx
+.pgpass
+
+# Local database volumes, user files, and backups
+/db-data/
+/postgres-data/
+/backups/
+/uploads/
+*.dump
+*.backup
+
+# Logs / caches / editor-local files
+*.log
+.idea/
+.vscode/
+.cache/
+
+# Operating system metadata
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Dependency lock files, Flyway migrations, and the Gradle Wrapper
+# (including gradle-wrapper.jar) intentionally remain trackable.

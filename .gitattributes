@@ -1,0 +1,17 @@
+# Keep repository text consistent without changing global Git settings.
+* text=auto eol=lf
+
+# Windows command scripts need CRLF in the working tree.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary assets and the Gradle Wrapper must not be normalized.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.jar binary
+*.pdf binary
