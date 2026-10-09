@@ -53,7 +53,7 @@ Flyway V1은 Spring Session JDBC의 공식 PostgreSQL 스키마를 바탕으로 
 
 현재 공개 API는 `GET /api/v1/health`와 `GET /api/v1/auth/csrf`다. Health는 실제 DB 연결을 확인하고 최소 상태만 반환한다. CSRF는 세션 쿠키와 함께 사용할 마스킹된 토큰·헤더 이름을 반환한다. 두 응답은 `no-store`다. 기본 계정·임시 로그인 기능은 없으며 나머지 API는 기본 거부한다.
 
-세션 쿠키는 HttpOnly·SameSite=Lax다. 기본 설정은 Secure이며 로컬 HTTP 개발 프로필에서만 Secure를 해제한다. 운영은 HTTPS에서 별도 환경변수로 실행한다. 세션 30분·DB pool 크기 같은 값은 초기 기술 설정이며 새로운 회원 운영 정책이 아니다.
+세션 쿠키는 HttpOnly·SameSite=Lax다. 기본 설정은 Secure이며 로컬 HTTP 개발 프로필에서만 Secure를 해제한다. 운영은 HTTPS에서 별도 환경변수로 실행한다. 2026-10-10 사용자 확정에 따라 로그인은 마지막 접속 후 90일 동안 유지하고 접속 시 서버 세션과 영속 쿠키를 함께 연장한다. 자세한 해제 조건과 기존 세션 전환은 [AUTHENTICATION](AUTHENTICATION.md)을 따른다. DB pool 크기는 기술 설정이다.
 
 프론트 공통 API client는 세션 쿠키·CSRF 헤더·공통 응답·오류 계약을 사용한다. 변경 요청은 자동 재시도하지 않고, 오프라인 요청은 즉시 실패해 연결 복구 때 자동 실행되지 않게 한다. 초기 화면은 제공된 정음 로고와 남색·노란색을 사용하는 준비 안내다.
 

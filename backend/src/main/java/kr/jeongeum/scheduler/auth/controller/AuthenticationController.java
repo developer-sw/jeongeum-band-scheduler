@@ -3,6 +3,7 @@ package kr.jeongeum.scheduler.auth.controller;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import kr.jeongeum.scheduler.auth.api.AuthRequests;
@@ -15,6 +16,7 @@ import kr.jeongeum.scheduler.member.api.MemberResponse;
 import kr.jeongeum.scheduler.member.domain.Member;
 import kr.jeongeum.scheduler.member.service.MemberService;
 import org.springframework.context.annotation.Profile;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -43,11 +45,13 @@ public class AuthenticationController {
     private final HttpSessionCsrfTokenRepository csrfTokens;
     private final Clock clock;
     private final MemberService memberService;
+    private final int sessionTimeoutSeconds;
 
     public AuthenticationController(LoginService login, RegistrationService registration,
             InvitationService invitations, SecurityContextRepository contexts,
             SessionAuthenticationStrategy sessionAuthentication, HttpSessionCsrfTokenRepository csrfTokens,
-            Clock clock, MemberService memberService) {
+            Clock clock, MemberService memberService,
+            @Value("${spring.session.timeout}") Duration sessionTimeout) {
         this.login = login;
         this.registration = registration;
         this.invitations = invitations;
@@ -56,6 +60,7 @@ public class AuthenticationController {
         this.csrfTokens = csrfTokens;
         this.clock = clock;
         this.memberService = memberService;
+        this.sessionTimeoutSeconds = Math.toIntExact(sessionTimeout.toSeconds());
     }
 
     @PostMapping("/api/v1/auth/login")
@@ -70,6 +75,8 @@ public class AuthenticationController {
         context.setAuthentication(authentication);
         SecurityContextHolder.setContext(context);
         contexts.saveContext(context, request, response);
+        // A pre-login CSRF session may still have the old inactivity limit.
+        request.getSession().setMaxInactiveInterval(sessionTimeoutSeconds);
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
                 .body(ApiResponse.of(memberService.current(member.id()), clock));
     }

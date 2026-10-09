@@ -33,6 +33,7 @@ export default function LoginPage() {
       <Field id="login-id" label="아이디"><input id="login-id" name="username" className={inputClass} autoComplete="username" autoCapitalize="none" spellCheck={false} required maxLength={32} value={loginId} onChange={(event) => setLoginId(event.target.value)} disabled={action.pending} /></Field>
       <Field id="login-password" label="비밀번호"><input id="login-password" name="password" type="password" className={inputClass} autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} disabled={action.pending} /></Field>
       <FormError message={action.error} /><button type="submit" className={`${primaryButton} w-full`} disabled={action.pending}>{action.pending ? "로그인하는 중…" : "로그인"}</button>
+      <p className="text-sm leading-7 text-navy-soft">로그인은 마지막 접속 후 90일 동안 유지돼요. 공용 기기에서는 사용 후 로그아웃해 주세요.</p>
       <p className="text-center text-sm text-navy-soft">처음 오셨나요? <Link href="/join" className="font-semibold text-navy underline underline-offset-4">초대로 가입하기</Link></p>
     </form>}
   </FormCard></AppShell>;
