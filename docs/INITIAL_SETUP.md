@@ -98,4 +98,6 @@ CI는 일반 Linux runner와 임시 DB를 사용하고 운영 secret·DB를 사�
 
 개발 의존성 전체 감사에는 Next lint plugin의 `braces` 미패치 권고가 전파된 high 4개 패키지가 남아 있다. 동일한 권고 한 건이며 런타임 의존성에는 포함되지 않는다. 상세 경로와 대응은 [frontend 안내](../frontend/README.md)에 기록한다.
 
-GitHub CI의 실제 실행 결과는 작업 브랜치 push 후 별도로 기록한다. 이후 초대·인증·회원·팀·곡의 기반을 구현하고 예약·반복 배정·변경·교환·공지·Push를 이어서 구현한다. PR 생성과 main 병합은 사용자 승인을 받은 뒤 진행한다.
+GitHub CI: 앱 코드 커밋 `fef700d`에서 [실행 37892024400](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/37892024400)이 성공했다. Linux runner에서 백엔드 테스트·JAR 빌드는 1분 42초, 프론트 설치·런타임 감사·타입·lint·테스트·build는 44초에 통과했다. 이 결과 기록 이후 변경은 문서뿐이며 앱 코드의 검증 대상은 위 커밋이다.
+
+이후 초대·인증·회원·팀·곡의 기반을 구현하고 예약·반복 배정·변경·교환·공지·Push를 이어서 구현한다. PR 생성과 main 병합은 사용자 승인을 받은 뒤 진행한다.
