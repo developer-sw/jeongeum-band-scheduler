@@ -7,12 +7,16 @@ import java.util.List;
 import kr.jeongeum.scheduler.auth.security.AuthenticationAttemptLimiter;
 import kr.jeongeum.scheduler.auth.service.AuthenticationInputs;
 import kr.jeongeum.scheduler.common.api.ApiException;
+import kr.jeongeum.scheduler.common.api.DirectoryInputs;
+import kr.jeongeum.scheduler.common.concurrency.DirectoryMutationGuard;
+import kr.jeongeum.scheduler.common.security.MemberAccess;
 import kr.jeongeum.scheduler.invitation.api.InvitationResponse;
 import kr.jeongeum.scheduler.invitation.api.IssuedInvitationResponse;
 import kr.jeongeum.scheduler.invitation.domain.Invitation;
 import kr.jeongeum.scheduler.invitation.repository.InvitationRepository;
-import kr.jeongeum.scheduler.member.domain.Member;
-import kr.jeongeum.scheduler.member.repository.MemberRepository;
+import kr.jeongeum.scheduler.roster.domain.RosterEntry;
+import kr.jeongeum.scheduler.roster.repository.RosterRepository;
+import kr.jeongeum.scheduler.roster.service.RosterService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,44 +24,74 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class InvitationService {
     private final InvitationRepository invitations;
-    private final MemberRepository members;
     private final AuthenticationAttemptLimiter limiter;
     private final Clock clock;
     private final Duration defaultExpiry;
+    private final RosterRepository roster;
+    private final DirectoryMutationGuard guard;
+    private final MemberAccess access;
 
-    public InvitationService(InvitationRepository invitations, MemberRepository members,
+    public InvitationService(InvitationRepository invitations,
             AuthenticationAttemptLimiter limiter, Clock clock,
-            @Value("${app.auth.invitation-validity:7d}") Duration defaultExpiry) {
+            @Value("${app.auth.invitation-validity:7d}") Duration defaultExpiry,
+            RosterRepository roster, DirectoryMutationGuard guard, MemberAccess access) {
         this.invitations = invitations;
-        this.members = members;
         this.limiter = limiter;
         this.clock = clock;
         this.defaultExpiry = defaultExpiry;
+        this.roster = roster;
+        this.guard = guard;
+        this.access = access;
     }
 
     @Transactional
     public IssuedInvitationResponse issue(long actorId, String recipientName,
             Instant expiresAt, Long replacesInvitationId) {
-        requireAdministrator(actorId);
-        String name = AuthenticationInputs.name(recipientName);
+        return issue(actorId, recipientName, null, expiresAt, replacesInvitationId);
+    }
+
+    @Transactional
+    public IssuedInvitationResponse issue(long actorId, String recipientName, Long requestedRosterId,
+            Instant expiresAt, Long replacesInvitationId) {
+        guard.lock();
+        access.administratorForMutation(actorId);
+        Instant now = clock.instant();
+        Instant expiry = expiresAt == null ? now.plus(defaultExpiry) : expiresAt;
+        if (!expiry.isAfter(now)) { throw ApiException.invalidInput(); }
+        Long rosterId = requestedRosterId;
         if (replacesInvitationId != null) {
             Invitation previous = invitations.lockById(replacesInvitationId).orElseThrow(() ->
                     new ApiException(404, "RESOURCE_NOT_FOUND", "초대를 찾을 수 없습니다."));
             if (previous.usedAt() != null) { throw alreadyUsed(); }
             if (previous.revokedAt() != null) { throw InvitationTokens.unavailable(); }
-            invitations.revoke(previous.id(), clock.instant());
+            if (previous.rosterEntryId() != null) {
+                if (requestedRosterId != null && !requestedRosterId.equals(previous.rosterEntryId())) {
+                    throw ApiException.invalidInput();
+                }
+                rosterId = previous.rosterEntryId();
+            } else {
+                // A legacy invite has no identity binding. Establish a new one, never match by name.
+                if (requestedRosterId != null) { throw ApiException.invalidInput(); }
+                rosterId = roster.insert(previous.recipientName(), now).id();
+                invitations.bindRoster(previous.id(), rosterId);
+            }
+            invitations.revoke(previous.id(), now);
         }
-        Instant now = clock.instant();
-        Instant expiry = expiresAt == null ? now.plus(defaultExpiry) : expiresAt;
-        if (!expiry.isAfter(now)) { throw ApiException.invalidInput(); }
+        RosterEntry entry = rosterId == null
+                ? roster.insert(AuthenticationInputs.name(recipientName), now)
+                : roster.lockById(rosterId).orElseThrow(DirectoryInputs::notFound);
+        if (entry.userId() != null) { throw RosterService.alreadyLinked(); }
+        if (invitations.pendingForRoster(entry.id())) {
+            throw new ApiException(409, "INVITATION_ALREADY_EXISTS", "이 명단에는 대기 중인 초대가 있습니다. 재발급을 사용해 주세요.");
+        }
         String token = InvitationTokens.create();
-        Invitation invitation = invitations.insert(InvitationTokens.digest(token), name, actorId, now, expiry);
+        Invitation invitation = invitations.insert(InvitationTokens.digest(token), entry.name(), actorId, now, expiry, entry.id());
         return IssuedInvitationResponse.from(invitation, token);
     }
 
     @Transactional
     public InvitationPage list(long actorId, String cursor, int limit) {
-        requireAdministrator(actorId);
+        access.administrator(actorId);
         if (limit < 1 || limit > 100) { throw ApiException.invalidInput(); }
         Long beforeId = null;
         if (cursor != null) {
@@ -76,7 +110,8 @@ public class InvitationService {
 
     @Transactional
     public void revoke(long actorId, long invitationId) {
-        requireAdministrator(actorId);
+        guard.lock();
+        access.administratorForMutation(actorId);
         Invitation invitation = invitations.lockById(invitationId).orElseThrow(() ->
                 new ApiException(404, "RESOURCE_NOT_FOUND", "초대를 찾을 수 없습니다."));
         if (invitation.usedAt() != null) { throw alreadyUsed(); }
@@ -91,13 +126,6 @@ public class InvitationService {
                 .orElseThrow(InvitationTokens::unavailable);
         if (!invitation.available(clock.instant())) { throw InvitationTokens.unavailable(); }
         return invitation.expiresAt();
-    }
-
-    private void requireAdministrator(long actorId) {
-        Member actor = members.lockById(actorId).orElseThrow(() ->
-                new ApiException(401, "AUTHENTICATION_REQUIRED", "로그인이 필요합니다."));
-        if (!actor.active()) { throw new ApiException(403, "INACTIVE_USER", "현재 이용할 수 없는 계정입니다."); }
-        if (!actor.globalAdmin()) { throw new ApiException(403, "FORBIDDEN", "요청을 수행할 권한이 없습니다."); }
     }
 
     private static ApiException alreadyUsed() {

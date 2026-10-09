@@ -2,7 +2,7 @@
 
 기준일: 2026-10-09 (Asia/Seoul)
 
-업무 정책의 기준은 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), [RESERVATION_RULES.md](RESERVATION_RULES.md)다. 이 문서의 업무 테이블·컬럼·상태·잠금은 정책을 구현하는 **기술 설계 권고안**이다. Flyway V1은 Spring Session JDBC, V2는 `users`·`invitation_codes`·최초 관리자 초기화용 `auth_bootstrap_guard`를 생성한다. 팀·예약·알림 테이블은 아직 구현하지 않았다. 현재 인증 스키마·검증은 [AUTHENTICATION.md](AUTHENTICATION.md), 초기 준비는 [INITIAL_SETUP.md](INITIAL_SETUP.md)를 따른다.
+업무 정책의 기준은 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), [RESERVATION_RULES.md](RESERVATION_RULES.md)다. 이 문서의 업무 테이블·컬럼·상태·잠금은 정책을 구현하는 **기술 설계 권고안**이다. Flyway V1은 Spring Session JDBC, V2는 `users`·`invitation_codes`·`auth_bootstrap_guard`다. 이번 V3에서 가입 전 명단·팀·소속·곡과 명단 연결용 초대 FK·잠금·역할 변경 이력을 추가하며 V1/V2는 수정하지 않는다. 예약·알림 테이블은 후속 구현이다. 현재 인증 검증은 [AUTHENTICATION.md](AUTHENTICATION.md), 명단·팀 계약은 [MEMBER_TEAM_MANAGEMENT.md](MEMBER_TEAM_MANAGEMENT.md)를 따른다.
 
 ## 1. 핵심 설계 선택
 
@@ -20,7 +20,9 @@
 ```mermaid
 erDiagram
     users ||--o{ invitation_codes : issues
-    users ||--o{ team_memberships : joins
+    users o|--o| roster_entries : linked_account
+    roster_entries o|--o{ invitation_codes : identifies
+    roster_entries ||--o{ team_memberships : joins
     teams ||--o{ team_memberships : includes
     teams ||--o{ team_songs : has
     users ||--o{ reservations : creates
@@ -49,10 +51,16 @@ erDiagram
         string status
         bigint version
     }
+    roster_entries {
+        bigint id PK
+        string name
+        bigint user_id FK,UK
+        bigint version
+    }
     team_memberships {
         bigint id PK
         bigint team_id FK
-        bigint user_id FK
+        bigint roster_entry_id FK
         string role
         string status
     }
@@ -257,18 +265,21 @@ erDiagram
 - `users`: 로그인 ID, 안전한 비밀번호 hash, 표시 이름, 전역 역할, `ACTIVE/INACTIVE/WITHDRAWN`, 가입·탈퇴 시각, 낙관적 version. `INACTIVE`는 현재 권한 차단을 나타내는 기술 상태다.
 - 이메일 필수 여부는 확정 정책이 아니다. 로그인 ID·표시 이름 사용은 기술 제안이며 실제 회원 자료를 문서나 fixture에 넣지 않는다.
 - `invitation_codes`: 원문 대신 code digest, 관리용 대상 이름, 발급자, 만료 시각, 사용·해지 시각, 사용한 회원, version. 일회 사용을 원자적으로 보장한다. 재발급은 기존 초대 ID를 명시해 해지와 신규 발급을 한 트랜잭션으로 처리한다.
+- V3의 초대 `roster_entry_id`는 명단의 고유 ID를 참조한다. 재발급도 같은 명단 ID를 계승하며 변경할 수 없다. 기존 NULL 초대는 가입·재발급 때 별도 명단 항목을 만들고 이름으로 기존 항목과 합치지 않는다. 같은 명단의 미사용·미해지 초대는 최대 한 건인 unique 제약을 둔다. 가입 후 명단 연결은 계정 생성·초대 소비와 같은 트랜잭션이다.
 - 사용자 ID는 예약 이력의 참조다. 탈퇴로 예약 FK와 creator를 삭제하지 않는다. 개인정보 보관·익명화 범위는 별도 운영 검토 대상이다.
 - Spring Session JDBC 테이블은 라이브러리 인증 저장소이며 이 업무 ERD와 구분해 migration으로 관리한다.
 
-### 5.2 teams / team_memberships / team_songs
+### 5.2 roster_entries / teams / team_memberships / team_songs
 
 - `teams`: 이름, `REGULAR/ADDITIONAL`, `ACTIVE/DISBANDED`, 생성·해체 시각, version.
-- `team_memberships`: 팀, 회원, `MEMBER/LEADER`, `ACTIVE/REMOVED`, 가입·제거 시각. 활성 `(team_id, user_id)` 중복을 금지한다.
+- `roster_entries`: 이름, nullable unique `user_id`, 생성·수정 시각, version. 미가입 명단에 로그인 ID·임시 비밀번호를 만들지 않는다. 기존 계정은 관리자가 명시적으로 한 명단에 연결하며 이미 연결된 계정·명단의 재연결은 거절한다.
+- `team_memberships`: 팀, `roster_entry_id`, `MEMBER/LEADER`, `ACTIVE/REMOVED`, 가입·제거 시각. 활성 `(team_id, roster_entry_id)` 중복을 금지한다. 가입 후 같은 명단 ID를 통해 계정의 소속을 조회하므로 소속·팀장 배정을 다시 복사하지 않는다. 로그인 권한은 연결된 활성 계정에만 적용한다.
 - 팀별 활성 팀장은 최대 한 명이라는 DB 제약을 권고한다. 팀장이 탈퇴하고 후임 지정 전인 상태는 허용하므로 항상 한 명이 있어야 한다는 제약을 만들지 않는다.
-- 회원의 활성 정규조 최대 하나는 사용자 행 잠금 안에서 팀 종류까지 확인한다. 다른 테이블의 `teams.kind`를 partial index 조건에서 직접 조회할 수 없다.
+- 같은 회원이 여러 활성 정규조·추가조에 소속될 수 있다. 회원별 활성 정규조 수를 한 개로 제한하는 제약·서비스 검증은 두지 않는다. 동일 팀의 활성 `(team_id, roster_entry_id)` 중복 금지와 팀별 역할 검증은 유지한다.
 - `team_songs`: 팀, 제목, 선택적 아티스트·메모, 표시 순서, 작성·수정자, version. 전역 음원 카탈로그를 만들지 않고 팀별 목록으로 시작한다.
 - 곡 목록 수정자는 전체 관리자 또는 해당 팀장이다.
 - 멤버십 변경으로 팀 예약을 자동 삭제하지 않는다. 멤버만 제거하는 경우의 유지 방식은 업무 문서에 제안으로 표시한다.
+- `directory_mutation_guard`: 명단·계정 연결·소속·팀장·곡·역할·초대·가입 변경 전에 잡는 singleton 행이다. 잠금 후 현재 실행자 권한을 다시 검사한다. `member_role_audit`는 역할 변경 전후·실행자·시각을 기록한다. 마지막 활성 전체 관리자의 강등은 기술 보호 장치로 거절한다.
 
 ### 5.3 time_blocks / assets / asset_incidents
 

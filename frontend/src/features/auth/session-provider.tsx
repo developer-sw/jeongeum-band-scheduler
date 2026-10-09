@@ -7,6 +7,7 @@ import { getMember } from "./api";
 import { invalidatesSession } from "./access";
 import { memberQueryKey, replaceSessionCache } from "./session-cache";
 import type { Member } from "./types";
+import { directoryScope, pruneDirectoryCache } from "@/features/directory/queries";
 
 interface Session {
   member: Member | null;
@@ -35,9 +36,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     if (invalidatesSession(error)) void replaceSessionCache(client, null);
     else if (error.code === "FORBIDDEN") {
       client.removeQueries({ queryKey: ["admin"] });
+      client.removeQueries({ queryKey: ["directory"] });
       void client.invalidateQueries({ queryKey: memberQueryKey });
     }
   }), [client]);
+
+  const scope = query.data ? directoryScope(query.data) : null;
+  useEffect(() => { void pruneDirectoryCache(client, query.data ?? null); }, [client, scope, query.data]);
 
   return (
     <SessionContext.Provider value={{

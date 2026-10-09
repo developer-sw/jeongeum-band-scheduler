@@ -2,7 +2,7 @@
 
 작성일: 2026-10-09 / 기준 시간대: `Asia/Seoul` / 기본 경로: `/api/v1`
 
-이 문서는 업무 기능의 설계 계약이다. 초기 health·CSRF·세션 기반에 인증·초대 API를 추가한다. 현재 실제 계약·검증은 [AUTHENTICATION](AUTHENTICATION.md)을 따르며 팀·예약 등 나머지 업무 API와 OpenAPI 산출물은 후속 단계다. 초기 연결 검증은 [INITIAL_SETUP](INITIAL_SETUP.md), 사용자 정책은 [PROJECT_CONTEXT](PROJECT_CONTEXT.md)와 [RESERVATION_RULES](RESERVATION_RULES.md), 저장 모델은 [ERD](ERD.md)를 따른다.
+이 문서는 업무 기능의 설계 계약이다. 인증·초대에 가입 전 명단·계정 연결과 회원·팀·팀장·곡 관리를 추가한다. 현재 인증 계약·검증은 [AUTHENTICATION](AUTHENTICATION.md), 이번 단계의 실제 DTO·검증은 [MEMBER_TEAM_MANAGEMENT](MEMBER_TEAM_MANAGEMENT.md)을 따른다. 예약·알림 API와 OpenAPI 산출물은 후속 단계다. 사용자 정책은 [PROJECT_CONTEXT](PROJECT_CONTEXT.md)와 [RESERVATION_RULES](RESERVATION_RULES.md), 저장 모델은 [ERD](ERD.md)를 따른다.
 
 Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 반환한다. CSRF는 `data.headerName=X-CSRF-TOKEN`, `data.token`을 반환한다. 두 응답은 공통 `meta`와 `Cache-Control: no-store`를 사용한다. 초기 보안 계층의 CSRF 누락·위조는 `403 CSRF_INVALID`, 미인증 보호 API 접근은 `401 AUTHENTICATION_REQUIRED`다.
 
@@ -32,7 +32,7 @@ Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 �
 }
 ```
 
-목록 응답은 `data.items`, `meta.nextCursor`를 사용한다. 오류 계약은 다음을 제안한다.
+기존 초대 목록은 `data.items`, `meta.nextCursor`를 사용한다. 이번 명단·회원·팀·곡 목록은 약 45명 규모에 맞춰 `data` 배열 전체를 반환하며 임의 개수로 자르지 않는다. 다른 후속 목록은 cursor 계약을 제안한다. version·곡 순서·숫자 ID에 소수가 전달되면 정수로 변환하지 않고 `400 INVALID_INPUT`으로 거절한다. 오류 계약은 다음을 제안한다.
 
 ```json
 {
@@ -63,6 +63,9 @@ Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 �
 | 409 | DATE_NOT_OPEN, IDEMPOTENCY_KEY_REUSED, LOGIN_ID_TAKEN, INVITATION_ALREADY_USED | 현재 예약 범위 밖, 재시도 키 오용, 로그인 ID 중복, 사용한 초대 해지·재발급 거부 |
 | 410 | INVITATION_UNAVAILABLE | 사용·해지·만료된 초대 |
 | 429 | TOO_MANY_REQUESTS | 인증·초대 등 보안 목적 요청 제한 |
+| 409 | ROSTER_ALREADY_LINKED, ACCOUNT_ALREADY_LINKED | 명단 또는 계정이 이미 연결됨 |
+| 409 | MEMBERSHIP_ALREADY_EXISTS, INVITATION_ALREADY_EXISTS | 같은 팀의 활성 소속 또는 같은 명단의 미해지 초대 중복 |
+| 409 | LAST_GLOBAL_ADMIN | 마지막 활성 전체 관리자 강등 거절 |
 
 보안 목적 요청 제한은 하루 예약 한도를 새로 추가하는 정책이 아니다.
 
@@ -76,11 +79,13 @@ Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 �
 | GET /auth/me | 활성 회원 | 본인 프로필·전역 역할·활성 팀 소속·팀장 정보 |
 | POST /auth/invitations/inspect | 공개 + CSRF | 본문의 초대 token 유효성 확인, 다른 회원 정보 제외 |
 | POST /auth/register | 공개 + CSRF | 초대 token·로그인 ID·비밀번호·표시 이름, 사용 처리와 회원 생성 원자화 |
-| POST /invitations | 전체 관리자 | 개인 초대 생성, 만료 시각과 관리용 대상 이름 기록 |
+| POST /invitations | 전체 관리자 | 명단 고유 ID에 개인 초대 연결, 만료 시각·관리용 이름 기록 |
 | GET /invitations | 전체 관리자 | 사용·만료·해지 상태, 원문 token을 다시 노출하지 않음 |
 | DELETE /invitations/{id} | 전체 관리자 | 아직 사용하지 않은 초대 해지 |
 
 가입 입력은 기술 제안이다. 승인된 인증 기능 구현에서는 loginId·password·displayName을 사용한다. 초대·입력 설정과 실제 검증 결과는 [AUTHENTICATION](AUTHENTICATION.md)에 기록한다. 필수 이메일, SMTP, SNS 로그인, 별도 가입 승인 단계는 확정 범위에 임의로 추가하지 않는다. 초대 원문은 발급 때 한 번만 전달하고 서버에는 hash를 저장한다. token을 URL query나 접근 로그에 남기지 않는 본문 전달을 사용한다.
+
+이번 명단 연결 확장에서 초대 요청은 `rosterEntryId`를 사용한다. 이름만 받는 기존 요청은 새 명단을 한 항목 생성하는 호환 경로이며 기존 명단의 이름으로 검색·합치지 않는다. 재발급은 기존 초대의 명단 ID를 유지하고 다른 명단으로 변경하는 요청을 거절한다. 이미 계정이 연결된 명단에는 가입용 초대를 만들 수 없다. 공개 초대 확인은 만료 시각만 반환하며 명단 이름·팀 소속·역할은 노출하지 않는다.
 
 재발급은 생성 요청의 선택적 `replacesInvitationId`로 기존 미사용 초대를 지정해 해지와 새 발급을 원자화한다. 대상 이름 일치만으로 다른 초대를 해지하지 않는다. 회원·초대 ID는 문자열로 전달한다. 가입은 `201` 회원 응답이며 자동 로그인하지 않는다. `GET /auth/me`의 `teamMemberships`는 팀 기능 구현 전에는 빈 목록이다. 공개 초대 확인은 본문의 `token`만 받고 유효한 초대의 `expiresAt`만 반환한다.
 
@@ -90,23 +95,29 @@ Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 �
 
 | Method / 경로 | 권한 | 계약 |
 |---|---|---|
+| GET /roster | 전체 관리자 | 가입 전·연결된 명단 목록, 연결 계정 정보 |
+| POST /roster | 전체 관리자 | 이름으로 새 명단 생성; 이름 중복으로 기존 사람을 자동 판정하지 않음 |
+| PATCH /roster/{id} | 전체 관리자 | 명단 이름 변경, version 검사 |
+| POST /roster/{id}/link-account | 전체 관리자 | 기존 활성 계정 명시적 연결, 양쪽 일대일 제약, 남은 초대 해지 |
 | GET /users | 전체 관리자 | 운영 회원 목록 |
-| PATCH /users/{id}/role | 전체 관리자 | 전역 역할 변경, 현재 권한 검사와 감사 기록 |
+| PATCH /users/{id}/role | 전체 관리자 | 전역 역할 변경·version·감사 기록, 마지막 활성 관리자 강등 거절 |
 | POST /users/{id}/withdraw | 전체 관리자 | 탈퇴 처리, 미래·진행 중 개인 예약만 취소, 팀 예약 유지 |
 | GET /teams | 활성 회원 | 팀 목록, 공개 필드는 최소화하는 제안 |
 | POST /teams | 전체 관리자 | REGULAR/ADDITIONAL 팀 생성 |
 | GET /teams/{id} | 활성 회원 | 팀 정보·곡 목록·권한별 명단 필드 |
 | PATCH /teams/{id} | 전체 관리자 | 팀 이름 등 기본 정보 변경; 기존 팀 종류 전환은 범위 밖 |
-| POST /teams/{id}/members | 전체 관리자 | 활성 회원 추가, 정규조 한 개 제약 |
-| DELETE /teams/{id}/members/{userId} | 전체 관리자 | 팀원 제거, 존속 팀 예약 유지 제안 |
-| PUT /teams/{id}/leader | 전체 관리자 | 활성 팀원 중 팀장 지정, 자동 전역 권한 부여 금지 |
+| POST /teams/{id}/members | 전체 관리자 | `rosterEntryId`로 가입 전·가입 후 명단 추가, 복수 소속 허용, 같은 팀의 활성 소속 중복 거절 |
+| DELETE /teams/{id}/members/{rosterEntryId} | 전체 관리자 | 명단의 소속 제거, 팀장 제거 시 후임 자동 지정 없음 |
+| PUT /teams/{id}/leader | 전체 관리자 | 활성 소속 명단 중 팀장 지정, null로 지정 해제, 자동 전역 권한 부여 금지 |
 | POST /teams/{id}/disband | 전체 관리자 | 팀 해체, 남은 팀 예약·반복 배정·관련 교환과 예정 알림 종료 |
 | GET /teams/{id}/songs | 활성 회원 | 팀별 곡 목록; 비소속 회원 조회 범위는 기술 제안 |
 | POST /teams/{id}/songs | 전체 관리자 또는 해당 팀장 | 곡명 필수, 아티스트 선택, 표시 순서 |
 | PATCH /teams/{id}/songs/{songId} | 전체 관리자 또는 해당 팀장 | 곡 내용·표시 순서 변경 |
-| DELETE /teams/{id}/songs/{songId} | 전체 관리자 또는 해당 팀장 | 해당 팀의 곡 항목 삭제 |
+| DELETE /teams/{id}/songs/{songId}?version=N | 전체 관리자 또는 해당 팀장 | 해당 팀의 곡 항목 삭제, version 검사 |
 
-명단 변경은 사용자·팀 잠금 규약을 따른다. 팀장 지정은 자기 팀 곡·예약 권한을 부여하며 다른 팀 관리 권한을 부여하지 않는다. 삭제 대상 곡이 요청 경로의 팀에 속하는지도 검증한다.
+명단·소속·곡·역할·초대·가입 변경은 `directory_mutation_guard`를 먼저 잠그고 현재 실행자 권한·대상 명단·팀을 다시 검사한다. 팀장 지정은 연결된 활성 계정에 자기 팀 권한만 부여한다. 삭제 대상 곡이 요청 경로의 팀에 속하는지도 검증한다. 팀 상세 명단은 전체 관리자 또는 해당 팀의 활성 계정만 조회하며 다른 회원에게는 `members=[]`, `canViewMembers=false`를 반환하는 읽기 기술안을 적용한다.
+
+이번 단계의 명단·회원·팀·곡 GET 목록은 약 45명 규모에 맞춰 `ApiResponse`의 `data` 배열로 반환하고 임의 개수로 잘라 누락하지 않는다. 기존 초대 목록만 cursor 계약을 유지한다. 탈퇴·팀 해체 API는 예약·교환·알림 정리까지 필요한 후속 구현이며 이번 단계에 제공하지 않는다.
 
 탈퇴 후에도 과거 예약의 주체·최초 예약자 이력을 보존한다. 탈퇴자가 만들었던 존속 팀 예약을 함께 취소하거나 새 예약자로 덮어쓰지 않는다. 본인 서비스 탈퇴 버튼은 확정된 관리 범위에 임의로 추가하지 않는다.
 

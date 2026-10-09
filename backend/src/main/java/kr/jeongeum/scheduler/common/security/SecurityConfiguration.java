@@ -42,6 +42,9 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.GET, "/api/v1/auth/me").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/logout").authenticated()
                         .requestMatchers("/api/v1/invitations", "/api/v1/invitations/**").hasRole("GLOBAL_ADMIN")
+                        .requestMatchers("/api/v1/roster", "/api/v1/roster/**", "/api/v1/users", "/api/v1/users/**")
+                                .hasRole("GLOBAL_ADMIN")
+                        .requestMatchers("/api/v1/teams", "/api/v1/teams/**").authenticated()
                         .anyRequest().denyAll())
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfTokens)

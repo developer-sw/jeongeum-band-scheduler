@@ -1,0 +1,106 @@
+# 명단·회원·팀·팀장·곡 관리
+
+기준일: 2026-10-09 / 최종 로컬 검증: 2026-10-10, Asia/Seoul. 사용자가 가입 전 명단과 가입 계정을 연결하는 구조를 포함한 이번 구현을 승인했다. 기존 `codex/multiple-regular-team-memberships`의 문서 정정을 보존해 `codex/team-management`에서 작업한다. 중단 후 남은 소스를 이어서 검증했고, 커밋·Push·PR·main 병합은 별도 승인 범위다.
+
+## 범위와 데이터 연결
+
+전체 관리자가 가입 전 명단을 만들고 여러 정규조·추가조와 팀장 역할을 배정한다. 명단 고유 ID에 개인 초대를 연결하고, 가입 시 계정 생성·명단 연결·초대 소비를 한 트랜잭션으로 처리한다. 이름이나 로그인 ID 문자열의 유사도로 같은 사람을 판단하지 않는다.
+
+명단은 로그인 계정과 분리한다. 미가입 명단에 임시 비밀번호 계정을 만들지 않는다. 명단 한 항목은 계정 최대 하나와 연결되고 계정도 명단 최대 하나와 연결된다. 기존 가입 계정은 관리자가 해당 계정 ID를 선택해 명시적으로 연결한다. 연결 시 그 명단의 남은 가입 초대를 해지한다. 잘못된 연결을 다른 계정으로 덮어쓰거나 자동으로 합치는 기능은 제공하지 않는다.
+
+팀 소속은 명단 ID를 참조한다. 가입·연결 때 소속 행을 복사하지 않고 같은 명단을 통해 계정의 현재 소속을 조회한다. 가입 전 팀장 배정은 로그인 권한을 만들지 않는다. 연결된 활성 계정만 해당 팀의 팀장 권한을 가지며 다른 소속 팀으로 확장하지 않는다. 공개 가입은 항상 일반 회원을 생성한다. 전체 관리자 역할 변경은 관리자 작업이다.
+
+이번 구현은 명단 생성·이름 수정·계정 연결, 회원 조회·전체 관리자 역할 관리, 팀 생성·이름 수정·소속 추가/제거·팀장 지정/해제, 팀별 곡 CRUD를 포함한다. 탈퇴·팀 해체는 예약·교환·알림 정리가 필요한 후속 단계다. CSV 가져오기, 음원 검색, 실제 명단 수집·적재, 운영 배포는 이번 구현에 추가하지 않는다.
+
+## API와 응답
+
+기본 경로는 `/api/v1`이다. 아래 목록은 `ApiResponse`의 `data` 배열을 반환하며 임의 개수로 잘라 누락하지 않는다. 기존 초대 목록의 cursor 계약은 유지한다. ID는 JSON 문자열, version은 0 이상의 정수다. version·곡 순서·숫자 ID에 JSON 소수가 들어오면 정수로 자르지 않고 거절한다. 쓰기에는 CSRF·현재 권한 검증을 적용하고 응답은 `no-store`다.
+
+| 경로 | 입력·응답 |
+|---|---|
+| GET /roster | 전체 관리자에게 명단 배열 |
+| POST /roster | `{name}` → 201 명단 |
+| PATCH /roster/{id} | `{name,version}` → 명단 |
+| POST /roster/{id}/link-account | `{userId,version}` → 연결된 명단 |
+| GET /users | 전체 관리자에게 회원 배열 |
+| PATCH /users/{id}/role | `{globalRole,version}` → 회원 |
+| GET /teams | 활성 회원에게 팀 배열 |
+| POST /teams | `{name,kind}` → 201 팀 |
+| PATCH /teams/{id} | `{name,version}` → 팀 |
+| GET /teams/{id} | 팀 상세·조회 가능 명단·곡·서버 계산 권한 |
+| POST /teams/{id}/members | `{rosterEntryId}` → 201 팀 상세 |
+| DELETE /teams/{id}/members/{rosterEntryId} | 204, 팀장 제거 후 후임 자동 지정 없음 |
+| PUT /teams/{id}/leader | `{rosterEntryId}` → 팀 상세; null은 지정 해제 |
+| GET /teams/{id}/songs | 활성 회원에게 곡 배열 |
+| POST /teams/{id}/songs | `{title,artist?,memo?,sortOrder?}` → 201 곡 |
+| PATCH /teams/{id}/songs/{songId} | `{title,artist?,memo?,sortOrder,version}` → 곡 |
+| DELETE /teams/{id}/songs/{songId}?version=N | 204 |
+
+명단·소속·팀장·팀 이름·역할 변경은 전체 관리자만 가능하다. 곡 변경은 전체 관리자 또는 해당 팀의 현재 팀장만 가능하다. 다른 팀 경로로 곡 ID를 바꿔도 처리하지 않는다. 팀 종류 변경은 제공하지 않는다.
+
+주요 응답 필드는 다음과 같다.
+
+```text
+RosterEntry: id, name, userId?, loginId?, displayName?, accountStatus?, version
+AdminMember: id, loginId, displayName, globalRole, status, rosterEntryId?, version
+Team: id, name, kind, status, version
+TeamMember: rosterEntryId, name, userId?, role
+Song: id, teamId, title, artist?, memo?, sortOrder, version
+TeamDetail: team, members, songs, canViewMembers, canManageTeam, canManageSongs
+CurrentMember.teamMemberships[]: teamId, teamName, kind, role
+```
+
+팀 상세 명단은 전체 관리자·현재 소속 활성 계정에게만 제공하는 읽기 기술안을 사용한다. 다른 활성 회원에게는 팀 기본 정보·곡만 제공하고 `members=[]`, `canViewMembers=false`다. 사전 명단·전체 회원의 로그인 식별자는 일반 회원에게 제공하지 않는다.
+
+## 초대 확장과 호환
+
+새 초대 발급 화면은 미가입 명단을 선택한다. 요청은 `rosterEntryId`를 사용하고 응답에는 그 ID와 가입 계정 `usedBy`를 포함한다. 관리용 `recipientName`은 유지한다. 공개 초대 확인 응답은 만료 시각만 반환한다.
+
+기존 이름만 받는 발급 API는 새 명단을 생성하는 호환 경로로 유지한다. 이름으로 기존 항목을 찾거나 합치지 않는다. 기존 NULL 명단 초대는 가입·재발급 때 새 명단에 연결한다. 재발급은 이전 명단 ID를 유지하며 다른 ID로 변경하는 요청은 거절한다. 계정이 연결된 명단에는 새 가입 초대를 만들지 않는다. 미사용·미해지 초대는 명단당 최대 한 건이며 만료된 경우에도 재발급으로 이전 코드를 명시해 교체한다. 해지·만료·재발급으로 명단이나 배정 소속을 삭제하지 않는다.
+
+## 저장·잠금과 기술 설정
+
+V1/V2는 변경하지 않고 V3에 `roster_entries`, `teams`, `team_memberships`, `team_songs`, `directory_mutation_guard`, `member_role_audit`와 초대의 명단 FK를 추가한다. 기존 계정을 이름으로 명단에 일괄 연결하는 backfill은 하지 않는다.
+
+명단·역할·팀·소속·곡·초대·가입 변경은 singleton `directory_mutation_guard`를 먼저 잠근다. 잠금 후 현재 실행자와 대상 상태·권한을 재검증한다. BCrypt 계산은 guard를 잡기 전에 수행한다. 약 45명의 단일 앱에 맞춘 단순한 기술 선택이며 향후 예약 쓰기도 권한 변경과 공통 잠금 순서를 맞춘다. 읽기 화면의 버튼은 권한 보장이 아니다.
+
+DB는 명단↔계정 일대일, 같은 팀의 활성 소속 중복 금지, 팀별 활성 팀장 최대 한 명, 명단별 미해지 초대 최대 한 건을 보장한다. 실패하면 계정 생성·연결·초대 소비를 함께 롤백한다. 전체 관리자 역할 변경에는 이전·새 역할·실행자·시각을 기록하고 마지막 활성 전체 관리자 강등은 기술 보호 장치로 거절한다.
+
+이름은 기존 인증 설정처럼 1~40자, 팀 이름은 1~80자, 곡 제목은 1~120자다. 아티스트는 선택 120자, 메모는 선택 1,000자, 곡 표시 순서는 0 이상이다. 동일 순서는 ID로 정렬하고 생성 시 생략하면 마지막에 추가한다. 이것은 입력·표현 기술 설정이며 새 운영 한도를 확정한 것이 아니다.
+
+version 불일치는 `409 VERSION_CONFLICT`다. 중복 소속은 `MEMBERSHIP_ALREADY_EXISTS`, 이미 연결된 명단·계정은 `ROSTER_ALREADY_LINKED`·`ACCOUNT_ALREADY_LINKED`, 미해지 초대 중복은 `INVITATION_ALREADY_EXISTS`, 마지막 관리자 강등은 `LAST_GLOBAL_ADMIN`이다. 오류에 token·비밀번호·hash를 넣지 않는다.
+
+## 화면과 검증 상태
+
+`/admin/members`는 명단과 계정을 구분하고 연결·역할 변경 전에 대상을 확인한다. `/admin/invitations`는 명단을 선택해 개인 초대를 발급한다. `/teams`와 `/teams/[id]`는 내 소속·팀별 명단·팀장·곡과 권한에 맞는 동작을 제공한다. API client·Query 계층을 공유하며 오프라인 변경을 자동 실행하지 않는다.
+
+사용자가 직접 수정한 하단 문구 `JEONGEUM · SENTIMENTAL MUSIC`을 보존했다. 기존 기능을 새로 작성하지 않고 중단 당시의 backend·frontend·테스트 변경을 이어서 마무리했다.
+
+### 2026-10-10 실행 결과
+
+| 검증 | 결과 |
+|---|---|
+| Backend `test bootJar --rerun-tasks` | 41건, 실패·오류·건너뜀 0, 빌드 성공 |
+| 기존 인증·환경 테스트 | 19건 유지·통과 |
+| 신규 `DirectoryIntegrationTest` | 22건, 실제 PostgreSQL·HTTP·경합 검증 통과 |
+| Frontend 타입 생성·검사 | 통과 |
+| ESLint | 오류·경고 0 |
+| Vitest | 29건 통과 |
+| Next production build | 성공, `/admin/members`·`/teams`·`/teams/[id]` 포함 |
+| 런타임 `npm audit --omit=dev` | 취약점 0 |
+| 개발 의존성을 포함한 전체 `npm audit` | 기존 lint 도구 체인의 high 4건 유지; 런타임에는 포함되지 않음 |
+| `git diff --check` | 통과 |
+| Git 후보 민감정보 검사 | 실제 DB 비밀번호 일치 0, 환경·비밀키·덤프·빌드 경로 0, 고신뢰 키 패턴 0 |
+| V1/V2 | 변경 없음 |
+
+신규 통합 테스트는 이름이 다른 가입 계정과 명단의 연결, 여러 정규조·추가조와 가입 전 팀장 배정, 수동 연결과 초대 소비의 경합, 재발급 ID 계승·중복 초대 제한, 현재 팀장·소속·전체 관리자 역할 재검증, 마지막 관리자 보호·감사 이력, 곡 버전·교차 팀 경로·DB 제약을 확인한다. 별도 임시 스키마의 V2에 합성 계정·사용/해지/만료 초대·세션을 넣고 V3로 올려 값 보존과 자동 이름 backfill이 없음을 확인했다. 소수 버전·곡 순서·ID 거절 뒤 원래 데이터가 유지되는 회귀 검증도 포함한다.
+
+재개 과정에서 프론트 테스트 fixture의 필수 nullable 필드 누락과 제어문자 정규식 lint 오류를 수정했다. HTML `maxLength`의 UTF-16 길이와 서버의 코드포인트 길이가 달라지는 문제는 새 폼의 코드포인트 검증으로 맞췄다. 초대 목록에 명단·초대·가입 계정 번호를 표시해 동명이인을 구분한다. Jackson의 소수→정수 기본 변환은 꺼서 음수 소수 버전이 0으로 처리되지 않게 했다.
+
+### 실제 화면과 데이터 보존
+
+개발 DB와 분리된 localhost 임시 PostgreSQL에 합성 데이터만 사용했다. 브라우저에서 명단 등록·복수 팀 배정·가입 전 팀장 지정·관리자 곡 등록, 기존 계정의 명시적 연결과 초대 자동 해지, 재발급의 명단 ID 유지, 마지막 관리자 강등 거절을 확인했다. 명단과 다른 표시 이름으로 가입한 회원에게 정규조 두 개와 추가조 한 개의 소속이 연결됐으며, 팀장인 팀에서만 곡 등록·수정·삭제가 가능했다. 다른 소속 팀의 곡은 읽기만 가능하고 미소속 팀의 명단과 전체 회원 관리 화면은 제한됐다. 최종 빌드의 로그인·로그아웃과 390px 모바일 팀장 화면의 가로 넘침 없음도 확인했다.
+
+화면 검증 중 테스트가 동일 JAR를 다시 빌드해 실행 서버의 응답이 지연됐다. 검증용 JAR를 별도로 복사해 다시 시작했고 최종 빌드에서 흐름을 확인했다. 임시 컨테이너와 검증용 탭은 종료하고 뷰포트 설정을 복원했다. 임시 서버 로그에 DB 비밀번호·합성 관리자 비밀번호가 없음을 검사했다. 화면 증거는 Git에서 제외된 `.local/team-ui-linked-member.jpg`, `.local/team-ui-mobile-leader.jpg`에 보존한다.
+
+기존 개발 PostgreSQL은 V1 상태와 `jeongeum-dev_postgres_data` 볼륨을 유지했다. 실제 명단·운영 계정을 넣거나 개발 DB에 V2/V3를 적용하지 않았다. 로컬 검증 보고 시점에는 커밋·Push·PR과 이번 변경의 원격 CI를 실행하지 않았다. 이후 사용자가 커밋·Push·main 대상 PR 생성을 승인했다. 원격 CI 결과는 생성한 PR에서 확인하며 main 병합은 별도 승인 범위다. 실제 명단 입력, 개발/운영 DB 적용과 관리자 초기화, 실기기 확인은 이후 작업이다. 탈퇴·팀 해체의 예약 정리, 예약·공지·Push·배포는 이번 단계 완료 범위에 포함하지 않는다. 현재 변경 범위의 검증을 막는 미해결 결함은 없다.

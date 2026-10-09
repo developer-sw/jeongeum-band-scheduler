@@ -4,7 +4,14 @@ export interface Member {
   displayName: string;
   globalRole: "MEMBER" | "GLOBAL_ADMIN";
   status: "ACTIVE";
-  teamMemberships: unknown[];
+  teamMemberships: TeamMembership[];
+}
+
+export interface TeamMembership {
+  teamId: string;
+  teamName: string;
+  kind: "REGULAR" | "ADDITIONAL";
+  role: "MEMBER" | "LEADER";
 }
 
 export interface LoginInput { loginId: string; password: string }
@@ -12,6 +19,8 @@ export interface RegisterInput extends LoginInput { invitationToken: string; dis
 
 export interface Invitation {
   id: string;
+  rosterEntryId: string | null;
+  usedBy: string | null;
   recipientName: string;
   status: "AVAILABLE" | "USED" | "EXPIRED" | "REVOKED";
   createdAt: string;
@@ -22,6 +31,8 @@ export interface Invitation {
 
 export interface IssuedInvitation {
   id: string;
+  rosterEntryId: string | null;
+  usedBy: string | null;
   recipientName: string;
   status: "AVAILABLE";
   expiresAt: string;
@@ -30,7 +41,8 @@ export interface IssuedInvitation {
 }
 
 export interface InvitationInput {
-  recipientName: string;
+  rosterEntryId?: string;
+  recipientName?: string;
   expiresAt?: string;
   replacesInvitationId?: string;
 }

@@ -1,6 +1,9 @@
 spring:
   application:
     name: jeongeum-band-scheduler
+  jackson:
+    deserialization:
+      accept-float-as-int: false
   datasource:
     url: ${APP_DB_URL}
     username: ${APP_DB_USERNAME}

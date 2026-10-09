@@ -9,12 +9,11 @@ import kr.jeongeum.scheduler.auth.api.AuthRequests;
 import kr.jeongeum.scheduler.auth.security.MemberPrincipal;
 import kr.jeongeum.scheduler.auth.service.LoginService;
 import kr.jeongeum.scheduler.auth.service.RegistrationService;
-import kr.jeongeum.scheduler.common.api.ApiException;
 import kr.jeongeum.scheduler.common.api.ApiResponse;
 import kr.jeongeum.scheduler.invitation.service.InvitationService;
 import kr.jeongeum.scheduler.member.api.MemberResponse;
 import kr.jeongeum.scheduler.member.domain.Member;
-import kr.jeongeum.scheduler.member.repository.MemberRepository;
+import kr.jeongeum.scheduler.member.service.MemberService;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
@@ -39,24 +38,24 @@ public class AuthenticationController {
     private final LoginService login;
     private final RegistrationService registration;
     private final InvitationService invitations;
-    private final MemberRepository members;
     private final SecurityContextRepository contexts;
     private final SessionAuthenticationStrategy sessionAuthentication;
     private final HttpSessionCsrfTokenRepository csrfTokens;
     private final Clock clock;
+    private final MemberService memberService;
 
     public AuthenticationController(LoginService login, RegistrationService registration,
-            InvitationService invitations, MemberRepository members, SecurityContextRepository contexts,
+            InvitationService invitations, SecurityContextRepository contexts,
             SessionAuthenticationStrategy sessionAuthentication, HttpSessionCsrfTokenRepository csrfTokens,
-            Clock clock) {
+            Clock clock, MemberService memberService) {
         this.login = login;
         this.registration = registration;
         this.invitations = invitations;
-        this.members = members;
         this.contexts = contexts;
         this.sessionAuthentication = sessionAuthentication;
         this.csrfTokens = csrfTokens;
         this.clock = clock;
+        this.memberService = memberService;
     }
 
     @PostMapping("/api/v1/auth/login")
@@ -72,7 +71,7 @@ public class AuthenticationController {
         SecurityContextHolder.setContext(context);
         contexts.saveContext(context, request, response);
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .body(ApiResponse.of(MemberResponse.from(member), clock));
+                .body(ApiResponse.of(memberService.current(member.id()), clock));
     }
 
     @PostMapping("/api/v1/auth/register")
@@ -84,11 +83,8 @@ public class AuthenticationController {
 
     @GetMapping("/api/v1/auth/me")
     public ResponseEntity<ApiResponse<MemberResponse>> me(@AuthenticationPrincipal MemberPrincipal principal) {
-        Member member = members.findById(principal.memberId()).orElseThrow(() ->
-                new ApiException(401, "AUTHENTICATION_REQUIRED", "로그인이 필요합니다."));
-        if (!member.active()) { throw new ApiException(403, "INACTIVE_USER", "현재 이용할 수 없는 계정입니다."); }
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .body(ApiResponse.of(MemberResponse.from(member), clock));
+                .body(ApiResponse.of(memberService.current(principal.memberId()), clock));
     }
 
     @PostMapping("/api/v1/auth/logout")

@@ -6,7 +6,7 @@
 
 ## 구현 계약과 기술 설정
 
-회원 ID는 bigint를 JSON 문자열로 전달한다. 응답의 `teamMemberships`는 팀 관리 기능이 아직 없으므로 빈 목록이다. 팀장 권한을 전역 역할로 저장하지 않는다.
+회원 ID는 bigint를 JSON 문자열로 전달한다. 인증 PR #3에서는 팀 관리 전이므로 `teamMemberships`를 빈 목록으로 반환했다. 이후 [회원·팀 관리 단계](MEMBER_TEAM_MANAGEMENT.md)에서는 연결된 명단의 현재 활성 소속을 `teamId/teamName/kind/role` 목록으로 반환하고 초대에 명단 ID를 연결한다. 팀장 권한을 전역 역할로 저장하지 않는다.
 
 | 요청 | 결과 |
 |---|---|
