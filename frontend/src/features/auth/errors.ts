@@ -10,6 +10,13 @@ const messages: Record<string, string> = {
   LOGIN_ID_TAKEN: "이미 사용 중인 아이디예요. 다른 아이디로 다시 시도해 주세요.",
   TOO_MANY_REQUESTS: "요청이 많아요. 잠시 기다린 뒤 다시 시도해 주세요.",
   INVALID_INPUT: "입력 내용을 확인해 주세요.",
+  RESOURCE_NOT_FOUND: "대상을 찾을 수 없어요. 목록을 새로 불러와 확인해 주세요.",
+  VERSION_CONFLICT: "다른 관리자가 먼저 수정했어요. 목록을 새로 불러온 뒤 내용을 확인하고 다시 시도해 주세요.",
+  MEMBERSHIP_ALREADY_EXISTS: "이미 이 팀에 등록된 사람이에요.",
+  ROSTER_ALREADY_LINKED: "이미 계정이 연결된 명단이에요. 목록을 새로 확인해 주세요.",
+  ACCOUNT_ALREADY_LINKED: "이미 다른 명단에 연결된 계정이에요.",
+  INVITATION_ALREADY_EXISTS: "이 명단에는 발급된 초대가 있어요. 기존 초대를 재발급해 주세요.",
+  LAST_GLOBAL_ADMIN: "마지막 활성 전체 관리자의 권한은 해제할 수 없어요.",
   CSRF_INVALID: "요청을 확인하지 못했어요. 다시 한 번 시도해 주세요.",
   OFFLINE: "오프라인에서는 요청할 수 없어요. 연결을 확인한 뒤 직접 다시 시도해 주세요.",
 };

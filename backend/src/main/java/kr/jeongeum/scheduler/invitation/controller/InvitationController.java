@@ -8,6 +8,7 @@ import java.util.List;
 import kr.jeongeum.scheduler.auth.security.MemberPrincipal;
 import kr.jeongeum.scheduler.common.api.ApiException;
 import kr.jeongeum.scheduler.common.api.ApiResponse;
+import kr.jeongeum.scheduler.common.api.DirectoryInputs;
 import kr.jeongeum.scheduler.invitation.api.InvitationResponse;
 import kr.jeongeum.scheduler.invitation.api.IssuedInvitationResponse;
 import kr.jeongeum.scheduler.invitation.service.InvitationService;
@@ -38,7 +39,7 @@ public class InvitationController {
     public ResponseEntity<ApiResponse<IssuedInvitationResponse>> issue(
             @AuthenticationPrincipal MemberPrincipal principal, @RequestBody Issue input) {
         return ResponseEntity.status(201).cacheControl(CacheControl.noStore()).body(ApiResponse.of(
-                invitations.issue(principal.memberId(), input.recipientName(), input.expiresAt(),
+                invitations.issue(principal.memberId(), input.recipientName(), DirectoryInputs.optionalId(input.rosterEntryId()), input.expiresAt(),
                         parseId(input.replacesInvitationId())), clock));
     }
 
@@ -68,7 +69,7 @@ public class InvitationController {
         } catch (NumberFormatException exception) { throw ApiException.invalidInput(); }
     }
 
-    public record Issue(String recipientName, Instant expiresAt, String replacesInvitationId) {}
+    public record Issue(String recipientName, String rosterEntryId, Instant expiresAt, String replacesInvitationId) {}
     public record PageResponse(PageData data, PageMeta meta) {}
     public record PageData(List<InvitationResponse> items) {}
     public record PageMeta(OffsetDateTime serverTime, String timeZone, String nextCursor) {}

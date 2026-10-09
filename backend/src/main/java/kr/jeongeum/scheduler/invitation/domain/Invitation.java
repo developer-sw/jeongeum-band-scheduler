@@ -3,7 +3,8 @@ package kr.jeongeum.scheduler.invitation.domain;
 import java.time.Instant;
 
 public record Invitation(long id, String digest, String recipientName, long issuedBy,
-        Instant createdAt, Instant expiresAt, Instant usedAt, Long usedBy, Instant revokedAt, long version) {
+        Instant createdAt, Instant expiresAt, Instant usedAt, Long usedBy, Instant revokedAt, long version,
+        Long rosterEntryId) {
     public boolean available(Instant now) {
         return usedAt == null && revokedAt == null && now.isBefore(expiresAt);
     }

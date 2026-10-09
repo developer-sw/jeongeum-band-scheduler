@@ -21,13 +21,13 @@ describe("administrator invitation route", () => {
   it("does not render invitation management fields for anonymous, ordinary, or inactive accounts", () => {
     const anonymous = render(null); const ordinary = render(member);
     const inactive = render({ ...member, globalRole: "GLOBAL_ADMIN", status: "INACTIVE" } as unknown as Member);
-    for (const markup of [anonymous, ordinary, inactive]) expect(markup).not.toContain('id="recipient-name"');
+    for (const markup of [anonymous, ordinary, inactive]) expect(markup).not.toContain('id="invitation-roster"');
     expect(anonymous).toContain("로그인이 필요해요");
     expect(ordinary).toContain("관리자만 이용할 수 있어요");
     expect(inactive).toContain("로그인이 필요해요");
   });
 
   it("renders the actual invitation form only for an active global administrator", () => {
-    expect(render({ ...member, globalRole: "GLOBAL_ADMIN" })).toContain('id="recipient-name"');
+    expect(render({ ...member, globalRole: "GLOBAL_ADMIN" })).toContain('id="invitation-roster"');
   });
 });

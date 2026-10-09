@@ -25,6 +25,6 @@ export function SessionGate({ children, admin = false }: { children: React.React
   if (session.loading) return <p role="status" className="py-12 text-center text-navy-soft">회원 정보를 확인하고 있어요.</p>;
   if (session.error && !session.member) return <div className="rounded-3xl bg-paper p-8"><h1 className="text-xl font-bold">연결을 확인해 주세요</h1><p className="my-4 text-sm leading-7">회원 정보를 불러오지 못했어요.</p><button type="button" className={secondaryButton} onClick={() => void session.refresh()}>다시 확인</button></div>;
   const access = memberAccess(session.member, admin);
-  if (access !== "ALLOWED") return <div className="rounded-3xl bg-paper p-8"><h1 className="text-xl font-bold">{access === "FORBIDDEN" ? "관리자만 이용할 수 있어요" : "로그인이 필요해요"}</h1><p className="my-4 text-sm leading-7">{access === "FORBIDDEN" ? "초대 관리는 전체 관리자가 처리해요." : "초대 가입을 마쳤다면 본인 계정으로 로그인해 주세요."}</p><Link className={primaryButton} href={access === "FORBIDDEN" ? "/" : "/login"}>{access === "FORBIDDEN" ? "홈으로" : "로그인하기"}</Link></div>;
+  if (access !== "ALLOWED") return <div className="rounded-3xl bg-paper p-8"><h1 className="text-xl font-bold">{access === "FORBIDDEN" ? "관리자만 이용할 수 있어요" : "로그인이 필요해요"}</h1><p className="my-4 text-sm leading-7">{access === "FORBIDDEN" ? "회원·팀 구성과 초대 관리는 전체 관리자가 처리해요." : "초대 가입을 마쳤다면 본인 계정으로 로그인해 주세요."}</p><Link className={primaryButton} href={access === "FORBIDDEN" ? "/" : "/login"}>{access === "FORBIDDEN" ? "홈으로" : "로그인하기"}</Link></div>;
   return children;
 }
