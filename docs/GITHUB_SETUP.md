@@ -35,7 +35,7 @@ GitHub Free 비공개 저장소에서는 PR과 Actions를 사용할 수 있지�
 
 ## CI 준비 범위
 
-현재 애플리케이션이 없으므로 실패하는 빈 CI workflow를 먼저 만들지 않는다. 앱 생성 후 Java 21·Gradle·PostgreSQL Testcontainers, 프론트 타입 검사·lint·build를 standard Linux runner에서 구성한다. 운영 secret은 테스트에 넣지 않는다. 필요 권한과 포함 사용량은 [배포 계획](DEPLOYMENT.md)의 기준을 따른다.
+backend/frontend 초기 구성과 함께 Java 21·Gradle·PostgreSQL Testcontainers, 프론트 타입 검사·lint·테스트·build를 Linux runner에서 수행하는 기본 CI를 작성했다. 실제 실행 결과는 [INITIAL_SETUP.md](INITIAL_SETUP.md)에 기록한다. 운영 secret은 테스트에 넣지 않는다. 필요 권한과 포함 사용량은 [배포 계획](DEPLOYMENT.md)의 기준을 따른다.
 
 ## 인증과 진행 기록
 
@@ -53,4 +53,4 @@ GitHub Free 비공개 저장소에서는 PR과 Actions를 사용할 수 있지�
 
 ## 다음 단계
 
-사용자가 요청한 Docker 정상화와 개발환경 검증은 [DEV_ENVIRONMENT.md](DEV_ENVIRONMENT.md)에 기록한다. 이후 승인된 범위에 맞춰 backend/frontend를 생성하고 로컬 실행·CI를 구성한다.
+Docker 정상화는 [DEV_ENVIRONMENT.md](DEV_ENVIRONMENT.md), backend/frontend 초기 실행·연결·CI 검증은 [INITIAL_SETUP.md](INITIAL_SETUP.md)에 기록한다. PR 생성·정식 전환·main 병합은 요청한 사용자 승인을 받은 뒤 진행한다.

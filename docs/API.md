@@ -2,7 +2,9 @@
 
 작성일: 2026-10-09 / 기준 시간대: `Asia/Seoul` / 기본 경로: `/api/v1`
 
-이 문서는 구현 전 계약이다. 실제 Controller, OpenAPI 산출물, 인증 설정, migration을 생성하지 않았다. 사용자 정책은 [PROJECT_CONTEXT](PROJECT_CONTEXT.md)와 [RESERVATION_RULES](RESERVATION_RULES.md), 저장 모델은 [ERD](ERD.md)를 따른다.
+이 문서는 업무 기능의 설계 계약이다. 초기 구성에서 `GET /api/v1/health`, `GET /api/v1/auth/csrf`, 기본 접근 거부·세션 보안과 세션 Flyway migration을 구현했다. 로그인·예약 등 나머지 업무 API와 OpenAPI 산출물은 아직 생성하지 않았다. 초기 연결 검증은 [INITIAL_SETUP](INITIAL_SETUP.md), 사용자 정책은 [PROJECT_CONTEXT](PROJECT_CONTEXT.md)와 [RESERVATION_RULES](RESERVATION_RULES.md), 저장 모델은 [ERD](ERD.md)를 따른다.
+
+Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 반환한다. CSRF는 `data.headerName=X-CSRF-TOKEN`, `data.token`을 반환한다. 두 응답은 공통 `meta`와 `Cache-Control: no-store`를 사용한다. 초기 보안 계층의 CSRF 누락·위조는 `403 CSRF_INVALID`, 미인증 보호 API 접근은 `401 AUTHENTICATION_REQUIRED`다.
 
 ## 1. 공통 계약
 
@@ -52,7 +54,7 @@
 |---|---|---|
 | 400 | INVALID_INPUT, INVALID_BLOCK, INVALID_EXCHANGE_SHAPE | 입력이나 허용된 블록·교환 구조 오류 |
 | 401 | AUTHENTICATION_REQUIRED, INVALID_CREDENTIALS | 미인증 또는 로그인 실패 |
-| 403 | FORBIDDEN, MEMBERSHIP_REQUIRED, INACTIVE_USER | 현재 권한·소속·회원 상태 불충족 |
+| 403 | FORBIDDEN, MEMBERSHIP_REQUIRED, INACTIVE_USER, CSRF_INVALID | 현재 권한·소속·회원 상태 불충족 또는 CSRF 검증 실패 |
 | 404 | RESOURCE_NOT_FOUND | 없거나 해당 사용자가 접근할 수 없는 대상 |
 | 409 | RESERVATION_CONFLICT, PERSONAL_OVERLAP | 예약·악기·개인 동시간 충돌 |
 | 409 | DAILY_LIMIT_EXCEEDED, ASSET_FAULTY | 최종 한도 초과, 신규 개인 배치의 고장 악기 |

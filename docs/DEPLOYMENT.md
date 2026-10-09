@@ -4,7 +4,7 @@
 
 ## 1. 범위와 현재 상태
 
-이 문서는 약 45명이 실제 사용하는 정음 예약 서비스의 개발환경 준비와 저비용 운영 계획이다. GitHub 재인증·비공개 저장소 초기 설정을 완료했으며 결과는 [GITHUB_SETUP.md](GITHUB_SETUP.md)에 기록한다. 사용자가 요청한 Docker 정상화·로컬 개발환경 설정 결과는 [DEV_ENVIRONMENT.md](DEV_ENVIRONMENT.md)에 기록한다. 애플리케이션·CI·도메인 구매·서버 생성과 배포는 아직 수행하지 않았다.
+이 문서는 약 45명이 실제 사용하는 정음 예약 서비스의 개발환경 준비와 저비용 운영 계획이다. GitHub·로컬 개발환경을 준비했고 앱 초기 구성·API 연결·기본 CI를 준비한다. 결과는 [GITHUB_SETUP.md](GITHUB_SETUP.md), [DEV_ENVIRONMENT.md](DEV_ENVIRONMENT.md), [INITIAL_SETUP.md](INITIAL_SETUP.md)를 따른다. 도메인 구매·운영 서버 생성과 배포는 아직 수행하지 않았다.
 
 확정 운영 정책은 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), 기술 구조는 [ARCHITECTURE.md](ARCHITECTURE.md)를 따른다. 이 문서의 금액은 **견적 비교**, 서버·백업·로그 설정은 **기술 설계안**이다. 도메인 구매 가능성·서버 재고·성능을 확인한 배포 완료 상태를 뜻하지 않는다.
 
@@ -12,12 +12,12 @@
 
 | 항목 | 점검 결과 | 다음 단계 |
 |---|---|---|
-| 프로젝트 루트 | 독립 Git 저장소와 설계·개발환경 파일 준비 | backend/frontend 초기 구성 |
+| 프로젝트 루트 | 독립 저장소, 설계·개발환경·앱 골격 준비 | 초기 구성 PR 검토 이후 업무 기능 구현 |
 | Git | 2.55 설치, 비공개 origin·main 연결 완료 | 기능별 브랜치·PR 사용 |
-| Java | 21.0.11 실행, JAVA_HOME·javac 경로 일치 확인 | 앱 생성 시 기존 JDK 21 사용 |
-| Node.js / npm | 24.18 / 11.16 실행 확인 | Next.js 패키지·lockfile·build 검증 |
+| Java | 21.0.11 실행, Spring Boot 4.1.1 테스트·JAR 성공 | 업무 기능 테스트 추가 |
+| Node.js / npm | 24.18 / 11.16, Next.js 16.4.0 타입·lint·테스트·build 성공 | 업무 화면과 API 연결 구현 |
 | GitHub CLI | developer-sw 재인증 완료 | 기존 인증 사용 |
-| Docker / PostgreSQL | WSL 2 Linux engine, PostgreSQL 17.11 healthy, SQL·데이터 유지·Testcontainers 검증 통과 | backend/frontend 초기 구성 |
+| Docker / PostgreSQL | PostgreSQL 17.11, 환경 검사·앱 통합 테스트·Flyway 적용 통과 | 업무 migration·동시성 검증 |
 | 도메인 | bandjeongeum.cloud 미구매 | 구매 시 이름 가용성·가격 확인 |
 | 클라우드 서버·R2 | 생성·연결하지 않음 | 배포 후보 선택 후 별도 준비 |
 
@@ -184,9 +184,9 @@ CI의 기본 GITHUB_TOKEN은 repository contents 읽기 권한으로 두고 작�
 
 - 최종 VPS 공급자·region·구매 가능성과 성능/지연 측정 결과.
 - bandjeongeum.cloud의 구매 가능성·일반 가격 적용·갱신 설정.
-- GitHub 로그인, 저장소 공개 여부와 적용 가능한 CI·branch protection 범위.
-- Docker engine 연결 문제 해결과 PostgreSQL/Testcontainers 실행.
-- Spring Boot·Next.js·PostgreSQL·이미지·CI action의 세부 고정 버전.
+- GitHub 비공개 저장소에 적용 가능한 branch protection 범위와 CI 사용량. 로그인·저장소 연결은 완료했다.
+- 운영 서버의 Docker·PostgreSQL 구성. 로컬 engine·DB·Testcontainers 실행은 완료했다.
+- 운영 컨테이너·배포 설정의 버전 고정. 초기 앱·개발 DB·검증 CI action의 버전은 고정했다.
 - R2 계정·bucket·최소 권한 token·암호화 키 보관·실제 dump 크기·보존 설정·복원 결과.
 - 선택한 서버 자원에서 memory·기동·예약·알림 작업·백업의 실측.
 

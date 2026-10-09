@@ -4,7 +4,7 @@
 
 ## 1. 문서 범위와 상태
 
-이 문서는 jeongeum-band-scheduler의 구현을 위한 설계 기준이다. GitHub 초기 설정을 완료했으며 결과는 [GITHUB_SETUP.md](GITHUB_SETUP.md)에 기록한다. 현재 로컬 Docker·PostgreSQL과 독립 환경 검증 도구를 설정한다. 최신 결과는 [DEV_ENVIRONMENT.md](DEV_ENVIRONMENT.md)에 기록하며 애플리케이션·CI·운영 서버는 아직 생성하지 않았다.
+이 문서는 jeongeum-band-scheduler의 구현을 위한 설계 기준이다. GitHub·로컬 개발환경 준비를 마쳤고 backend/frontend 초기 구성·DB·API·보안 연결과 기본 CI를 준비한다. 최신 결과는 [INITIAL_SETUP.md](INITIAL_SETUP.md)에 기록한다. 업무 기능과 운영 서버·배포는 아직 준비하지 않았다.
 
 운영 정책의 기준 문서는 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md)와 [RESERVATION_RULES.md](RESERVATION_RULES.md)이다. 이 문서의 **확정 정책**은 사용자 결정의 요약이고, **기술 설계안**은 그 정책을 구현하기 위한 구조다. 세부 버전·성능 한도·설정 수치는 구현과 검증을 거쳐 고정한다.
 
@@ -46,7 +46,7 @@ flowchart TD
 | 운영 | Docker Compose, Caddy, Cloudflare | 컨테이너 실행, HTTPS, DNS |
 | 테스트 | 백엔드 핵심 테스트, PostgreSQL Testcontainers | 실제 DB 제약·동시성 검증 |
 
-Java 21은 확정 기술이다. Spring Boot·Next.js·PostgreSQL 등 세부 버전은 프로젝트를 생성할 때 지원 상태와 Java 21 호환성을 확인해 고정한다. 설치되어 있는 도구 버전을 프레임워크 버전으로 간주하지 않는다.
+Java 21은 확정 기술이다. 초기 구성에서 공식 배포·지원 정보를 확인해 Spring Boot 4.1.1·Gradle 9.8.1, Next.js 16.4.0·React 19.3.0, PostgreSQL 17.11을 고정했다. 의존성 버전은 BOM·명시 버전·lock 파일로 관리한다. 설치되어 있는 도구 버전을 프레임워크 버전으로 간주하지 않는다.
 
 ## 4. 구현이 유지해야 할 확정 정책
 
