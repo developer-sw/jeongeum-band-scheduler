@@ -27,6 +27,13 @@ export class ApiError extends Error {
   }
 }
 
+const accessErrorListeners = new Set<(error: ApiError) => void>();
+
+export function onApiAccessError(listener: (error: ApiError) => void): () => void {
+  accessErrorListeners.add(listener);
+  return () => { accessErrorListeners.delete(listener); };
+}
+
 interface RequestOptions {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
@@ -43,14 +50,16 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-async function readResponse<T>(response: Response): Promise<ApiResponse<T> | null> {
+async function readResponse<T>(response: Response, signal?: AbortSignal): Promise<ApiResponse<T> | null> {
+  signal?.throwIfAborted();
   if (response.status === 204) return null;
 
-  const payload: unknown = await response.json().catch(() => null);
+  const payload: unknown = await response.json().catch(() => { signal?.throwIfAborted(); return null; });
+  signal?.throwIfAborted();
 
   if (!response.ok) {
     const error = isRecord(payload) && isRecord(payload.error) ? payload.error : null;
-    throw new ApiError(
+    const failure = new ApiError(
       response.status,
       typeof error?.code === "string" ? error.code : "REQUEST_FAILED",
       typeof error?.message === "string" ? error.message : "요청을 완료하지 못했어요. 잠시 후 다시 시도해 주세요.",
@@ -60,6 +69,11 @@ async function readResponse<T>(response: Response): Promise<ApiResponse<T> | nul
         conflicts: Array.isArray(error?.conflicts) ? error.conflicts : undefined,
       },
     );
+    if (failure.status === 401 || failure.status === 403) {
+      signal?.throwIfAborted();
+      accessErrorListeners.forEach((listener) => listener(failure));
+    }
+    throw failure;
   }
 
   if (
@@ -83,7 +97,7 @@ async function csrfToken(signal?: AbortSignal): Promise<CsrfToken> {
     headers: { Accept: "application/json" },
     signal,
   });
-  const result = await readResponse<CsrfToken>(response);
+  const result = await readResponse<CsrfToken>(response, signal);
 
   if (
     !isRecord(result?.data) ||
@@ -138,5 +152,5 @@ export async function apiRequest<T>(
   });
 
   // Mutations are never replayed automatically, including a CSRF rejection or network failure.
-  return readResponse<T>(response);
+  return readResponse<T>(response, options.signal);
 }

@@ -2,7 +2,7 @@
 
 기준일: 2026-10-09 (Asia/Seoul)
 
-업무 정책의 기준은 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), [RESERVATION_RULES.md](RESERVATION_RULES.md)다. 이 문서의 업무 테이블·컬럼·상태·잠금은 정책을 구현하는 **기술 설계 권고안**이며 실제 업무 migration은 아직 없다. 초기 구성의 Flyway V1은 Spring Session JDBC의 두 세션 테이블만 생성한다. 현재 준비 상태는 [INITIAL_SETUP.md](INITIAL_SETUP.md)를 따른다.
+업무 정책의 기준은 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), [RESERVATION_RULES.md](RESERVATION_RULES.md)다. 이 문서의 업무 테이블·컬럼·상태·잠금은 정책을 구현하는 **기술 설계 권고안**이다. Flyway V1은 Spring Session JDBC, V2는 `users`·`invitation_codes`·최초 관리자 초기화용 `auth_bootstrap_guard`를 생성한다. 팀·예약·알림 테이블은 아직 구현하지 않았다. 현재 인증 스키마·검증은 [AUTHENTICATION.md](AUTHENTICATION.md), 초기 준비는 [INITIAL_SETUP.md](INITIAL_SETUP.md)를 따른다.
 
 ## 1. 핵심 설계 선택
 
@@ -254,9 +254,9 @@ erDiagram
 
 ### 5.1 users / invitation_codes
 
-- `users`: 로그인 ID, 안전한 비밀번호 hash, 표시 이름, 전역 역할, `ACTIVE/WITHDRAWN`, 가입·탈퇴 시각, 낙관적 version.
+- `users`: 로그인 ID, 안전한 비밀번호 hash, 표시 이름, 전역 역할, `ACTIVE/INACTIVE/WITHDRAWN`, 가입·탈퇴 시각, 낙관적 version. `INACTIVE`는 현재 권한 차단을 나타내는 기술 상태다.
 - 이메일 필수 여부는 확정 정책이 아니다. 로그인 ID·표시 이름 사용은 기술 제안이며 실제 회원 자료를 문서나 fixture에 넣지 않는다.
-- `invitation_codes`: 원문 대신 code digest, 발급자, 만료 시각, 사용 시각, 사용한 회원, version. 일회 사용을 원자적으로 보장한다.
+- `invitation_codes`: 원문 대신 code digest, 관리용 대상 이름, 발급자, 만료 시각, 사용·해지 시각, 사용한 회원, version. 일회 사용을 원자적으로 보장한다. 재발급은 기존 초대 ID를 명시해 해지와 신규 발급을 한 트랜잭션으로 처리한다.
 - 사용자 ID는 예약 이력의 참조다. 탈퇴로 예약 FK와 creator를 삭제하지 않는다. 개인정보 보관·익명화 범위는 별도 운영 검토 대상이다.
 - Spring Session JDBC 테이블은 라이브러리 인증 저장소이며 이 업무 ERD와 구분해 migration으로 관리한다.
 

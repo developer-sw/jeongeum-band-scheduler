@@ -25,20 +25,20 @@ public class SecurityErrorHandler implements AuthenticationEntryPoint, AccessDen
     @Override
     public void commence(HttpServletRequest request, HttpServletResponse response,
             AuthenticationException exception) throws IOException {
-        write(request, response, 401, "AUTHENTICATION_REQUIRED", "로그인이 필요합니다.");
+        reject(request, response, 401, "AUTHENTICATION_REQUIRED", "로그인이 필요합니다.");
     }
 
     @Override
     public void handle(HttpServletRequest request, HttpServletResponse response,
             org.springframework.security.access.AccessDeniedException exception) throws IOException {
         if (exception instanceof CsrfException) {
-            write(request, response, 403, "CSRF_INVALID", "보안 토큰을 다시 받아 요청해 주세요.");
+            reject(request, response, 403, "CSRF_INVALID", "보안 토큰을 다시 받아 요청해 주세요.");
         } else {
-            write(request, response, 403, "FORBIDDEN", "요청을 수행할 권한이 없습니다.");
+            reject(request, response, 403, "FORBIDDEN", "요청을 수행할 권한이 없습니다.");
         }
     }
 
-    private void write(HttpServletRequest request, HttpServletResponse response, int status,
+    public void reject(HttpServletRequest request, HttpServletResponse response, int status,
             String code, String message) throws IOException {
         response.setStatus(status);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);

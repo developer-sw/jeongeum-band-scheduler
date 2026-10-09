@@ -2,7 +2,7 @@
 
 작성일: 2026-10-09 / 기준 시간대: `Asia/Seoul` / 기본 경로: `/api/v1`
 
-이 문서는 업무 기능의 설계 계약이다. 초기 구성에서 `GET /api/v1/health`, `GET /api/v1/auth/csrf`, 기본 접근 거부·세션 보안과 세션 Flyway migration을 구현했다. 로그인·예약 등 나머지 업무 API와 OpenAPI 산출물은 아직 생성하지 않았다. 초기 연결 검증은 [INITIAL_SETUP](INITIAL_SETUP.md), 사용자 정책은 [PROJECT_CONTEXT](PROJECT_CONTEXT.md)와 [RESERVATION_RULES](RESERVATION_RULES.md), 저장 모델은 [ERD](ERD.md)를 따른다.
+이 문서는 업무 기능의 설계 계약이다. 초기 health·CSRF·세션 기반에 인증·초대 API를 추가한다. 현재 실제 계약·검증은 [AUTHENTICATION](AUTHENTICATION.md)을 따르며 팀·예약 등 나머지 업무 API와 OpenAPI 산출물은 후속 단계다. 초기 연결 검증은 [INITIAL_SETUP](INITIAL_SETUP.md), 사용자 정책은 [PROJECT_CONTEXT](PROJECT_CONTEXT.md)와 [RESERVATION_RULES](RESERVATION_RULES.md), 저장 모델은 [ERD](ERD.md)를 따른다.
 
 Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 반환한다. CSRF는 `data.headerName=X-CSRF-TOKEN`, `data.token`을 반환한다. 두 응답은 공통 `meta`와 `Cache-Control: no-store`를 사용한다. 초기 보안 계층의 CSRF 누락·위조는 `403 CSRF_INVALID`, 미인증 보호 API 접근은 `401 AUTHENTICATION_REQUIRED`다.
 
@@ -60,7 +60,7 @@ Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 �
 | 409 | DAILY_LIMIT_EXCEEDED, ASSET_FAULTY | 최종 한도 초과, 신규 개인 배치의 고장 악기 |
 | 409 | VERSION_CONFLICT, RESERVATION_STARTED, RESERVATION_FINISHED | 다른 변경 또는 처리 가능 시점 초과 |
 | 409 | EXCHANGE_EXPIRED, EXCHANGE_INVALIDATED, ASSIGNMENT_CONFLICT | 교환 만료·무효화, 고정 배정 충돌 |
-| 409 | DATE_NOT_OPEN, IDEMPOTENCY_KEY_REUSED | 현재 예약 범위 밖, 재시도 키 오용 |
+| 409 | DATE_NOT_OPEN, IDEMPOTENCY_KEY_REUSED, LOGIN_ID_TAKEN, INVITATION_ALREADY_USED | 현재 예약 범위 밖, 재시도 키 오용, 로그인 ID 중복, 사용한 초대 해지·재발급 거부 |
 | 410 | INVITATION_UNAVAILABLE | 사용·해지·만료된 초대 |
 | 429 | TOO_MANY_REQUESTS | 인증·초대 등 보안 목적 요청 제한 |
 
@@ -80,7 +80,9 @@ Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 �
 | GET /invitations | 전체 관리자 | 사용·만료·해지 상태, 원문 token을 다시 노출하지 않음 |
 | DELETE /invitations/{id} | 전체 관리자 | 아직 사용하지 않은 초대 해지 |
 
-가입 입력은 기술 제안이다. 필수 이메일, SMTP, SNS 로그인, 별도 가입 승인 단계는 확정 범위에 임의로 추가하지 않는다. 초대 원문은 발급 때 한 번만 전달하고 서버에는 hash를 저장한다. token을 URL query나 접근 로그에 남기지 않는 본문 전달을 권장한다.
+가입 입력은 기술 제안이다. 승인된 인증 기능 구현에서는 loginId·password·displayName을 사용한다. 초대·입력 설정과 실제 검증 결과는 [AUTHENTICATION](AUTHENTICATION.md)에 기록한다. 필수 이메일, SMTP, SNS 로그인, 별도 가입 승인 단계는 확정 범위에 임의로 추가하지 않는다. 초대 원문은 발급 때 한 번만 전달하고 서버에는 hash를 저장한다. token을 URL query나 접근 로그에 남기지 않는 본문 전달을 사용한다.
+
+재발급은 생성 요청의 선택적 `replacesInvitationId`로 기존 미사용 초대를 지정해 해지와 새 발급을 원자화한다. 대상 이름 일치만으로 다른 초대를 해지하지 않는다. 회원·초대 ID는 문자열로 전달한다. 가입은 `201` 회원 응답이며 자동 로그인하지 않는다. `GET /auth/me`의 `teamMemberships`는 팀 기능 구현 전에는 빈 목록이다. 공개 초대 확인은 본문의 `token`만 받고 유효한 초대의 `expiresAt`만 반환한다.
 
 비밀번호 hash나 세션 secret을 응답하지 않는다. 최초 전체 관리자 계정은 공개 회원가입 API에서 역할을 지정해 만들지 않고 별도의 안전한 운영 초기 절차로 만든다.
 

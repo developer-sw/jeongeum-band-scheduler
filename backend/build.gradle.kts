@@ -44,6 +44,7 @@ tasks.withType<JavaCompile>().configureEach {
 }
 
 tasks.test {
+    dependsOn(tasks.bootJar)
     useJUnitPlatform()
     maxParallelForks = 1
     maxHeapSize = "384m"

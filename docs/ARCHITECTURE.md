@@ -4,7 +4,7 @@
 
 ## 1. 문서 범위와 상태
 
-이 문서는 jeongeum-band-scheduler의 구현을 위한 설계 기준이다. GitHub·로컬 개발환경 준비를 마쳤고 backend/frontend 초기 구성·DB·API·보안 연결과 기본 CI를 준비한다. 최신 결과는 [INITIAL_SETUP.md](INITIAL_SETUP.md)에 기록한다. 업무 기능과 운영 서버·배포는 아직 준비하지 않았다.
+이 문서는 jeongeum-band-scheduler의 구현을 위한 설계 기준이다. GitHub·로컬 개발환경·초기 앱 구성을 준비했고 초대·가입·로그인·권한 기반을 구현한다. 초기 구성은 [INITIAL_SETUP.md](INITIAL_SETUP.md), 현재 인증 설정·검증은 [AUTHENTICATION.md](AUTHENTICATION.md)에 기록한다. 팀·곡·예약·공지·Push와 운영 서버·배포는 후속 단계다.
 
 운영 정책의 기준 문서는 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md)와 [RESERVATION_RULES.md](RESERVATION_RULES.md)이다. 이 문서의 **확정 정책**은 사용자 결정의 요약이고, **기술 설계안**은 그 정책을 구현하기 위한 구조다. 세부 버전·성능 한도·설정 수치는 구현과 검증을 거쳐 고정한다.
 
@@ -108,7 +108,7 @@ DB migration은 Flyway로 관리하고, 운영에 적용된 파일은 수정하�
 
 전역 관리자가 개인별 초대를 발급한다. 추측하기 어려운 임의 토큰을 사용하고 DB에는 원문 대신 hash, 만료 시각, 소비 시각, 발급자를 보관한다. 가입 시 만료·미사용 여부를 확인하고 계정 생성과 토큰 소비를 한 트랜잭션에서 처리해 중복 소비를 막는다. 재발급 시 기존 미사용 초대를 폐기한다.
 
-초대받은 사람이 사용할 로그인 식별자는 아직 사용자 결정이 없다. **기술 제안**은 loginId + password + 표시 이름을 수집해 SMTP·이메일 인증 서비스를 추가하지 않는 방식이다. 이메일 로그인으로 정했다면 API·회원 모델을 그 결정에 맞춰 수정한다. 초대 만료 시간의 구체적인 값은 구현 전 설정값으로 정한다.
+승인된 인증 구현은 **기술 제안**인 loginId + password + 표시 이름을 사용하며 SMTP·이메일 인증 서비스를 추가하지 않는다. 사용자 확정 운영 정책과 구분하고 세부 입력·초대 만료 설정은 [AUTHENTICATION](AUTHENTICATION.md)에 기록한다. 이메일 로그인으로 정했다면 API·회원 모델을 그 결정에 맞춰 수정한다.
 
 비밀번호는 Spring PasswordEncoder의 adaptive hash를 사용하고 실행 환경에서 검증 비용을 조정한다. 공용 초기 비밀번호를 배포하거나 평문 비밀번호를 저장하지 않는다.
 

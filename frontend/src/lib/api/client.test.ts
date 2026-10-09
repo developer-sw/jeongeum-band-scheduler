@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ApiError, apiRequest } from "./client";
+import { ApiError, apiRequest, onApiAccessError } from "./client";
 
 const meta = { serverTime: "2026-10-09T14:00:00+09:00", timeZone: "Asia/Seoul" };
 const json = (payload: unknown, status = 200) => Response.json(payload, { status });
@@ -7,6 +7,22 @@ const json = (payload: unknown, status = 200) => Response.json(payload, { status
 afterEach(() => vi.unstubAllGlobals());
 
 describe("same-origin API requests", () => {
+  it("does not invalidate the new account when an old 401 response is canceled during JSON parsing", async () => {
+    let finish!: (value: unknown) => void;
+    const delayed = new Promise((resolve) => { finish = resolve; });
+    const bodyStarted = vi.fn(() => delayed);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 401, ok: false, json: bodyStarted }));
+    const controller = new AbortController();
+    const accessListener = vi.fn(); const unsubscribe = onApiAccessError(accessListener);
+    try {
+      const pending = apiRequest("/api/v1/auth/me", { signal: controller.signal });
+      await vi.waitFor(() => expect(bodyStarted).toHaveBeenCalledOnce());
+      controller.abort();
+      finish({ error: { code: "AUTHENTICATION_REQUIRED", message: "" } });
+      await expect(pending).rejects.toMatchObject({ name: "AbortError" });
+      expect(accessListener).not.toHaveBeenCalled();
+    } finally { unsubscribe(); }
+  });
   it("reads typed data and server time without fetching a CSRF token for GET", async () => {
     const fetchMock = vi.fn().mockResolvedValue(json({ data: { status: "UP" }, meta }));
     vi.stubGlobal("fetch", fetchMock);

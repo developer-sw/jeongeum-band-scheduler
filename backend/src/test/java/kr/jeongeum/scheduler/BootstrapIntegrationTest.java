@@ -17,6 +17,8 @@ import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
+import kr.jeongeum.scheduler.auth.security.MemberPrincipal;
+import kr.jeongeum.scheduler.member.repository.MemberRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -27,6 +29,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.session.Session;
 import org.springframework.session.SessionRepository;
@@ -73,6 +76,12 @@ class BootstrapIntegrationTest {
     @Autowired
     ObjectMapper json;
 
+    @Autowired
+    MemberRepository members;
+
+    @Autowired
+    PasswordEncoder passwords;
+
     private CookieManager cookies;
     private HttpClient client;
 
@@ -85,8 +94,8 @@ class BootstrapIntegrationTest {
 
     @Test
     void migratesPostgreSqlAndReturnsMinimalHealthContract() throws Exception {
-        assertEquals("1", jdbc.queryForObject(
-                "SELECT version FROM flyway_schema_history WHERE success = true", String.class));
+        assertEquals(List.of("1", "2"), jdbc.queryForList(
+                "SELECT version FROM flyway_schema_history WHERE success = true ORDER BY installed_rank", String.class));
         assertEquals(2, jdbc.queryForObject(
                 "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' "
                         + "AND table_name IN ('spring_session', 'spring_session_attributes')", Integer.class));
@@ -175,8 +184,11 @@ class BootstrapIntegrationTest {
         S session = repository.findById(id);
         assertNotNull(session);
         var context = SecurityContextHolder.createEmptyContext();
+        var member = members.insert("fixture-" + UUID.randomUUID().toString().substring(0, 16),
+                passwords.encode(UUID.randomUUID().toString()), "합성 회원", "MEMBER", java.time.Instant.now())
+                .orElseThrow();
         context.setAuthentication(UsernamePasswordAuthenticationToken.authenticated(
-                "synthetic-test-user", null, List.of(new SimpleGrantedAuthority("ROLE_TEST"))));
+                new MemberPrincipal(member.id()), null, List.of()));
         session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, context);
         repository.save(session);
     }
