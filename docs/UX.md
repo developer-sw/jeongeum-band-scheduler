@@ -1,6 +1,6 @@
 # UX 및 반응형 화면 설계
 
-작성 기준: 2026-10-09, Asia/Seoul. 현재 단계는 Markdown 설계 문서 작성이며 화면·API·배포 구현은 시작하지 않았다. 아래에서 **확정 정책**과 **UI 제안**을 구분한다. 예약 정책·권한의 상세 계약은 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), [RESERVATION_RULES.md](RESERVATION_RULES.md), [API.md](API.md)를 함께 확인한다.
+작성 기준: 2026-10-09, Asia/Seoul. 초기 frontend는 사용자 로고와 남색·노란색을 사용하는 준비 안내 화면이다. 실제 로그인·예약 UI와 배포는 아직 구현하지 않았다. 아래에서 **확정 정책**과 **UI 제안**을 구분한다. 예약 정책·권한의 상세 계약은 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), [RESERVATION_RULES.md](RESERVATION_RULES.md), [API.md](API.md)를 함께 확인한다.
 
 ## 1. 목표와 첫 운영 범위
 

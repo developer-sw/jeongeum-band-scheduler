@@ -1,6 +1,6 @@
 # 프로젝트 전제와 확정 요구사항
 
-작성일: 2026-10-09 / 단계: GitHub 초기 설정 완료 후 로컬 개발환경 설정·검증 / 기준 시간대: `Asia/Seoul`
+작성일: 2026-10-09 / 단계: backend/frontend 초기 구성·연결 검증 / 기준 시간대: `Asia/Seoul`
 
 이 문서의 **확정 정책**은 사용자 답변을 옮긴 것이다. **기술 설계 권고안**은 검토 대상이며, 문서 작성 승인을 실제 구현·구매·배포 승인으로 취급하지 않는다.
 
@@ -196,10 +196,12 @@ B10은 시작하는 한국 날짜의 예약이다. 서버에서는 끝을 다음
 
 이후 GitHub 재인증·비공개 저장소 연결·main 업로드를 완료했다. Docker Desktop을 시작해 WSL 2 Linux 엔진을 복구하고 로컬 PostgreSQL을 실행했다. 최신 도구 버전과 실제 검증 결과는 [DEV_ENVIRONMENT.md](DEV_ENVIRONMENT.md)에 기록한다.
 
+사용자가 backend/frontend 초기 구성을 요청했다. Spring·Next.js 골격, 세션 migration·CSRF·API 전달·기본 CI의 실제 준비·검증은 [INITIAL_SETUP.md](INITIAL_SETUP.md)에 기록하며 업무 기능 완료와 구분한다.
+
 ## 16. 다음 단계와 완료 기준
 
 1. 이 문서와 ERD·API·UX·테스트 설계를 서로 맞춰 검토한다.
-2. GitHub 초기 설정 이후 사용자가 요청한 Docker 정상화·개발환경 검증을 진행한다. 이후 backend/frontend 프로젝트 초기 구성을 준비한다.
+2. GitHub·개발환경 준비 이후 사용자가 요청한 backend/frontend 초기 구성·연결을 검증한다. PR 생성·정식 전환·main 병합은 사용자 승인을 받는다.
 3. 인증·팀·곡, 예약·한도, 반복 배정, 변경·교환, 화면·공지·Push를 구현한다.
 4. 실제 PostgreSQL 경합, 권한, rollback, 실기기 Push, HTTPS와 백업 복원을 검증한다.
 5. 필수 기능과 핵심 검증 상태를 확인하고 오픈한다.

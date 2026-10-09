@@ -2,7 +2,7 @@
 
 확인일: 2026-10-09 / 실행 환경: Windows PowerShell, 프로젝트 루트 `C:\Users\swj12\Desktop\jeongeum-band-scheduler`
 
-Docker Desktop의 WSL 2 Linux 엔진과 개발용 PostgreSQL을 사용한다. Spring과 Next.js 애플리케이션은 다음 초기 구성 단계에서 생성한다. `tools/environment-check`는 Java·Docker·PostgreSQL 실행을 확인하는 독립 도구이며 서비스의 업무 코드나 migration은 포함하지 않는다.
+Docker Desktop의 WSL 2 Linux 엔진과 개발용 PostgreSQL을 사용한다. 이후 생성한 Spring·Next.js 앱의 실행·검증은 [INITIAL_SETUP.md](INITIAL_SETUP.md)를 따른다. `tools/environment-check`는 Java·Docker·PostgreSQL 실행을 확인하는 독립 도구이며 서비스의 업무 코드나 migration은 포함하지 않는다.
 
 ## 설치 및 확인 상태
 
@@ -82,4 +82,4 @@ Wrapper는 공식 배포 SHA-256을 확인한다. 의존성 버전은 도구의 
 
 IntelliJ에서 Java 프로젝트를 열 때 Project SDK와 Gradle JVM을 기존 JDK 21로 지정하고 Gradle 실행은 Wrapper를 사용한다. VS Code와 IntelliJ 모두 `.editorconfig`의 UTF-8·들여쓰기·줄바꿈 규칙을 따른다. 별도 전역 Gradle·Windows PostgreSQL·Ubuntu 배포판 설치는 필요하지 않다.
 
-다음은 `backend`와 `frontend` 초기 구성, 프레임워크 버전 고정, 같은 origin의 `/api` 연결, 로컬 실행 및 CI 준비다. 도메인·운영 서버·배포는 아직 준비하지 않았다.
+`backend`와 `frontend` 초기 구성 이후 버전·API 연결·앱 실행 및 CI 검증은 [INITIAL_SETUP.md](INITIAL_SETUP.md)에 기록한다. 도메인·운영 서버·배포는 아직 준비하지 않았다.

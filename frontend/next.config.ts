@@ -1,0 +1,30 @@
+import type { NextConfig } from "next";
+
+function apiOrigin() {
+  const configured = process.env.APP_API_ORIGIN;
+  const value = configured ?? "http://127.0.0.1:8080";
+  const origin = new URL(value);
+
+  if (
+    !["http:", "https:"].includes(origin.protocol) ||
+    origin.username ||
+    origin.password ||
+    origin.pathname !== "/" ||
+    origin.search ||
+    origin.hash
+  ) {
+    throw new Error("APP_API_ORIGIN must be an HTTP(S) origin without credentials or a path.");
+  }
+
+  return origin.origin;
+}
+
+const nextConfig: NextConfig = {
+  agentRules: false,
+  poweredByHeader: false,
+  async rewrites() {
+    return [{ source: "/api/:path*", destination: `${apiOrigin()}/api/:path*` }];
+  },
+};
+
+export default nextConfig;

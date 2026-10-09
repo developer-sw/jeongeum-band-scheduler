@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-navy: #091c55;
+  --color-navy-soft: #34466e;
+  --color-yellow: #ffcf3d;
+  --color-paper: #f7f8fa;
+  --font-sans: "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", Arial, sans-serif;
+}
+
+:root {
+  color-scheme: light;
+  background: #ffffff;
+  color: #091c55;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background: #ffcf3d;
+  color: #091c55;
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: 3px solid #091c55;
+  outline-offset: 4px;
+}

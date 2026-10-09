@@ -1,6 +1,6 @@
 # 테스트 및 운영 검증 계획
 
-작성 기준: 2026-10-09, Asia/Seoul. 이 문서는 앞으로 구현할 업무 테스트의 기준이다. 로컬 DB와 독립 Testcontainers 환경 검증은 [DEV_ENVIRONMENT.md](DEV_ENVIRONMENT.md)에 기록한다. 애플리케이션 테스트·CI는 아직 생성하지 않았으며 아래 업무 항목의 통과를 주장하지 않는다. [RESERVATION_RULES.md](RESERVATION_RULES.md), [API.md](API.md), [ERD.md](ERD.md), [UX.md](UX.md), [NOTIFICATIONS.md](NOTIFICATIONS.md)와 함께 검토한다.
+작성 기준: 2026-10-09, Asia/Seoul. 이 문서는 앞으로 구현할 업무 테스트의 기준이다. 로컬 DB와 독립 환경 검증은 [DEV_ENVIRONMENT.md](DEV_ENVIRONMENT.md), 초기 앱의 DB·HTTP·세션·CSRF·API client·오프라인 검증과 CI 결과는 [INITIAL_SETUP.md](INITIAL_SETUP.md)에 기록한다. 아래 예약·권한 등 업무 항목의 통과를 주장하지 않는다. [RESERVATION_RULES.md](RESERVATION_RULES.md), [API.md](API.md), [ERD.md](ERD.md), [UX.md](UX.md), [NOTIFICATIONS.md](NOTIFICATIONS.md)와 함께 검토한다.
 
 ## 1. 목표와 우선순위
 

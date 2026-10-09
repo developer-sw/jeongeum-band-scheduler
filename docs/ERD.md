@@ -2,7 +2,7 @@
 
 기준일: 2026-10-09 (Asia/Seoul)
 
-업무 정책의 기준은 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), [RESERVATION_RULES.md](RESERVATION_RULES.md)다. 이 문서의 테이블·컬럼·상태·잠금은 정책을 구현하는 **기술 설계 권고안**이며 실행 SQL이나 migration이 아니다. 실제 DDL, Spring 프로젝트, 데이터베이스는 아직 만들지 않는다.
+업무 정책의 기준은 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), [RESERVATION_RULES.md](RESERVATION_RULES.md)다. 이 문서의 업무 테이블·컬럼·상태·잠금은 정책을 구현하는 **기술 설계 권고안**이며 실제 업무 migration은 아직 없다. 초기 구성의 Flyway V1은 Spring Session JDBC의 두 세션 테이블만 생성한다. 현재 준비 상태는 [INITIAL_SETUP.md](INITIAL_SETUP.md)를 따른다.
 
 ## 1. 핵심 설계 선택
 
