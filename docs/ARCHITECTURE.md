@@ -4,7 +4,7 @@
 
 ## 1. 문서 범위와 상태
 
-이 문서는 jeongeum-band-scheduler의 구현을 위한 설계 기준이다. 설계 문서 작성 이후 사용자가 요청한 GitHub 초기 설정을 진행했으며, 최신 결과는 [GITHUB_SETUP.md](GITHUB_SETUP.md)에 기록한다. 애플리케이션 생성·의존성 설치·서버 생성은 아직 수행하지 않았다.
+이 문서는 jeongeum-band-scheduler의 구현을 위한 설계 기준이다. GitHub 초기 설정을 완료했으며 결과는 [GITHUB_SETUP.md](GITHUB_SETUP.md)에 기록한다. 현재 로컬 Docker·PostgreSQL과 독립 환경 검증 도구를 설정한다. 최신 결과는 [DEV_ENVIRONMENT.md](DEV_ENVIRONMENT.md)에 기록하며 애플리케이션·CI·운영 서버는 아직 생성하지 않았다.
 
 운영 정책의 기준 문서는 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md)와 [RESERVATION_RULES.md](RESERVATION_RULES.md)이다. 이 문서의 **확정 정책**은 사용자 결정의 요약이고, **기술 설계안**은 그 정책을 구현하기 위한 구조다. 세부 버전·성능 한도·설정 수치는 구현과 검증을 거쳐 고정한다.
 

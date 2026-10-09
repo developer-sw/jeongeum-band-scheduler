@@ -53,4 +53,4 @@ GitHub Free 비공개 저장소에서는 PR과 Actions를 사용할 수 있지�
 
 ## 다음 단계
 
-Docker Desktop의 Linux engine 연결을 정상화하고 PostgreSQL·Testcontainers가 실행되는지 확인한다. 그다음 승인된 범위에 맞춰 backend/frontend를 생성하고 로컬 실행·CI를 구성한다.
+사용자가 요청한 Docker 정상화와 개발환경 검증은 [DEV_ENVIRONMENT.md](DEV_ENVIRONMENT.md)에 기록한다. 이후 승인된 범위에 맞춰 backend/frontend를 생성하고 로컬 실행·CI를 구성한다.
