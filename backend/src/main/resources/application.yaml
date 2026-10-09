@@ -24,7 +24,7 @@ spring:
     jdbc:
       initialize-schema: never
       table-name: SPRING_SESSION
-    timeout: 30m
+    timeout: 90d
 
 server:
   address: ${APP_BIND_ADDRESS:127.0.0.1}
@@ -37,6 +37,7 @@ server:
         http-only: true
         secure: true
         same-site: lax
+        max-age: ${spring.session.timeout}
   error:
     include-message: never
     include-binding-errors: never

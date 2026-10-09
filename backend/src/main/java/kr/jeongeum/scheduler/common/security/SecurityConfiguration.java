@@ -1,6 +1,9 @@
 package kr.jeongeum.scheduler.common.security;
 
 import kr.jeongeum.scheduler.auth.security.CurrentMemberFilter;
+import kr.jeongeum.scheduler.auth.security.PersistentLoginCookieFilter;
+import java.time.Duration;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
@@ -24,6 +27,7 @@ import org.springframework.security.web.csrf.CsrfAuthenticationStrategy;
 import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
 import org.springframework.security.web.csrf.XorCsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.savedrequest.NullRequestCache;
+import org.springframework.session.web.http.CookieSerializer;
 import java.util.List;
 
 @Configuration(proxyBeanMethods = false)
@@ -33,7 +37,8 @@ public class SecurityConfiguration {
     @Profile("!bootstrap-admin")
     SecurityFilterChain securityFilterChain(HttpSecurity http, SecurityErrorHandler errors,
             CurrentMemberFilter currentMember, SecurityContextRepository contexts,
-            HttpSessionCsrfTokenRepository csrfTokens) throws Exception {
+            HttpSessionCsrfTokenRepository csrfTokens, CookieSerializer cookies,
+            @Value("${spring.session.timeout}") Duration sessionTimeout) throws Exception {
         http
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(HttpMethod.GET, "/api/v1/health", "/api/v1/auth/csrf").permitAll()
@@ -57,7 +62,8 @@ public class SecurityConfiguration {
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)
-                .addFilterBefore(currentMember, AnonymousAuthenticationFilter.class);
+                .addFilterBefore(currentMember, AnonymousAuthenticationFilter.class)
+                .addFilterAfter(new PersistentLoginCookieFilter(cookies, sessionTimeout), CurrentMemberFilter.class);
         return http.build();
     }
 

@@ -14,6 +14,7 @@ Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 �
 - 블록 코드는 B01~B10이다. 시작·종료·기간을 클라이언트 입력으로 받지 않는다.
 - 악기 코드는 `VOCAL`, `KEYBOARD`, `ELECTRIC_GUITAR`, `BASS`, `DRUMS`, `ACOUSTIC_GUITAR`를 제안한다. 표시명은 각각 보컬·건반·일렉기타·베이스·드럼·통기타다.
 - 인증은 서버 세션 쿠키다. 프론트와 API는 같은 origin의 `/api` 경로로 연결한다.
+- 로그인은 마지막 접속 후 90일 동안 유지하고 인증 요청 때 서버 세션·쿠키 만료를 연장한다. `SESSION`은 영속 HttpOnly 쿠키이며 로그아웃·비활성·탈퇴와 만료 시 접근을 해제한다. 요청·응답 JSON 형식이나 별도 갱신 API는 추가하지 않는다. 자세한 계약은 [AUTHENTICATION](AUTHENTICATION.md)을 따른다.
 - 상태 변경 요청은 CSRF token을 요구한다. 공개 가입·로그인에도 Spring Security 설정과 일치하는 CSRF 흐름을 적용한다.
 - 실행자·개인 주체·알림함 소유자·구독 소유자는 인증 정보에서 결정한다. 요청의 임의 `userId`를 신뢰하지 않는다.
 - 예약 변경·취소에는 예약의 `expectedVersion`, 교환 승인·거절·악기 배분에는 요청의 `expectedVersion`을 사용한다. 교환 항목에는 원본 예약 버전도 따로 저장한다. 서버가 잠금 후 현재 값과 비교한다.
