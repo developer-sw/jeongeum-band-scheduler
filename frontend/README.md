@@ -21,4 +21,4 @@ ESLint 10.12.0·TypeScript ESLint 8.71.1·Next 공식 plugin 16.4.0·React Hooks
 
 2026-10-09 런타임 `npm audit --omit=dev`는 0건이다. 전체 감사의 high 4개 패키지는 Next 개발용 lint plugin → fast-glob → micromatch → braces에 전파된 같은 [미패치 권고](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm)다. 사이트 런타임 의존성에는 포함되지 않는다. lint 설정에 임의 외부 glob 입력을 받지 않고 CI에 운영 secret을 제공하지 않는다. 지원하지 않는 강제 버전 교체는 적용하지 않았으며 upstream 패치가 나오면 의존성을 갱신하고 검증한다.
 
-2026-10-09 재검증: 타입 생성·검사, lint 오류·경고 0, Vitest 18건, production build 통과. 실제 프록시·쿠키·CSRF·가입·로그인 연결은 [인증 구현 안내](../docs/AUTHENTICATION.md)에 기록한다. 초기 구성의 이전 CI 결과는 [초기 구성 안내](../docs/INITIAL_SETUP.md)를 따른다. 위 로컬 재검증 시점에는 인증 변경의 원격 CI를 실행하지 않았으며, 이후 Push·초안 PR의 GitHub Checks에서 별도로 확인한다. 프로젝트 지침은 루트 AGENTS.md를 사용하며 Next의 자동 지침 파일 생성은 해제했다.
+2026-10-09 재검증: 타입 생성·검사, lint 오류·경고 0, Vitest 18건, production build 통과. 실제 프록시·쿠키·CSRF 연결과 브라우저 초대·가입·로그인·권한 차단·로그아웃은 [인증 구현 안내](../docs/AUTHENTICATION.md)에 기록한다. 초기 구성의 이전 CI 결과는 [초기 구성 안내](../docs/INITIAL_SETUP.md), 인증 변경과 최종 화면 수정의 커밋별 CI는 [PR #3](https://github.com/developer-sw/jeongeum-band-scheduler/pull/3/checks)을 따른다. 프로젝트 지침은 루트 AGENTS.md를 사용하며 Next의 자동 지침 파일 생성은 해제했다.

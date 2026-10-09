@@ -85,6 +85,24 @@ java -jar ./backend/build/libs/jeongeum-band-scheduler-backend-0.0.1-SNAPSHOT.ja
 
 기존 `jeongeum-dev-postgres-1`와 `jeongeum-dev_postgres_data` 볼륨은 유지했다. 개발 DB의 migration은 V1 한 건과 세션 테이블 그대로이며, 이번 검증에서 V2 적용·개발 관리자 생성·데이터 삭제를 하지 않았다. API 연결 검증은 별도 임시 DB를 만들고 끝난 뒤 그 검증용 컨테이너만 종료했다. V1 파일은 변경하지 않았다. 테스트용 합성 계정의 비밀번호와 초대 원문은 무작위로 생성하고 Git·문서·출력에 저장하지 않았다.
 
-기존 CI는 백엔드 테스트·JAR, 프론트 타입·lint·테스트·빌드와 런타임 감사를 실행하도록 구성되어 있다. 위 로컬 재검증 시점에는 인증 변경의 원격 CI가 미실행이었다. 이후 사용자가 커밋·Push·main 대상 초안 PR 생성을 승인했으며, 원격 CI 결과는 해당 PR의 GitHub Checks에서 별도로 확인한다. 정식 PR 전환·main 병합은 해당 단계의 사용자 승인을 받는다. 운영 의존성과 별개인 개발용 lint 의존성의 기존 감사 항목은 [Frontend README](../frontend/README.md)를 따른다. 브라우저 폼 전체 성공 흐름·실기기·운영 HTTPS는 이번 자동 테스트/HTTP 프록시 검증으로 완료했다고 주장하지 않는다.
+기존 CI는 백엔드 테스트·JAR, 프론트 타입·lint·테스트·빌드와 런타임 감사를 실행한다. 인증 구현 커밋 `b2f15de`의 [PR CI](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/37920225547)와 [Push CI](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/37920201260)는 모두 통과했다. 최종 화면 수정 이후의 결과는 [PR #3의 Checks](https://github.com/developer-sw/jeongeum-band-scheduler/pull/3/checks)에서 해당 커밋 기준으로 확인한다. 사용자가 PR #3의 실제 화면 최종 점검과 main 반영을 승인했다. 운영 의존성과 별개인 개발용 lint 의존성의 기존 감사 항목은 [Frontend README](../frontend/README.md)를 따른다.
+
+### 실제 브라우저 최종 점검
+
+2026-10-09, 인앱 브라우저에서 실행 중인 Next 개발 서버와 별도 임시 PostgreSQL·백엔드 JAR로 아래 흐름을 확인했다. 개발 DB 대신 검증용 합성 계정만 사용했다.
+
+| 화면 흐름 | 실제 결과 |
+|---|---|
+| 잘못된 비밀번호·관리자 로그인 | 오류 안내 후 비밀번호 입력 제거, 정상 로그인 후 전체 관리자 홈 표시 |
+| 관리자 초대 발급·재발급·해지 | 새 코드 발급, 이전 코드 무효화, 해지 상태 표시; 코드 패널 닫기 후 원문 제거 |
+| 해지·소비한 초대 재사용 | 가입을 거절하고 초대 이용 불가 안내 표시 |
+| 유효한 초대로 가입 | 입력 길이 검증, 일반 회원 생성, 자동 로그인 없이 로그인 화면 이동 |
+| 가입 완료 안내 | `/login?joined=1` 이동·새로고침에서 표시, 일반 `/login` 메뉴 이동 시 제거 |
+| 일반 회원 로그인 | 대문자 ID 정규화, 회원 홈 표시, 관리자 메뉴 없음 |
+| 일반 회원의 관리자 URL 직접 접근 | 관리자 전용 안내, 발급 버튼 없음 |
+| 로그아웃 후 뒤로 가기·새로고침 | 로그인 필요 안내, 이전 회원 정보·관리자 작업이 다시 나타나지 않음 |
+| 초대 입력 후 다른 화면 이동·뒤로 가기 | 이전 초대 입력이 제거됨 |
+
+PC 화면과 390×844 모바일 viewport에서 폼·관리자 목록을 확인했다. 가입 후 완료 안내가 숨겨지는 문제를 실제 화면에서 발견해 수정했다. 비민감 `joined=1` query를 Next의 `useSearchParams`로 읽고 `Suspense` 경계를 두어 정적 빌드와 링크 이동을 지원한다. 새 검증 회원 가입·완료 화면 새로고침·일반 로그인 메뉴 이동까지 회귀 검증했고, 수정 후 기존 프론트 18건·타입·lint·production build도 통과했다. 검증 화면 캡처는 Git에서 제외한 로컬 `.local`에 보관한다. 이 검증은 개발 서버의 브라우저 흐름이며 실기기·운영 HTTPS·Push 수신 검증을 대신하지 않는다.
 
 팀장·소속 권한, 탈퇴 예약 정리, Push 기기 정리, 운영 HTTPS·프록시·실기기 확인은 후속 구현·운영 검증이다. 비밀번호 재설정과 SMTP는 이번 범위에 추가하지 않는다.

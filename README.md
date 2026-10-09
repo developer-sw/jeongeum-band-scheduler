@@ -78,7 +78,7 @@ GitHub 재인증·독립 저장소 연결을 완료했다. JDK 21과 Node.js/npm
 
 개발 DB 실행은 [DEV_ENVIRONMENT](docs/DEV_ENVIRONMENT.md), 앱 실행은 [INITIAL_SETUP](docs/INITIAL_SETUP.md)의 명령을 사용한다. 두 터미널에서 `./scripts/Start-Backend.ps1`, `./scripts/Start-Frontend.ps1`을 실행하고 `http://127.0.0.1:3000`을 연다. 첫 프론트 실행 전 `frontend`에서 `npm.cmd ci`로 의존성을 설치한다.
 
-초대·가입·로그인·권한 기반과 전체 관리자 초대 화면을 구현하고 로컬 검증했다. 백엔드 19건·프론트 18건과 양쪽 빌드가 통과했으며 상세 결과와 최초 관리자 준비는 [AUTHENTICATION](docs/AUTHENTICATION.md)을 따른다. 인증 변경은 기능 브랜치와 main 대상 초안 PR로 검토한다. 정식 PR 전환·main 병합은 해당 단계의 사용자 승인 후 진행한다. 공용 기본 계정은 없으며 팀·곡·예약·공지·Push와 운영 배포는 후속 단계다.
+초대·가입·로그인·권한 기반과 전체 관리자 초대 화면을 구현하고 검증했다. 백엔드 19건·프론트 18건과 양쪽 빌드가 통과했으며 실제 브라우저의 초대 발급·가입·로그인·권한 차단·로그아웃도 확인했다. 상세 결과와 최초 관리자 준비는 [AUTHENTICATION](docs/AUTHENTICATION.md), main 반영과 해당 커밋의 CI 결과는 [PR #3](https://github.com/developer-sw/jeongeum-band-scheduler/pull/3)을 따른다. 공용 기본 계정은 없으며 팀·곡·예약·공지·Push와 운영 배포는 후속 단계다.
 
 ## 참고 프로젝트 원칙
 

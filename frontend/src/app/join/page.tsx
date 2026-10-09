@@ -27,7 +27,7 @@ export default function JoinPage() {
     event.preventDefault(); const issue = loginIdError(loginId) ?? displayNameError(displayName) ?? passwordError(password);
     setValidation(issue ?? null); if (issue) return;
     const result = await action.run((signal) => register({ invitationToken: token.trim(), loginId: normalizeLoginId(loginId), displayName: displayName.trim(), password }, signal));
-    if (result) { setToken(""); setPassword(""); setJoined(true); router.replace("/login#joined"); }
+    if (result) { setToken(""); setPassword(""); setJoined(true); router.replace("/login?joined=1"); }
   }
 
   return <AppShell><FormCard title={joined ? "정음에 오신 걸 환영해요" : "초대로 시작해요"} description={joined ? "가입을 마쳤어요. 본인 계정으로 로그인해 주세요." : "관리자에게 받은 개인 초대를 입력해 주세요. 초대는 한 번만 사용할 수 있어요."}>
