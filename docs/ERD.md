@@ -2,7 +2,7 @@
 
 기준일: 2026-10-09 (Asia/Seoul)
 
-업무 정책의 기준은 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), [RESERVATION_RULES.md](RESERVATION_RULES.md)다. 이 문서의 업무 테이블·컬럼·상태·잠금은 정책을 구현하는 **기술 설계 권고안**이다. Flyway V1은 Spring Session JDBC, V2는 `users`·`invitation_codes`·`auth_bootstrap_guard`다. 이번 V3에서 가입 전 명단·팀·소속·곡과 명단 연결용 초대 FK·잠금·역할 변경 이력을 추가하며 V1/V2는 수정하지 않는다. 예약·알림 테이블은 후속 구현이다. 현재 인증 검증은 [AUTHENTICATION.md](AUTHENTICATION.md), 명단·팀 계약은 [MEMBER_TEAM_MANAGEMENT.md](MEMBER_TEAM_MANAGEMENT.md)를 따른다.
+업무 정책의 기준은 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), [RESERVATION_RULES.md](RESERVATION_RULES.md)다. 이 문서의 업무 테이블·컬럼·상태·잠금은 정책을 구현하는 **기술 설계 권고안**이다. Flyway V1은 Spring Session JDBC, V2는 `users`·`invitation_codes`·`auth_bootstrap_guard`다. V3는 가입 전 명단·팀·소속·곡과 명단 연결용 초대 FK·잠금·역할 변경 이력을 추가한다. 이번 V4는 블록·악기·예약 날짜·예약·점유·한도 ledger·작업 이력·재시도 키를 추가하며 V1~V3를 수정하지 않는다. 실제 V4 계약은 [RESERVATION_FOUNDATION.md](RESERVATION_FOUNDATION.md)을 따른다. 반복·교환·공지·알림 테이블은 후속 구현이며 아래의 전체 ERD는 완료된 migration 목록과 구분한다. 인증 검증은 [AUTHENTICATION.md](AUTHENTICATION.md), 명단·팀 계약은 [MEMBER_TEAM_MANAGEMENT.md](MEMBER_TEAM_MANAGEMENT.md)를 따른다.
 
 ## 1. 핵심 설계 선택
 
@@ -296,8 +296,8 @@ erDiagram
 - 상태는 `PREPARING/OPEN`, 고정 반영 완료 시각, 생성 시각, version을 둔다.
 - 운영일은 서울 `LocalDate`이며 24:00 종료가 다음 날짜 mutex에 속하는 것으로 해석하지 않는다.
 - 과거 날짜 행을 유지한다. `OPEN` 상태여도 현재 `오늘..오늘+14일` 범위 밖의 생성 요청은 거절한다.
-- 없는 날짜는 PK unique를 이용해 별도의 짧은 ensure 단계에서 먼저 생성한다. 없는 행에 `FOR UPDATE`를 호출하는 것만으로는 잠금이 생기지 않는다.
-- 본 업무 트랜잭션은 이미 존재하는 날짜 행을 날짜 오름차순으로 `FOR UPDATE`한다.
+- 없는 날짜는 선행 `directory_mutation_guard`를 보유한 업무 트랜잭션에서 `INSERT ... ON CONFLICT DO NOTHING`으로 생성한 뒤 날짜 오름차순으로 `FOR UPDATE`한다. 없는 행에 `FOR UPDATE`만 호출해서는 잠금이 생기지 않는다.
+- 기본 구현은 고정 배정 기능이 아직 없어 개방 범위의 날짜를 `OPEN`으로 준비한다. 반복 배정 구현 단계에서는 고정 회차 반영과 `OPEN` 전환을 연결해야 하며, 기본 단계만으로 반복 배정 우선권을 검증했다고 주장하지 않는다.
 
 **recurring_schedule_guard:** 주간 패턴 설정을 보호하는 singleton 행을 추가하는 기술안이다. 신규·수정·종료·팀 해체의 패턴 상태 변경은 FOR UPDATE, 날짜 개방의 패턴 읽기는 FOR SHARE를 사용한다. 열린 날짜 밖의 미래 패턴에는 날짜 mutex가 없을 수 있으므로 이 행이 서로 다른 관리자·팀의 충돌 조회와 패턴 저장을 직렬화한다. 일반 예약은 이 guard를 잠그지 않는다.
 
@@ -425,11 +425,11 @@ erDiagram
 
 | 순서 | 대상 | 취득 기준 |
 |---:|---|---|
-| 0 | 사전 입력·계획 | 원본·예상 버전·필요 주체/자원/날짜를 읽고 없는 booking_days를 짧게 ensure |
+| 0 | 사전 입력·계획 및 directory_mutation_guard | 형식·필요 대상 집합을 읽고 guard를 먼저 잠근다. 현재 회원·소속·역할과 재시도 권한을 다시 검사한다 |
 | 1 | users, teams | 관련 user ID 오름차순, 다음 team ID 오름차순. 주체뿐 아니라 actor·approver·권한 변경 대상 포함 |
 | 2 | assets | 관련 asset ID 오름차순. 신규/이동의 고장 검사에는 FOR SHARE, 고장 등록·복구는 FOR UPDATE |
 | 3 | recurring_schedule_guard | 패턴 쓰기는 FOR UPDATE, 날짜 개방은 FOR SHARE. 일반 예약은 생략 |
-| 4 | booking_days | 기존·새 예약·한도·반복 적용의 모든 날짜 오름차순 FOR UPDATE |
+| 4 | booking_days | guard 안에서 없는 행을 ensure한 뒤 기존·새 예약·한도·반복 적용의 모든 날짜 오름차순 FOR UPDATE |
 | 5 | reservations 및 관련 업무 행 | reservation ID 오름차순 잠금, 교환/회차 version 재검증 |
 | 6 | 실제 쓰기 | 원본 release, 후속 insert, quota, 회차/교환 상태, 알림/outbox를 원자적으로 기록 |
 

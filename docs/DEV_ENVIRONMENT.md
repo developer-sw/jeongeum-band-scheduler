@@ -83,3 +83,15 @@ Wrapper는 공식 배포 SHA-256을 확인한다. 의존성 버전은 도구의 
 IntelliJ에서 Java 프로젝트를 열 때 Project SDK와 Gradle JVM을 기존 JDK 21로 지정하고 Gradle 실행은 Wrapper를 사용한다. VS Code와 IntelliJ 모두 `.editorconfig`의 UTF-8·들여쓰기·줄바꿈 규칙을 따른다. 별도 전역 Gradle·Windows PostgreSQL·Ubuntu 배포판 설치는 필요하지 않다.
 
 `backend`와 `frontend` 초기 구성 이후 버전·API 연결·앱 실행 및 CI 검증은 [INITIAL_SETUP.md](INITIAL_SETUP.md)에 기록한다. 도메인·운영 서버·배포는 아직 준비하지 않았다.
+
+## 2026-10-10 실제 실행환경 재점검
+
+사용자가 실제 로컬 환경 점검 후 예약 기본 구현을 요청했다. Docker Desktop을 시작하자 기존 PostgreSQL 컨테이너가 healthy로 복구됐으며 `jeongeum-dev_postgres_data` 볼륨을 유지했다. 점검 당시 개발 DB에는 Flyway V1만 적용돼 있었다.
+
+개발 DB를 변경하기 전에 Git에서 제외되는 `backups/local-before-reservations-20261010-110833.dump`에 custom-format 논리 백업을 생성했다. `pg_restore --list`로 형식을 확인하고 SHA-256을 기록했다. Windows 텍스트 리다이렉션 대신 컨테이너 내부 파일 생성과 `docker cp`를 사용했다. 외부 백업·복원 검증 완료를 주장하지 않는다.
+
+기존 [Start-Backend.ps1](../scripts/Start-Backend.ps1) 실행으로 V2·V3를 적용했고, [Start-Frontend.ps1](../scripts/Start-Frontend.ps1) 실행 후 [Test-ApplicationConnection.ps1](../scripts/Test-ApplicationConnection.ps1)이 통과했다. 실제 Next.js → 백엔드 → DB health, no-store, HttpOnly 세션, CSRF와 익명 보호 API 거절을 확인했다. 실제 개발 DB의 회원과 관리자는 0명이므로 최초 관리자 생성은 [Initialize-Admin.ps1](../scripts/Initialize-Admin.ps1)의 숨김 비밀번호 입력 절차로 진행한다. 자동 기본 관리자·실제 회원 fixture를 추가하지 않았다.
+
+V4 직전 V3 DB를 `backups/local-v3-before-v4-20261010-112854.dump`에 추가 백업하고 형식·SHA-256·Git 제외를 확인했다. 실제 백엔드 재시작으로 V4를 적용했으며 Flyway V1~V4는 모두 성공 상태다. 개발 DB는 사용자·예약 각각 0건, 기본 블록 10개·악기 6개다. 합성 QA 계정과 예약을 개발 DB에 넣지 않았다.
+
+최종 프론트 `127.0.0.1:3000`·백엔드 `127.0.0.1:8080`·기존 PostgreSQL `127.0.0.1:5432`를 실행하고 앱 연결 검사를 다시 통과했다. 임시 QA 서버와 컨테이너만 중지했다. 예약 PostgreSQL 통합 테스트·최종 빌드·화면 검증 결과와 실제 제한은 [RESERVATION_FOUNDATION.md](RESERVATION_FOUNDATION.md)에 구분해 기록한다. 사용자 GitHub README, 기존 소스·설정·비밀번호 파일과 Docker 볼륨을 보존했다.

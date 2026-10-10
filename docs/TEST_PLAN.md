@@ -1,6 +1,6 @@
 # 테스트 및 운영 검증 계획
 
-작성 기준: 2026-10-09, Asia/Seoul. 이 문서는 업무 테스트의 기준이다. 로컬 DB·초기 앱 검증은 [DEV_ENVIRONMENT.md](DEV_ENVIRONMENT.md), [INITIAL_SETUP.md](INITIAL_SETUP.md), 초대·가입·세션·권한 회수·경합은 [AUTHENTICATION.md](AUTHENTICATION.md), 2026-10-10 명단·팀·곡 단계의 실제 검증은 [MEMBER_TEAM_MANAGEMENT.md](MEMBER_TEAM_MANAGEMENT.md)에 기록한다. 예약·Push 등 후속 항목의 통과를 주장하지 않는다. [RESERVATION_RULES.md](RESERVATION_RULES.md), [API.md](API.md), [ERD.md](ERD.md), [UX.md](UX.md), [NOTIFICATIONS.md](NOTIFICATIONS.md)와 함께 검토한다.
+작성 기준: 2026-10-10, Asia/Seoul. 이 문서는 업무 테스트의 기준이다. 로컬 DB·초기 앱 검증은 [DEV_ENVIRONMENT.md](DEV_ENVIRONMENT.md), [INITIAL_SETUP.md](INITIAL_SETUP.md), 초대·가입·세션·권한 회수·경합은 [AUTHENTICATION.md](AUTHENTICATION.md), 명단·팀·곡 단계는 [MEMBER_TEAM_MANAGEMENT.md](MEMBER_TEAM_MANAGEMENT.md), 이번 예약 기본 단계의 실제 결과는 [RESERVATION_FOUNDATION.md](RESERVATION_FOUNDATION.md)에 기록한다. 기본 예약 검증을 변경·교환·반복 배정·Push 등 후속 항목의 통과로 간주하지 않는다. [RESERVATION_RULES.md](RESERVATION_RULES.md), [API.md](API.md), [ERD.md](ERD.md), [UX.md](UX.md), [NOTIFICATIONS.md](NOTIFICATIONS.md)와 함께 검토한다.
 
 ## 1. 목표와 우선순위
 

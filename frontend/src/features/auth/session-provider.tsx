@@ -37,6 +37,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     else if (error.code === "FORBIDDEN") {
       client.removeQueries({ queryKey: ["admin"] });
       client.removeQueries({ queryKey: ["directory"] });
+      client.removeQueries({ queryKey: ["reservations"] });
       void client.invalidateQueries({ queryKey: memberQueryKey });
     }
   }), [client]);

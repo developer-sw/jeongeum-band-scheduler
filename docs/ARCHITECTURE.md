@@ -4,7 +4,7 @@
 
 ## 1. 문서 범위와 상태
 
-이 문서는 jeongeum-band-scheduler의 구현을 위한 설계 기준이다. 초기 구성·인증 기반을 준비했고 명단·계정 연결과 회원·팀·팀장·곡 관리를 구현한다. 초기 구성은 [INITIAL_SETUP.md](INITIAL_SETUP.md), 인증 설정·검증은 [AUTHENTICATION.md](AUTHENTICATION.md), 이번 단계는 [MEMBER_TEAM_MANAGEMENT.md](MEMBER_TEAM_MANAGEMENT.md)에 기록한다. 예약·공지·Push와 운영 서버·배포는 후속 단계다.
+이 문서는 jeongeum-band-scheduler의 구현을 위한 설계 기준이다. 초기 구성·인증·명단·계정 연결과 회원·팀·팀장·곡 관리를 준비했고 예약 기본 기능을 구현한다. 초기 구성은 [INITIAL_SETUP.md](INITIAL_SETUP.md), 인증 설정·검증은 [AUTHENTICATION.md](AUTHENTICATION.md), 명단·팀 단계는 [MEMBER_TEAM_MANAGEMENT.md](MEMBER_TEAM_MANAGEMENT.md), 이번 단계는 [RESERVATION_FOUNDATION.md](RESERVATION_FOUNDATION.md)에 기록한다. 예약 변경·교환·반복 배정·공지·Push와 운영 서버·배포는 후속 단계다.
 
 운영 정책의 기준 문서는 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md)와 [RESERVATION_RULES.md](RESERVATION_RULES.md)이다. 이 문서의 **확정 정책**은 사용자 결정의 요약이고, **기술 설계안**은 그 정책을 구현하기 위한 구조다. 세부 버전·성능 한도·설정 수치는 구현과 검증을 거쳐 고정한다.
 
@@ -151,7 +151,7 @@ DB migration은 Flyway로 관리하고, 운영에 적용된 파일은 수정하�
 기술 설계안의 불변조건은 다음과 같다.
 
 1. 허용 블록, 주체, 악기 고장 상태, 날짜와 시작 조건을 서버에서 검증한다.
-2. 이번 명단·권한·초대·가입 변경은 `directory_mutation_guard`를 먼저 잠근다. 향후 예약 쓰기도 권한 변경과 공통 순서를 공유하도록 이 guard 다음에 주체뿐 아니라 실행자·승인자를 포함하는 관련 회원 행, 관련 팀 행을 각각 ID 오름차순으로 `FOR NO KEY UPDATE` 잠근 뒤, 악기 행 → 반복 관리·생성 작업이면 recurring_schedule_guard → booking_days 날짜 행 → 예약 행 순으로 잠그는 기술안을 따른다. 새 개인 배치의 고장 검증은 악기 행을 `FOR SHARE`, 고장 등록·복구는 `FOR UPDATE`로 잠근다. 각 단계 안에서는 ID 또는 날짜 오름차순을 사용하고 날짜 행은 `FOR UPDATE`로 한도와 점유 변경을 직렬화한다. 필요한 가장 강한 모드를 처음부터 선택해 뒤늦은 잠금 승격을 피한다.
+2. 명단·권한·초대·가입 변경과 이번 예약 생성·취소는 `directory_mutation_guard`를 먼저 잠근다. 현재 권한을 재검증한 뒤 주체뿐 아니라 실행자·승인자를 포함하는 관련 회원 행, 관련 팀 행을 각각 ID 오름차순으로 `FOR NO KEY UPDATE` 잠그고, 악기 행 → 반복 관리·생성 작업이면 recurring_schedule_guard → booking_days 날짜 행 → 예약 행 순으로 잠그는 기술안을 따른다. 새 개인 배치의 고장 검증은 악기 행을 `FOR SHARE`, 고장 등록·복구는 `FOR UPDATE`로 잠근다. 없는 날짜는 guard 안에서 생성한 뒤 잠근다. 각 단계 안에서는 ID 또는 날짜 오름차순을 사용하고 날짜 행은 `FOR UPDATE`로 한도와 점유 변경을 직렬화한다. 필요한 가장 강한 모드를 처음부터 선택해 뒤늦은 잠금 승격을 피한다.
 3. 10개 고정 블록은 서로 겹치지 않으므로 30분 atomic slot을 추가하지 않는다. reservation_assets의 활성 점유에 대한 partial unique(reservation_date, time_block_code, asset_id)가 최종 점유 방어선이다. 팀은 6자원 전체, 개인은 일반 1자원 또는 허용된 90분 2자원 예외를 점유한다. 동일 회원의 같은 블록 개인 중복은 별도 제약·잠금으로 방어한다.
 4. 두 블록 묶음은 모든 점유가 함께 성공하거나 함께 롤백된다. 부분 성공 예약을 만들지 않는다.
 5. 변경·교환에서는 회원·팀 → 악기 → 사용 날짜 → 예약 ID 순으로 잠그고 예약 version을 재검증한다. 원래 예약과 목적 점유·각 주체의 한도·현재 권한을 한 트랜잭션에서 반영한다. 팀원·팀장 변경과 회원·팀 비활성화도 관련 회원·팀 잠금 규칙을 공유해 권한 회수와 예약 변경의 경합을 처리한다. 재조회한 날짜·자원 집합이 이미 취득한 잠금 범위와 달라지면 역순 잠금을 추가하지 않고 트랜잭션을 다시 시작한다.

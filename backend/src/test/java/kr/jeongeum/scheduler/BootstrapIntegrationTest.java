@@ -94,7 +94,7 @@ class BootstrapIntegrationTest {
 
     @Test
     void migratesPostgreSqlAndReturnsMinimalHealthContract() throws Exception {
-        assertEquals(List.of("1", "2", "3"), jdbc.queryForList(
+        assertEquals(List.of("1", "2", "3", "4"), jdbc.queryForList(
                 "SELECT version FROM flyway_schema_history WHERE success = true ORDER BY installed_rank", String.class));
         assertEquals(2, jdbc.queryForObject(
                 "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' "
@@ -137,20 +137,20 @@ class BootstrapIntegrationTest {
         String secondToken = csrf().get("token").asString();
         assertNotEquals(firstData.get("token").asString(), secondToken,
                 "BREACH protection masks the same stored token differently per response");
-        assertEquals(401, post("/api/v1/reservations", firstData).statusCode(),
+        assertEquals(401, post("/api/v1/unknown-protected-probe", firstData).statusCode(),
                 "A masked token from the previous request remains valid for its session");
     }
 
     @Test
     void protectsUnknownApiWithJsonAndDoesNotEnableDefaultLoginOrBasicAuth() throws Exception {
-        var anonymous = get("/api/v1/reservations");
+        var anonymous = get("/api/v1/unknown-protected-probe");
         assertError(anonymous, 401, "AUTHENTICATION_REQUIRED");
         assertEquals(anonymous.headers().firstValue("X-Request-ID").orElseThrow(),
                 json.readTree(anonymous.body()).at("/error/requestId").asString());
         assertFalse(anonymous.headers().firstValue("Location").isPresent());
         assertFalse(anonymous.headers().firstValue("WWW-Authenticate").isPresent());
 
-        var basic = send(HttpRequest.newBuilder(uri("/api/v1/reservations"))
+        var basic = send(HttpRequest.newBuilder(uri("/api/v1/unknown-protected-probe"))
                 .header("Authorization", "Basic " + Base64.getEncoder().encodeToString(
                         "synthetic-user:unused-test-value".getBytes(StandardCharsets.UTF_8))).GET().build());
         assertError(basic, 401, "AUTHENTICATION_REQUIRED");
@@ -160,14 +160,14 @@ class BootstrapIntegrationTest {
     @Test
     void rejectsMissingInvalidAndOtherSessionsCsrfWithoutBypassingAuthentication() throws Exception {
         JsonNode valid = csrf();
-        assertError(post("/api/v1/reservations", null), 403, "CSRF_INVALID");
+        assertError(post("/api/v1/unknown-protected-probe", null), 403, "CSRF_INVALID");
         JsonNode invalid = json.readTree("{\"headerName\":\"X-CSRF-TOKEN\",\"token\":\"invalid\"}");
-        assertError(post("/api/v1/reservations", invalid), 403, "CSRF_INVALID");
-        assertError(post("/api/v1/reservations", valid), 401, "AUTHENTICATION_REQUIRED");
+        assertError(post("/api/v1/unknown-protected-probe", invalid), 403, "CSRF_INVALID");
+        assertError(post("/api/v1/unknown-protected-probe", valid), 401, "AUTHENTICATION_REQUIRED");
 
         newClient();
         csrf();
-        assertError(post("/api/v1/reservations", valid), 403, "CSRF_INVALID");
+        assertError(post("/api/v1/unknown-protected-probe", valid), 403, "CSRF_INVALID");
     }
 
     @Test
@@ -175,9 +175,9 @@ class BootstrapIntegrationTest {
         JsonNode valid = csrf();
         installAuthenticatedContext(sessions, sessionId());
 
-        assertError(get("/api/v1/reservations"), 403, "FORBIDDEN");
-        assertError(post("/api/v1/reservations", null), 403, "CSRF_INVALID");
-        assertError(post("/api/v1/reservations", valid), 403, "FORBIDDEN");
+        assertError(get("/api/v1/unknown-protected-probe"), 403, "FORBIDDEN");
+        assertError(post("/api/v1/unknown-protected-probe", null), 403, "CSRF_INVALID");
+        assertError(post("/api/v1/unknown-protected-probe", valid), 403, "FORBIDDEN");
     }
 
     private <S extends Session> void installAuthenticatedContext(SessionRepository<S> repository, String id) {
