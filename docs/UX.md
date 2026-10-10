@@ -1,6 +1,6 @@
 # UX 및 반응형 화면 설계
 
-작성 기준: 2026-10-09, Asia/Seoul. 사용자 로고·남색·노란색을 유지하며 로그인·초대 가입·현재 회원 홈·전체 관리자 초대 화면을 구현한다. 현재 계약·검증은 [AUTHENTICATION](AUTHENTICATION.md)에 기록한다. 예약 UI와 배포는 후속 단계다. 아래에서 **확정 정책**과 **UI 제안**을 구분한다. 예약 정책·권한의 상세 계약은 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), [RESERVATION_RULES.md](RESERVATION_RULES.md), [API.md](API.md)를 함께 확인한다.
+작성 기준: 2026-10-10, Asia/Seoul. 사용자 로고·남색·노란색과 하단 `JEONGEUM · SENTIMENTAL MUSIC` 문구를 유지한다. 인증 화면은 [AUTHENTICATION](AUTHENTICATION.md), 명단·팀 화면은 [MEMBER_TEAM_MANAGEMENT](MEMBER_TEAM_MANAGEMENT.md), 이번 일정·생성·취소 화면은 [RESERVATION_FOUNDATION](RESERVATION_FOUNDATION.md)을 따른다. 변경·교환·반복·공지·Push UI와 배포는 후속 단계다. 아래에서 **확정 정책**과 **UI 제안**을 구분한다. 예약 정책·권한의 상세 계약은 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), [RESERVATION_RULES.md](RESERVATION_RULES.md), [API.md](API.md)를 함께 확인한다.
 
 ## 1. 목표와 첫 운영 범위
 

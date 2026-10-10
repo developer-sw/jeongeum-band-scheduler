@@ -2,7 +2,7 @@
 
 작성일: 2026-10-09 / 기준 시간대: `Asia/Seoul` / 기본 경로: `/api/v1`
 
-이 문서는 업무 기능의 설계 계약이다. 인증·초대에 가입 전 명단·계정 연결과 회원·팀·팀장·곡 관리를 추가한다. 현재 인증 계약·검증은 [AUTHENTICATION](AUTHENTICATION.md), 이번 단계의 실제 DTO·검증은 [MEMBER_TEAM_MANAGEMENT](MEMBER_TEAM_MANAGEMENT.md)을 따른다. 예약·알림 API와 OpenAPI 산출물은 후속 단계다. 사용자 정책은 [PROJECT_CONTEXT](PROJECT_CONTEXT.md)와 [RESERVATION_RULES](RESERVATION_RULES.md), 저장 모델은 [ERD](ERD.md)를 따른다.
+이 문서는 업무 기능의 설계 계약이다. 인증·초대에 가입 전 명단·계정 연결과 회원·팀·팀장·곡 관리를 추가했다. 인증 계약·검증은 [AUTHENTICATION](AUTHENTICATION.md), 명단·팀 DTO·검증은 [MEMBER_TEAM_MANAGEMENT](MEMBER_TEAM_MANAGEMENT.md)을 따른다. 이번 예약 기본 단계의 실제 DTO·재시도·검증은 [RESERVATION_FOUNDATION](RESERVATION_FOUNDATION.md)을 따른다. 아래의 batch·PATCH·교환·반복·고장 관리·알림 API와 OpenAPI 산출물은 후속 단계의 설계 계약이며 이번에 제공하는 API와 구분한다. 사용자 정책은 [PROJECT_CONTEXT](PROJECT_CONTEXT.md)와 [RESERVATION_RULES](RESERVATION_RULES.md), 저장 모델은 [ERD](ERD.md)를 따른다.
 
 Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 반환한다. CSRF는 `data.headerName=X-CSRF-TOKEN`, `data.token`을 반환한다. 두 응답은 공통 `meta`와 `Cache-Control: no-store`를 사용한다. 초기 보안 계층의 CSRF 누락·위조는 `403 CSRF_INVALID`, 미인증 보호 API 접근은 `401 AUTHENTICATION_REQUIRED`다.
 
@@ -18,7 +18,7 @@ Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 �
 - 상태 변경 요청은 CSRF token을 요구한다. 공개 가입·로그인에도 Spring Security 설정과 일치하는 CSRF 흐름을 적용한다.
 - 실행자·개인 주체·알림함 소유자·구독 소유자는 인증 정보에서 결정한다. 요청의 임의 `userId`를 신뢰하지 않는다.
 - 예약 변경·취소에는 예약의 `expectedVersion`, 교환 승인·거절·악기 배분에는 요청의 `expectedVersion`을 사용한다. 교환 항목에는 원본 예약 버전도 따로 저장한다. 서버가 잠금 후 현재 값과 비교한다.
-- 상태 변경의 기술 권고안은 `Idempotency-Key`다. 사용자·경로·본문 fingerprint를 함께 검증하여 같은 재시도는 같은 결과를 반환한다. 다른 본문으로 같은 키를 재사용하면 거절한다. 이것이 업무 충돌 검사를 대체하지 않는다.
+- 상태 변경의 기술 권고안은 `Idempotency-Key`다. 이번 예약 생성·취소는 16~128자 공백 없는 출력 가능한 ASCII 헤더를 필수로 사용한다. 실행자·경로·정규화한 본문 fingerprint를 검증하여 재시도는 새 작업 없이 기존 예약 ID의 현재 상태를 반환한다. 현재 조회·조작 권한은 재검증하고 다른 본문·경로로 같은 키를 재사용하면 거절한다. 실패는 키를 성공 처리하지 않으며 이번 단계에서는 시간 경과에 따른 키 삭제·재사용을 허용하지 않는다. 이것이 업무 충돌 검사를 대체하지 않는다.
 - 목록은 cursor pagination을 제안한다. 프론트의 편의용 `allowedActions`도 서버 권한 검증을 대체하지 않는다.
 
 일반 성공은 `200`, 생성은 `201`, 본문이 필요 없는 삭제·해제는 `204`다.
@@ -141,6 +141,8 @@ Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 �
 - 본인·팀장·전체 관리자 등 현재 권한에 따른 행동 표시
 
 조회 응답을 받은 뒤에도 실제 mutation은 현재 상태를 다시 검사한다. 예약하지 않은 미래 날짜를 조회할 수 있더라도 개방 범위 밖의 생성은 거절한다. 무인증 공개 일정은 현재 설계에 포함하지 않는다. 개인 이름 등 공개 범위는 정책 확정사항과 구분한다.
+
+기본 단계의 일정 조회는 오늘~오늘+14일 안의 최대 15일 구간을 제공한다. 과거 이력은 예약 목록의 별도 날짜 구간으로 조회한다. 이는 조회량을 제한하는 기술 설정이며 예약 한도를 추가하는 정책이 아니다. 아직 고정 배정 기능이 없어 이 단계의 `OPEN`은 고정 회차 반영 검증 완료를 뜻하지 않는다.
 
 고장 등록은 여섯 점유 행에 가짜 예약을 생성하는 동작이 아니다. 팀 예약은 고장 안내와 함께 허용한다. 고장 등록과 신규 예약의 경합은 동일 악기 잠금으로 선후를 결정한다.
 

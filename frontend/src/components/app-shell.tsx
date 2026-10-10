@@ -18,7 +18,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <header className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-6 py-5 sm:px-10">
       <Link href="/" aria-label="정음 홈" className="flex items-center gap-2"><Image src="/jeongeum-logo.jpg" alt="" width={52} height={52} /><span className="text-base font-extrabold tracking-[0.16em] sm:text-lg">JEONGEUM</span></Link>
       <nav aria-label="주요 메뉴" className="flex flex-wrap items-center gap-4 text-sm font-semibold">
-        {member ? <><Link href="/">내 정보</Link><Link href="/teams">팀·곡 목록</Link>{member.globalRole === "GLOBAL_ADMIN" && <><Link href="/admin/members">회원 관리</Link><Link href="/admin/invitations">초대 관리</Link></>}</> : <><Link href="/login">로그인</Link><Link href="/join" className="rounded-lg bg-yellow px-3 py-2">초대 가입</Link></>}
+        {member ? <><Link href="/">내 정보</Link><Link href="/reservations">합주실 예약</Link><Link href="/teams">팀·곡 목록</Link>{member.globalRole === "GLOBAL_ADMIN" && <><Link href="/admin/members">회원 관리</Link><Link href="/admin/invitations">초대 관리</Link></>}</> : <><Link href="/login">로그인</Link><Link href="/join" className="rounded-lg bg-yellow px-3 py-2">초대 가입</Link></>}
       </nav>
     </header>
     {!online && <p role="status" className="mx-6 mb-4 rounded-xl border border-yellow bg-yellow/20 px-5 py-3 text-sm leading-6 sm:mx-10">현재 오프라인이에요. 변경 요청은 저장하거나 자동 실행하지 않아요. 연결 후 직접 다시 시도해 주세요.</p>}
