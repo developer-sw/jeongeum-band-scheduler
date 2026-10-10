@@ -42,7 +42,7 @@ export function ResourceList({ block, instruments }: { block: ScheduleBlock; ins
 function BlockSummary({ block, now }: { block: ScheduleBlock; now: number }) {
   const team = block.reservations.find((reservation) => reservation.subjectType === "TEAM");
   const phase = phaseAt(block.startsAt, block.endsAt, now);
-  return <><p className="font-semibold break-words">{team ? `${subjectLabel(team)} · 전체 독점` : block.reservations.length ? `개인 ${block.reservations.length}건 · 악기별 공유` : "빈 시간"}</p><p className="mt-1 text-xs leading-6 text-navy-soft">{phaseLabels[phase]}{phase === "IN_PROGRESS" && ` · 잔여 약 ${remainingMinutes(block, now)}분`}</p></>;
+  return <><p className="font-semibold break-words">{team ? `${subjectLabel(team)} · 전체 독점` : block.reservations.length ? `개인 ${block.reservations.length}건 · 악기별 공유` : "빈 시간"}</p>{team?.originKind === "FIXED" && <p className="mt-2 text-xs font-bold">관리자 고정 배정{team.quotaExempt && " · 60분 한도 면제"}</p>}<p className="mt-1 text-xs leading-6 text-navy-soft">{phaseLabels[phase]}{phase === "IN_PROGRESS" && ` · 잔여 약 ${remainingMinutes(block, now)}분`}</p></>;
 }
 
 export function MobileSchedule({ day, instruments, now, selectedBlockCode, onSelect }: { day: ScheduleDay; instruments: Instrument[]; now: number; selectedBlockCode?: string; onSelect: (date: string, block: ScheduleBlock) => void }) {

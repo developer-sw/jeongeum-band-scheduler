@@ -15,6 +15,8 @@ export interface ReservationSummary {
   instrumentCodes: InstrumentCode[];
   status: "CONFIRMED" | "CANCELED" | "REPLACED";
   phase: ReservationPhase;
+  originKind: "MANUAL" | "FIXED" | "CHANGE" | "EXCHANGE";
+  quotaExempt: boolean;
   isMine: boolean;
   canCancel: boolean;
 }

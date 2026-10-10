@@ -1,8 +1,8 @@
 # ERD와 트랜잭션 설계
 
-기준일: 2026-10-09 (Asia/Seoul)
+기준일: 2026-10-10 (Asia/Seoul)
 
-업무 정책의 기준은 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), [RESERVATION_RULES.md](RESERVATION_RULES.md)다. 이 문서의 업무 테이블·컬럼·상태·잠금은 정책을 구현하는 **기술 설계 권고안**이다. Flyway V1은 Spring Session JDBC, V2는 `users`·`invitation_codes`·`auth_bootstrap_guard`다. V3는 가입 전 명단·팀·소속·곡과 명단 연결용 초대 FK·잠금·역할 변경 이력을 추가한다. 이번 V4는 블록·악기·예약 날짜·예약·점유·한도 ledger·작업 이력·재시도 키를 추가하며 V1~V3를 수정하지 않는다. 실제 V4 계약은 [RESERVATION_FOUNDATION.md](RESERVATION_FOUNDATION.md)을 따른다. 반복·교환·공지·알림 테이블은 후속 구현이며 아래의 전체 ERD는 완료된 migration 목록과 구분한다. 인증 검증은 [AUTHENTICATION.md](AUTHENTICATION.md), 명단·팀 계약은 [MEMBER_TEAM_MANAGEMENT.md](MEMBER_TEAM_MANAGEMENT.md)를 따른다.
+업무 정책의 기준은 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), [RESERVATION_RULES.md](RESERVATION_RULES.md)다. 이 문서의 업무 테이블·컬럼·상태·잠금은 정책을 구현하는 **기술 설계 권고안**이다. Flyway V1은 Spring Session JDBC, V2는 `users`·`invitation_codes`·`auth_bootstrap_guard`다. V3는 가입 전 명단·팀·소속·곡과 명단 연결용 초대 FK·잠금·역할 변경 이력을 추가했다. V4는 블록·악기·예약 날짜·예약·점유·한도 ledger·작업 이력·재시도 키를 추가했으며 실제 계약은 [RESERVATION_FOUNDATION.md](RESERVATION_FOUNDATION.md)을 따른다. 이번 V5는 반복 배정·패턴 revision·주차 회차·예약 연결·패턴 guard·관리 재시도 키와 날짜의 `recurring_prepared` 표식을 추가하며 V1~V4를 수정하지 않는다. 실제 V5 계약은 [RECURRING_ASSIGNMENTS.md](RECURRING_ASSIGNMENTS.md)를 따른다. 교환·공지·알림 테이블은 후속 구현이며 아래의 전체 ERD는 완료된 migration 목록과 구분한다. 인증 검증은 [AUTHENTICATION.md](AUTHENTICATION.md), 명단·팀 계약은 [MEMBER_TEAM_MANAGEMENT.md](MEMBER_TEAM_MANAGEMENT.md)를 따른다.
 
 ## 1. 핵심 설계 선택
 
@@ -125,6 +125,7 @@ erDiagram
         bigint team_id FK
         bigint created_by_user_id FK
         string status
+        date end_date
         bigint version
     }
     recurring_assignment_revisions {
@@ -134,7 +135,7 @@ erDiagram
         date effective_date
         int weekday
         string time_block_code FK
-        date end_date
+        timestamptz created_at
     }
     recurring_occurrences {
         bigint id PK
@@ -297,7 +298,7 @@ erDiagram
 - 운영일은 서울 `LocalDate`이며 24:00 종료가 다음 날짜 mutex에 속하는 것으로 해석하지 않는다.
 - 과거 날짜 행을 유지한다. `OPEN` 상태여도 현재 `오늘..오늘+14일` 범위 밖의 생성 요청은 거절한다.
 - 없는 날짜는 선행 `directory_mutation_guard`를 보유한 업무 트랜잭션에서 `INSERT ... ON CONFLICT DO NOTHING`으로 생성한 뒤 날짜 오름차순으로 `FOR UPDATE`한다. 없는 행에 `FOR UPDATE`만 호출해서는 잠금이 생기지 않는다.
-- 기본 구현은 고정 배정 기능이 아직 없어 개방 범위의 날짜를 `OPEN`으로 준비한다. 반복 배정 구현 단계에서는 고정 회차 반영과 `OPEN` 전환을 연결해야 하며, 기본 단계만으로 반복 배정 우선권을 검증했다고 주장하지 않는다.
+- V5는 `recurring_prepared` 완료 표식을 추가한다. V4의 기존 날짜는 데이터를 유지하고 표식을 false로 시작한다. 실제 고정 회차 반영과 OPEN 전환을 같은 트랜잭션에서 수행한 뒤에만 일정에서 공개한다. 저장된 OPEN이어도 표식이 false인 날짜는 PREPARING으로 취급한다. 상세 구현 모델은 [RECURRING_ASSIGNMENTS](RECURRING_ASSIGNMENTS.md)를 따른다.
 
 **recurring_schedule_guard:** 주간 패턴 설정을 보호하는 singleton 행을 추가하는 기술안이다. 신규·수정·종료·팀 해체의 패턴 상태 변경은 FOR UPDATE, 날짜 개방의 패턴 읽기는 FOR SHARE를 사용한다. 열린 날짜 밖의 미래 패턴에는 날짜 mutex가 없을 수 있으므로 이 행이 서로 다른 관리자·팀의 충돌 조회와 패턴 저장을 직렬화한다. 일반 예약은 이 guard를 잠그지 않는다.
 
@@ -314,7 +315,7 @@ erDiagram
 | usable_from | 잔여 시간 예약을 포함한 예약 효력 시작 |
 | status | `CONFIRMED/CANCELED/REPLACED` |
 | origin_kind | `MANUAL/FIXED/CHANGE/EXCHANGE`; 생성 경로 audit |
-| quota_exempt | 원래 직접 고정 배정만 true; 사용자 후속 60분에는 전파하지 않음 |
+| quota_exempt | 원래 직접 고정 60분만 true; 사용자 후속 60분에는 전파하지 않음. 90분은 면제 표시 없이 한도 비대상 |
 | dual_asset_exception | 교환으로 생성된 90분 개인 예외인지 표시 |
 | created_at, canceled_at, cancel_reason | 생성·취소 이력 |
 
@@ -322,6 +323,8 @@ erDiagram
 - 종료 표시 `ENDED`는 현재 시각과 end로 계산하는 조회 상태다. 정상 종료를 `CANCELED`로 바꾸거나 사용 이력을 삭제하지 않는다.
 - 원래 creator가 탈퇴했어도 존속 팀 예약은 존재할 수 있다. 현재 실행자와 팀 상태를 검증하며 역사적 creator의 탈퇴를 팀 예약 삭제 조건으로 삼지 않는다.
 - 개인 `CONFIRMED` 예약의 `(owner_user_id, reservation_date, time_block_code)`는 unique다. 두 악기 예외도 예약 한 행이므로 이 조건을 만족한다.
+
+내 공연조 일정(`/my-schedule`)은 별도 일정 테이블이나 미래 패턴 복제 없이 기존 `reservations`와 현재 활성 `team_memberships`를 사용한다. 서버의 `scope=mine` 응답 가운데 현재 소속 팀의 `owner_type=TEAM`, `status=CONFIRMED` 실제 예약만 표시하고 날짜의 `OPEN/recurring_prepared` 상태를 함께 확인한다. 일반 예약과 고정 회차는 `origin_kind`로 구분한다. `recurring_occurrences`의 PLANNED만 있는 회차는 확정 예약 목록에 포함하지 않으며 취소·교체 이력과 계보는 기존 모델에 남긴다. 화면의 시간순 정렬·팀 필터·상태 표시는 조회 표현이며 V5 이후 새 migration을 추가하지 않는다.
 
 ### 5.6 reservation_assets
 
@@ -359,7 +362,7 @@ erDiagram
 ### 5.9 recurring_assignments / revisions / occurrences
 
 - `recurring_assignments`: 팀, 원래 관리 발급자, ACTIVE/ENDED, version. 한 assignment는 한 주의 한 블록 배정이다. 인접 두 60분 고정 배정은 두 assignment로 구성할 수 있다.
-- `recurring_assignment_revisions`: 적용 시작일, 요일, 블록, 선택적 종료일, revision 번호. 과거 패턴 이력을 수정하지 않고 새 revision을 추가한다.
+- `recurring_assignment_revisions`: 적용 시작일, 요일, 블록, revision 번호, 승인 시각 `created_at`. 과거 패턴 이력을 수정하지 않고 새 revision을 추가한다. 시작 전 경계 판정은 저장된 승인 시각으로 고정하며 지연 복구 시각으로 이전 패턴을 되살리지 않는다. V5의 포함 종료일은 assignment에 저장하며 관리 version과 작업 이력으로 종료 변경을 기록한다.
 - `recurring_occurrences`: assignment, 서울 월요일 week_start_date, 패턴 revision, 원래 관리자 예정 위치, 상태, version.
 - `(assignment_id, week_start_date)`는 unique이며 패턴 revision과 실제 예약 날짜를 키에 넣지 않는다.
 - 상태는 `PLANNED/MATERIALIZED/CANCELED_EXCEPTION/CHANGED_EXCEPTION/EXCHANGED_EXCEPTION/ENDED`를 제안한다.
@@ -367,7 +370,7 @@ erDiagram
 - 예외가 있는 회차는 자동 생성·전체 패턴 수정으로 초기 위치에 다시 만들지 않는다.
 - 관리자 패턴 변경의 예외 없는 새 직접 배정은 새 원래 위치에서 FIXED 면제를 받을 수 있다. 사용자 변경·교환 lineage는 FIXED 생성으로 둔갑시키지 않는다.
 - 적용 기간이 겹치는 미래 주간 패턴의 요일·블록 충돌도 검사한다. 아직 booking_days가 없는 미래라고 중복 고정 배정을 허용하지 않는다.
-- 일반 종료는 종료일 이후의 미시작·예외 없는 직접 배정을 정리하고 변경·교환 후속 및 예외 이력을 유지하는 기술안이다. 종료일 이전 회차는 계속 유효하며 미래 종료일은 날짜 조건으로 생성에 반영한다. 팀 해체의 전체 남은 예약 취소와 구분한다.
+- 일반 종료는 종료일 이후의 미시작·예외 없는 직접 배정을 정리하고 변경·교환 후속 및 예외 이력을 유지하는 기술안이다. 종료일 당일까지의 회차는 계속 유효하며 미래 종료일은 날짜 조건으로 생성에 반영한다. 팀 해체의 전체 남은 예약 취소와 구분한다.
 
 **요일 변경 예:** 원래 수요일 회차를 그 주 금요일로 사용자가 변경했다면 해당 주차는 CHANGED_EXCEPTION이다. 관리자가 패턴을 목요일로 바꿔도 그 주의 목요일 예약을 새로 만들지 않는다. 다음 예외 없는 적용 가능 주차부터 새 패턴을 사용한다.
 

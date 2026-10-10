@@ -12,6 +12,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import kr.jeongeum.scheduler.common.api.ApiException;
 import kr.jeongeum.scheduler.common.concurrency.DirectoryMutationGuard;
+import kr.jeongeum.scheduler.recurring.service.RecurringOpeningService;
 import kr.jeongeum.scheduler.reservation.api.InstrumentResponse;
 import kr.jeongeum.scheduler.reservation.api.ScheduleResponse;
 import kr.jeongeum.scheduler.reservation.domain.Instrument;
@@ -21,6 +22,8 @@ import kr.jeongeum.scheduler.reservation.repository.ReservationRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class ScheduleService {
@@ -28,13 +31,23 @@ public class ScheduleService {
     private final ReservationViews views;
     private final DirectoryMutationGuard guard;
     private final Clock clock;
-    public ScheduleService(ReservationRepository reservations, ReservationViews views, DirectoryMutationGuard guard, Clock clock) {
+    private final RecurringOpeningService opening;
+    private final TransactionTemplate writes;
+    public ScheduleService(ReservationRepository reservations, ReservationViews views, DirectoryMutationGuard guard, Clock clock,
+            RecurringOpeningService opening, PlatformTransactionManager transactionManager) {
         this.reservations = reservations; this.views = views; this.guard = guard; this.clock = clock;
+        this.opening = opening; this.writes = new TransactionTemplate(transactionManager); this.writes.setTimeout(10);
     }
-    @Transactional(timeout = 10)
     public ScheduleResponse schedule(long actorId, String fromInput, String toInput) {
-        // New dates are prepared only in the same mutation protocol as reservation writes.
-        // Recurring allocation will later populate PREPARING dates before marking them OPEN.
+        views.context(actorId);
+        LocalDate today = LocalDate.ofInstant(now(), TimeBlock.SEOUL);
+        LocalDate from = fromInput == null ? today : ReservationInputs.date(fromInput);
+        LocalDate to = toInput == null ? today.plusDays(14) : ReservationInputs.date(toInput);
+        requireRange(from, to, today);
+        opening.prepareRange(from, to);
+        return writes.execute(status -> scheduleTransactional(actorId, fromInput, toInput));
+    }
+    private ScheduleResponse scheduleTransactional(long actorId, String fromInput, String toInput) {
         guard.lock();
         ReservationViews.Context context = views.context(actorId);
         Instant initialNow = now();

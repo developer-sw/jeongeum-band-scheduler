@@ -23,10 +23,10 @@
 - **사용 대상:** 정음 동아리의 전체 관리자, 팀장, 일반 회원
 - **개발 형태:** Spring Boot 백엔드와 Next.js 프론트엔드를 분리한 단일 Git 저장소
 - **UI 방향:** 동일한 코드베이스에서 모바일·데스크톱에 적합한 반응형 화면 제공
-- **현재 단계:** 인증·회원 명단·팀·곡 관리 구현 완료 / 예약 및 운영 기능 개발 예정
+- **현재 단계:** 인증·회원 명단·팀·곡 관리·기본 예약 구현 완료 / 반복 고정 배정·날짜 개방과 내 공연조 일정 로컬 검증
 - **배포 상태:** 로컬 개발·테스트 단계. 운영 도메인과 서버는 아직 연결하지 않음
 
-> **구현 상태 안내:** 현재 저장소에는 회원·팀 관리 기능이 구현되어 있지만, 핵심 합주실 예약 기능과 PWA 설치·Web Push는 아직 구현 완료 상태가 아닙니다. 아래의 **구현 완료**와 **개발 예정**을 구분해 주세요.
+> **구현 상태 안내:** 기본 예약·취소는 PR #6으로 main에 반영했습니다. 반복 고정 배정·날짜 개방은 작업 브랜치에서 구현·검증하며, 예약 변경·교환과 PWA 설치·Web Push는 후속 개발 범위입니다. 아래의 상태를 구분해 주세요.
 
 ## ✅ 구현 현황
 
@@ -38,15 +38,17 @@
 | 회원·명단 | ✅ 구현 완료 | 가입 전 명단, 초대를 통한 계정 연결, 기존 계정 수동 연결, 회원·관리자 역할 관리 |
 | 합주팀·곡 | ✅ 구현 완료 | 정규조·추가조, 복수 팀 소속, 팀장 지정, 팀별 연습곡 등록·조회·수정·삭제 |
 | 권한·무결성 | ✅ 구현 완료 | 전역 관리자와 팀별 팀장 권한 분리, 트랜잭션·잠금, DB 제약 및 버전 충돌 처리 |
-| 웹 화면 | ✅ 현재 기능 구현 | 로그인·가입·회원 홈·관리자 명단/초대·팀 목록/상세, 기본 반응형 레이아웃 |
-| 합주실 예약 | 📋 개발 예정 | 고정 시간 블록, 팀 독점 예약·악기별 개인 예약, 예약 충돌·일일 한도 처리 |
-| 일정 변경·교환 | 📋 개발 예정 | 예약 취소·변경, 반복 고정 배정, 예약 간 교환 및 승인 |
+| 웹 화면 | ✅ 현재 기능 구현 | 로그인·가입·회원 홈·관리자 명단/초대·팀 목록/상세·합주실 시간표, 반응형 레이아웃 |
+| 합주실 예약 | ✅ 구현 완료 | 고정 시간 블록, 팀 독점·악기별 개인 예약, 충돌·일일 한도·취소·이력 |
+| 반복 고정 배정 | ✅ 로컬 구현·검증 | 관리자 정규조·추가조 배정, 적용일별 패턴 수정·종료, 회차 취소 예외, 고정 반영 후 날짜 개방 |
+| 내 공연조 일정 | ✅ 로컬 구현 | 현재 소속 정규조·추가조의 여러 날짜 일반/고정 확정 예약 통합 조회, 팀 필터, 날짜·시간순 목록 |
+| 일정 변경·교환 | 📋 개발 예정 | 단건 예약 변경, 예약 간 교환 및 승인 |
 | 공지·알림 | 📋 개발 예정 | 전체 공지, 사이트 내 알림함, 시작 전 알림, Web Push |
 | PWA·운영 | 📋 개발 예정 | 홈 화면 설치, 기본 오프라인 안내, HTTPS 배포·백업·복원·실기기 검증 |
 
 ### 권한 모델
 
-- **전체 관리자(`GLOBAL_ADMIN`)**: 동아리 명단, 회원·역할, 팀 구성·팀장, 초대와 팀별 곡 관리
+- **전체 관리자(`GLOBAL_ADMIN`)**: 동아리 명단, 회원·역할, 팀 구성·팀장, 초대·팀별 곡·반복 고정 배정 관리와 예약 취소
 - **팀장(`LEADER`)**: 자신이 담당하는 팀의 연습곡 관리. 다른 팀이나 전체 관리자 권한은 부여하지 않음
 - **일반 회원(`MEMBER`)**: 본인 계정과 팀 정보 조회, 권한 범위에서 팀·곡 목록 확인
 
@@ -58,7 +60,7 @@
 | --- | --- |
 | Backend | Java 21, Spring Boot 4.1.1, Gradle 9.8.1 |
 | Backend 주요 구성 | Spring MVC, Spring Security, Spring Session JDBC, Spring Data JPA, Bean Validation |
-| Database | PostgreSQL 17.11, Flyway V1~V3 |
+| Database | PostgreSQL 17.11, Flyway V1~V5 |
 | Frontend | Next.js 16.4.0 (App Router), React 19.3.0, TypeScript 6.0.3 |
 | UI·데이터 | Tailwind CSS 4.3.3, TanStack Query 5.104.1 |
 | 테스트 | JUnit 5, Testcontainers(PostgreSQL), Vitest |
@@ -79,19 +81,23 @@ jeongeum-band-scheduler/
 │   │   ├── health/                      # DB 연결 상태 확인
 │   │   ├── invitation/                  # 개인 초대 발급·소비·해지
 │   │   ├── member/                      # 회원 조회·역할
+│   │   ├── reservation/                 # 시간표·기본 예약·취소·한도·점유
+│   │   ├── recurring/                   # 반복 배정·회차·날짜 개방
 │   │   ├── roster/                      # 가입 전 동아리 명단
 │   │   └── team/                        # 합주팀·소속·연습곡
 │   ├── src/main/resources/db/migration/
 │   │   ├── V1__create_spring_session.sql
 │   │   ├── V2__create_members_and_invitations.sql
-│   │   └── V3__create_roster_teams_and_songs.sql
+│   │   ├── V3__create_roster_teams_and_songs.sql
+│   │   ├── V4__create_basic_reservations.sql
+│   │   └── V5__create_recurring_assignments.sql
 │   ├── src/test/                        # 통합 테스트
 │   └── build.gradle.kts
 ├── frontend/
 │   ├── public/jeongeum-logo.jpg
-│   ├── src/app/                         # 메인·로그인·가입·관리자·팀 화면
+│   ├── src/app/                         # 메인·로그인·가입·관리자·팀·예약 화면
 │   ├── src/components/                  # 공통 UI
-│   ├── src/features/                    # 인증·명단·팀·상태 관련 로직
+│   ├── src/features/                    # 인증·명단·팀·예약·반복 배정 관련 로직
 │   ├── src/lib/                         # API 클라이언트·Query 설정
 │   ├── src/providers/
 │   └── package.json
@@ -146,6 +152,8 @@ cd ..
 
 웹 화면: **http://127.0.0.1:3000**
 
+로그인 후 **내 공연조 일정** 메뉴: `http://127.0.0.1:3000/my-schedule`. 현재 소속 공연조의 오늘~서버 예약 가능 마지막 날짜까지 실제 확정 예약을 한 목록에서 확인하며, 일정 선택은 해당 날짜의 합주실 시간표로 연결됩니다. 전체 관리자 **고정 배정** 메뉴는 `http://127.0.0.1:3000/admin/recurring-assignments`입니다.
+
 Next.js는 브라우저의 동일 출처 `/api/*` 요청을 로컬 Spring Boot의 `/api/*`로 전달합니다. 이미 개발 서버가 실행 중이면 중복 실행하지 마세요.
 
 ### 5. 연결 확인
@@ -186,12 +194,13 @@ Spring Session JDBC를 사용하며 `HttpOnly`·`SameSite=Lax` 세션 쿠키와 
 
 ## 🧪 테스트 및 CI
 
-- **Backend:** PostgreSQL Testcontainers 기반 인증·명단·팀·권한·경합 통합 테스트. PR #5 기준 **총 52개 테스트 검증** 및 JAR 빌드 성공
-- **Frontend:** Vitest **29개 테스트**, TypeScript 검사, ESLint, Next.js 프로덕션 빌드 통과
+- **Backend:** PostgreSQL Testcontainers 기반 인증·명단·팀·예약·권한·경합 통합 테스트 **114개 통과**(반복 배정 31개·기본 예약 31개 포함), Gradle production build 성공
+- **Frontend:** Vitest **66개 통과**(반복 배정 15개·내 공연조 일정 9개 포함), TypeScript 검사·ESLint·Next.js production build 통과(18개 route)
+- **실제 실행·복구:** 기존 Spring Boot 종료·새 JVM 재시작, 데이터 보존 확인. 격리 PostgreSQL에서 등록된 자정 cron, 10초 잠금 timeout의 전체 rollback, 60초 자동 재시도와 누락 날짜 복구·중복 방지 확인
 - **GitHub Actions:** Ubuntu에서 백엔드 테스트·빌드와 프론트엔드 의존성 감사·타입·lint·테스트·빌드를 자동 실행
-- **최신 `main` CI:** [2026-10-10 기준 성공한 실행](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/37962146279)
+- **PR #6 `main` CI:** [기본 예약 병합 후 성공한 실행](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/38033615083). 아래 로컬 검증 기록은 반복 배정 변경을 Push하기 전 결과이며, 이번 변경의 원격 CI는 해당 초안 PR의 Checks에서 확인
 
-검증 수치는 해당 커밋의 기록입니다. **예약 경합·실서비스 트래픽·실기기 PWA/Push·운영 백업 복원**은 아직 검증 완료 범위가 아닙니다.
+수치는 2026-10-10 로컬 검증 기록이며 상세 범위는 [반복 배정 구현 문서](docs/RECURRING_ASSIGNMENTS.md)에 정리했습니다. **실서비스 트래픽·실기기 PWA/Push·운영 외부 백업 복원**은 아직 검증 완료 범위가 아닙니다.
 
 로컬 재검증:
 
@@ -208,13 +217,15 @@ npm.cmd run build
 
 ## 📅 예약 정책 및 향후 개발
 
-설계가 확정된 예약 정책 중 주요 내용은 다음과 같습니다. **아래 정책은 아직 구현 완료를 뜻하지 않습니다.**
+설계가 확정된 예약 정책 중 주요 내용은 다음과 같습니다. 기본 예약과 반복 배정의 구현 범위는 위 현황과 각 구현 문서에서 구분합니다.
 
 - **운영 시간:** 매일 12:00~24:00. 12:00~18:00은 60분 단위 6개, 18:00~24:00은 90분 단위 4개 블록
 - **예약 가능 날짜:** 한국 시간 기준 오늘부터 14일 뒤까지(양 끝 포함)
 - **팀 예약:** 정규조·추가조 모두 합주실 전체를 독점 사용
 - **개인 예약:** 보컬·건반·일렉기타·베이스·드럼·통기타의 악기별 공유 이용
-- **추가 예정:** 60분 예약 한도, 반복 고정 배정, 취소·변경·교환, 악기 고장 관리, 공지·알림함·Web Push, 모바일 일별·PC 주간 시간표
+- **60분 예약 한도:** 개인별·팀별 하루 120분, 시작 후 취소한 사용량 유지, 원래 관리자 배정 60분만 면제
+- **반복 배정:** 정규조·추가조의 매주 고정 시간, 적용 시작일별 수정, 개별 취소 예외 보존, 고정 반영 후 날짜 개방
+- **추가 예정:** 단건 변경·교환, 악기 고장 관리, 탈퇴·팀 해체 예약 정리, 공지·알림함·Web Push, PC 주간 시간표
 
 자세한 제약, 예외, 동시성 모델은 [예약 규칙](docs/RESERVATION_RULES.md)과 [데이터 모델](docs/ERD.md)에 정리했습니다.
 
@@ -229,6 +240,8 @@ npm.cmd run build
 | [AUTHENTICATION](docs/AUTHENTICATION.md) | 초대·가입·로그인, 90일 세션, 최초 관리자 절차 |
 | [MEMBER_TEAM_MANAGEMENT](docs/MEMBER_TEAM_MANAGEMENT.md) | 명단·계정 연결, 복수 팀·팀장·곡 관리 및 테스트 |
 | [RESERVATION_RULES](docs/RESERVATION_RULES.md) | 예약 블록, 한도, 반복·변경·교환 정책 |
+| [RESERVATION_FOUNDATION](docs/RESERVATION_FOUNDATION.md) | 기본 예약·취소·점유·한도 구현 및 검증 |
+| [RECURRING_ASSIGNMENTS](docs/RECURRING_ASSIGNMENTS.md) | 반복 배정·회차 예외·날짜 개방·V5 적용 및 검증 |
 | [UX](docs/UX.md) | 데스크톱/모바일 화면 계획과 브랜드 |
 | [TEST_PLAN](docs/TEST_PLAN.md) | 기능·보안·경합·운영 검증 항목 |
 | [INITIAL_SETUP](docs/INITIAL_SETUP.md) | 백엔드·프론트엔드 초기 설정과 검증 |
@@ -245,6 +258,7 @@ npm.cmd run build
 | [#3](https://github.com/developer-sw/jeongeum-band-scheduler/pull/3) | 일회용 초대 가입·로그인·인가 기반 |
 | [#4](https://github.com/developer-sw/jeongeum-band-scheduler/pull/4) | 회원 명단과 계정 연결, 팀·팀장·곡 관리 |
 | [#5](https://github.com/developer-sw/jeongeum-band-scheduler/pull/5) | 접속 시 갱신되는 90일 로그인 유지 |
+| [#6](https://github.com/developer-sw/jeongeum-band-scheduler/pull/6) | 기본 시간표·팀/개인 예약·한도·취소 및 PostgreSQL 경합 검증 |
 
 현재는 **로컬 개발 및 기능 확장 단계**이며, 동아리 대상 운영 배포·실사용 지표는 아직 없습니다. 기능과 운영 검증을 거쳐 실제 사용자에게 제공할 예정입니다.
 

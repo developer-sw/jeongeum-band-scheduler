@@ -10,6 +10,7 @@ import kr.jeongeum.scheduler.common.api.ApiException;
 import kr.jeongeum.scheduler.common.api.DirectoryInputs;
 import kr.jeongeum.scheduler.common.concurrency.DirectoryMutationGuard;
 import kr.jeongeum.scheduler.member.repository.MemberRepository;
+import kr.jeongeum.scheduler.recurring.service.RecurringOpeningService;
 import kr.jeongeum.scheduler.reservation.api.ReservationRequests;
 import kr.jeongeum.scheduler.reservation.api.ReservationResponse;
 import kr.jeongeum.scheduler.reservation.domain.Instrument;
@@ -22,6 +23,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class ReservationService {
@@ -32,14 +35,22 @@ public class ReservationService {
     private final DirectoryMutationGuard guard;
     private final Clock clock;
     private final JdbcTemplate jdbc;
+    private final RecurringOpeningService opening;
+    private final TransactionTemplate writes;
     public ReservationService(ReservationRepository reservations, ReservationViews views, MemberRepository members,
-            TeamRepository teams, DirectoryMutationGuard guard, Clock clock, JdbcTemplate jdbc) {
+            TeamRepository teams, DirectoryMutationGuard guard, Clock clock, JdbcTemplate jdbc,
+            RecurringOpeningService opening, PlatformTransactionManager transactionManager) {
         this.reservations = reservations; this.views = views; this.members = members;
         this.teams = teams; this.guard = guard; this.clock = clock; this.jdbc = jdbc;
+        this.opening = opening; this.writes = new TransactionTemplate(transactionManager); this.writes.setTimeout(10);
     }
     public record Result(ReservationResponse reservation, int status) {}
-    @Transactional(timeout = 10)
     public Result create(long actorId, String key, ReservationRequests.Create input) {
+        views.context(actorId);
+        opening.prepareDate(ReservationInputs.date(input.date()));
+        return writes.execute(status -> createTransactional(actorId, key, input));
+    }
+    private Result createTransactional(long actorId, String key, ReservationRequests.Create input) {
         String digest = ReservationInputs.keyDigest(key);
         LocalDate date = ReservationInputs.date(input.date());
         TimeBlock block = TimeBlock.require(input.blockCode());
@@ -122,7 +133,8 @@ public class ReservationService {
         lockUsers(actorId, planned.creatorUserId());
         if (planned.teamId() != null) { lockTeam(planned.teamId()); }
         reservations.lockInstruments();
-        if (!"OPEN".equals(reservations.ensureAndLockDay(planned.date(), now()))) { throw notOpen(); }
+        // Cancellation is also the explicit way to resolve a conflict that keeps a date PREPARING.
+        reservations.ensureAndLockDay(planned.date(), now());
         Reservation reservation = reservations.lock(id).orElseThrow(DirectoryInputs::notFound);
         // Later change/exchange implementations must restart instead of extending this lock set.
         if (!reservation.date().equals(planned.date()) || !reservation.blockCode().equals(planned.blockCode())
@@ -140,6 +152,7 @@ public class ReservationService {
                 reservations.quota(reservation, operationId, -consumed, "RELEASE", now);
             }
             reservations.cancel(id, actorId, operationId, now, reason);
+            reservations.cancelOccurrence(id, now);
         } else if (!"CANCELED".equals(reservation.status())) { throw versionConflict(); }
         reservations.recordIdempotency(actorId, digest, fingerprint, route, 200, id, operationId, now);
         return new Result(views.detail(context, reservations.find(id).orElseThrow(DirectoryInputs::notFound), now), 200);
