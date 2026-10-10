@@ -216,7 +216,7 @@ B10은 시작하는 한국 날짜의 예약이다. 서버에서는 끝을 다음
 
 예약 기본 PR #6은 `cf02718`로 main에 반영했다. 사용자는 실제 로컬 DB의 최초 관리자 계정 생성을 완료했고, 정규조·추가조의 반복 고정 배정과 날짜 개방 구현을 요청했다. 이번 구현 계약과 실제 검증 결과는 [RECURRING_ASSIGNMENTS](RECURRING_ASSIGNMENTS.md)에 기록한다. 기존 관리자 계정·PostgreSQL 볼륨·세션·예약 이력을 보존하며 V1~V4 migration을 수정하지 않는다. 예약 변경·교환·알림 등의 첫 운영 필수 기능은 별도 후속 단계로 유지한다.
 
-반복 배정 관리자 UI의 최종 브라우저 검증과 내 공연조 일정 구현·검증 결과를 보고했고, 사용자가 커밋·Push·main 대상 초안 PR 진행을 승인했다. 기존 개발 DB에서는 예약 mutation을 수행하지 않고 별도 임시 PostgreSQL의 합성 계정으로 검증한다. 원격 CI를 확인하며 정식 PR 전환·main 병합은 별도 승인 대상이다.
+반복 배정 관리자 UI의 최종 브라우저 검증과 내 공연조 일정 구현·검증 결과를 보고한 뒤 사용자 승인으로 [PR #7](https://github.com/developer-sw/jeongeum-band-scheduler/pull/7)을 정식 전환·main 병합했다. 병합 커밋은 `4fccdc7`이며 [main CI](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/38060582682)의 백엔드·프론트엔드 검증이 모두 통과했다. 데이터 변경 검증은 별도 임시 PostgreSQL의 합성 계정으로 수행했고 기존 개발 DB의 관리자·예약·Docker 볼륨을 보존했다. 최신 화면의 최종 모바일 실행 검증은 미완료이며 직접 확인 절차를 구현 문서에 기록했다.
 
 1. 이 문서와 ERD·API·UX·테스트 설계를 서로 맞춰 검토한다.
 2. GitHub·개발환경 준비 이후 사용자가 요청한 backend/frontend 초기 구성·연결을 검증한다. PR 생성·정식 전환·main 병합은 사용자 승인을 받는다.

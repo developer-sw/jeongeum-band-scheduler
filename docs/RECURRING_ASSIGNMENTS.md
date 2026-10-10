@@ -1,6 +1,6 @@
 # 반복 고정 배정과 날짜 개방
 
-작성 기준: 2026-10-10, Asia/Seoul. 작업 브랜치: `codex/recurring-assignments`, 기준 main: `cf02718`(예약 기본 PR #6 병합). 반복 배정 관리자 UI의 최종 검증과 내 공연조 일정 구현·검증 결과를 보고했고, 사용자가 커밋·Push·main 대상 초안 PR 진행을 승인했다. 원격 CI를 확인하며 정식 PR 전환·main 병합은 별도 승인 대상이다.
+작성 기준: 2026-10-10, Asia/Seoul. 구현 브랜치: `codex/recurring-assignments`, 구현 시작 기준 main: `cf02718`(예약 기본 PR #6 병합). 반복 배정 관리자 UI의 최종 검증과 내 공연조 일정 구현·검증 결과를 보고한 뒤 사용자 승인으로 [PR #7](https://github.com/developer-sw/jeongeum-band-scheduler/pull/7)을 정식 전환·main 병합했다. 병합 커밋 `4fccdc7`의 [main CI](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/38060582682)가 통과했다.
 
 ## 1. 범위와 확정 정책
 
@@ -126,7 +126,7 @@ V1~V4를 유지하고 새 V5 migration을 추가한다.
 
 자정·누락 복구·중복 작업자·권한 경합은 가변 Clock과 실제 PostgreSQL의 별도 트랜잭션으로 검증했다. 후속 실행에서는 등록된 자정 cron 자체의 dispatch와 10초 실제 잠금 timeout·60초 자동 재시도를 검증했다. 실제 벽시계 자정까지 기다린 검증, 후속 변경·교환 API의 예외 생성, 실서비스 트래픽·실기기 PWA/Push·운영 외부 백업 복원은 미검증이다. 백업 보존·해시 비교 도구와 결과 JSON은 `.local/` 및 `backups/`에만 두며 Git에 넣지 않는다.
 
-위 로컬 검증 결과를 보고한 시점에는 커밋·Push·PR 생성과 이번 변경의 GitHub CI를 수행하지 않았다. 결과 보고 후 사용자가 커밋·Push·main 대상 초안 PR 진행을 승인했으며, 원격 CI 결과는 PR에서 확인한다. 정식 PR 전환·main 병합은 별도 승인 대상이다.
+위 로컬 검증 결과를 보고한 뒤 사용자 승인으로 기능 커밋 `e26e649`를 Push하고 PR #7을 생성했다. Push·PR CI 모두 통과 후 추가 승인으로 정식 PR 전환·main 병합을 완료했으며, 병합 커밋 `4fccdc7`의 main CI도 통과했다. 로컬 main을 같은 커밋으로 동기화했다. 최신 모바일 실행 검증의 미완료 상태는 병합과 별개로 유지한다.
 
 ## 7. 내 공연조 일정 모아보기
 
