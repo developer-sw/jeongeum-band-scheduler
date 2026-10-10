@@ -66,7 +66,8 @@ public class ReservationViews {
         return new ReservationSummary(Long.toString(reservation.id()), reservation.version(), reservation.ownerType(),
                 reservation.purpose(), string(reservation.teamId()), name, codes, reservation.status(),
                 TimeBlock.require(reservation.blockCode()).phase(reservation.date(), now), mine(context, reservation),
-                "CONFIRMED".equals(reservation.status()) && now.isBefore(reservation.endsAt()) && cancelAuthority(context, reservation));
+                "CONFIRMED".equals(reservation.status()) && now.isBefore(reservation.endsAt()) && cancelAuthority(context, reservation),
+                reservation.originKind(), reservation.quotaExempt());
     }
     public ReservationResponse detail(Context context, Reservation reservation, Instant now) {
         return detail(context, reservation, reservations.instrumentCodes(reservation.id()), now);

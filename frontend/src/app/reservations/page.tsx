@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AppShell } from "@/components/app-shell";
 import { Field, FormError, SessionGate, inputClass, primaryButton, secondaryButton } from "@/components/auth-ui";
@@ -55,9 +56,9 @@ function CancellationPanel({ scope, id, now, disabled, onCancel, onClose }: { sc
   return <section className="rounded-3xl border border-yellow bg-yellow/10 p-6" aria-labelledby="cancel-title"><h2 ref={title} id="cancel-title" tabIndex={-1} className="text-xl font-bold">예약 취소 확인</h2><ReservationQueryState pending={query.isPending} error={query.error} retry={() => void query.refetch()} />{!query.error && detail && <><p className="mt-3 text-sm leading-7 break-words">예약 #{detail.id} · {subjectLabel(detail)}<br />{dateLabel(detail.date)} · {blockLabel(detail)} · {detail.subjectType === "TEAM" ? "합주실 전체" : instrumentNames(detail.instrumentCodes)}</p><p className="mt-3 text-sm leading-7">{cancellationNotice(detail, now)}</p>{detail.originKind === "FIXED" && <p className="mt-2 text-sm leading-7">이 날짜의 회차만 취소하며 다음 주 고정 배정은 유지해요.</p>}{!allowed && <p role="status" className="mt-3 text-sm leading-7">현재 권한이나 예약 상태에 따라 취소할 수 없어요. 목록을 새로 확인해 주세요.</p>}<div className="mt-5 flex flex-wrap gap-3"><button type="button" className={primaryButton} disabled={disabled || !allowed} onClick={() => onCancel(detail)}>{disabled ? "요청 확인 중…" : "예약 취소 확정"}</button><button type="button" className={secondaryButton} disabled={disabled} onClick={onClose}>닫기</button></div></>}{query.error && <button type="button" className={`${secondaryButton} mt-4`} onClick={onClose}>닫기</button>}</section>;
 }
 
-function ReservationBoard({ member, scope }: { member: Member; scope: string }) {
+function ReservationBoard({ member, scope, initialDate }: { member: Member; scope: string; initialDate: string }) {
   const client = useQueryClient(); const query = useQuery(scheduleQuery(scope)); const now = useServerClock(query.data); const action = useReservationAction();
-  const [selected, setSelected] = useState(""); const [selectedBlock, setSelectedBlock] = useState<string | null>(null); const [historyDate, setHistoryDate] = useState("");
+  const [selected, setSelected] = useState(initialDate); const [selectedBlock, setSelectedBlock] = useState<string | null>(null); const [historyDate, setHistoryDate] = useState("");
   const [cancelId, setCancelId] = useState<string | null>(null); const [notice, setNotice] = useState<string | null>(null);
   const schedule = query.data;
   const today = schedule && now ? seoulDate(now) : schedule?.today;
@@ -98,5 +99,5 @@ function ReservationBoard({ member, scope }: { member: Member; scope: string }) 
   </div>;
 }
 
-function ReservationWorkspace() { const { member } = useSession(); const scope = directoryScope(member!); return <ReservationBoard key={scope} member={member!} scope={scope} />; }
-export default function ReservationsPage() { return <AppShell><SessionGate><ReservationWorkspace /></SessionGate></AppShell>; }
+function ReservationWorkspace() { const { member } = useSession(); const scope = directoryScope(member!); const initialDate = useSearchParams().get("date") ?? ""; return <ReservationBoard key={`${scope}:${initialDate}`} member={member!} scope={scope} initialDate={initialDate} />; }
+export default function ReservationsPage() { return <AppShell><SessionGate><Suspense fallback={<p role="status" className="py-6 text-navy-soft">예약 날짜를 확인하고 있어요.</p>}><ReservationWorkspace /></Suspense></SessionGate></AppShell>; }

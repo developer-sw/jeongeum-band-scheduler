@@ -35,14 +35,21 @@ public class ReservationRepository {
     public String ensureAndLockDay(LocalDate date, Instant now) {
         // The directory guard precedes every caller, including concurrent first creation of a date.
         jdbc.update("""
-                INSERT INTO booking_days(reservation_date, status, opened_at, created_at) VALUES (?, 'OPEN', ?, ?)
+                INSERT INTO booking_days(reservation_date, status, created_at) VALUES (?, 'PREPARING', ?)
                 ON CONFLICT (reservation_date) DO NOTHING
-                """, date, Timestamp.from(now), Timestamp.from(now));
-        return jdbc.queryForObject("SELECT status FROM booking_days WHERE reservation_date = ? FOR UPDATE", String.class, date);
+                """, date, Timestamp.from(now));
+        return jdbc.queryForObject("SELECT CASE WHEN recurring_prepared THEN status ELSE 'PREPARING' END FROM booking_days WHERE reservation_date = ? FOR UPDATE", String.class, date);
+    }
+    public boolean prepared(LocalDate date) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM booking_days WHERE reservation_date = ? AND status = 'OPEN' AND recurring_prepared)", Boolean.class, date));
+    }
+    public void openDay(LocalDate date, Instant now) {
+        jdbc.update("UPDATE booking_days SET status = 'OPEN', recurring_prepared = TRUE, opened_at = COALESCE(opened_at, ?), version = version + 1 WHERE reservation_date = ?",
+                Timestamp.from(now), date);
     }
     public Map<LocalDate, String> dayStatuses(LocalDate from, LocalDate to) {
         Map<LocalDate, String> result = new HashMap<>();
-        jdbc.query("SELECT reservation_date, status FROM booking_days WHERE reservation_date BETWEEN ? AND ?",
+        jdbc.query("SELECT reservation_date, CASE WHEN recurring_prepared THEN status ELSE 'PREPARING' END AS status FROM booking_days WHERE reservation_date BETWEEN ? AND ?",
                 (org.springframework.jdbc.core.RowCallbackHandler) row -> result.put(row.getObject("reservation_date", LocalDate.class),
                         row.getString("status")), from, to);
         return result;
@@ -105,6 +112,29 @@ public class ReservationRepository {
                 INSERT INTO reservation_operations(kind, actor_kind, actor_user_id, occurred_at, reason)
                 VALUES (?, 'USER', ?, ?, ?) RETURNING id
                 """, Long.class, kind, actorId, Timestamp.from(now), reason);
+    }
+    public long systemOperation(String kind, Instant now) {
+        return jdbc.queryForObject("INSERT INTO reservation_operations(kind, actor_kind, occurred_at) VALUES (?, 'SYSTEM', ?) RETURNING id",
+                Long.class, kind, Timestamp.from(now));
+    }
+    public Reservation insertFixed(String purpose, long teamId, long creatorId, LocalDate date, TimeBlock block, Instant now, long operationId) {
+        Instant start = block.startsAt(date);
+        Instant usableFrom = now.isAfter(start) ? now : start;
+        return jdbc.query("""
+                INSERT INTO reservations(owner_type,purpose,team_id,creator_user_id,reservation_date,time_block_code,
+                block_start_minute,block_end_minute,duration_minutes,block_start_at,block_end_at,usable_from,
+                origin_kind,quota_exempt,created_at,created_operation_id)
+                VALUES ('TEAM',?,?,?,?,?,?,?,?,?,?,?,'FIXED',?,?,?) RETURNING *
+                """, RESERVATION, purpose, teamId, creatorId, date, block.name(), block.startMinute(), block.endMinute(),
+                block.durationMinutes(), Timestamp.from(start), Timestamp.from(block.endsAt(date)), Timestamp.from(usableFrom),
+                block.durationMinutes() == 60, Timestamp.from(now), operationId).getFirst();
+    }
+    public void cancelOccurrence(long reservationId, Instant now) {
+        jdbc.update("""
+                UPDATE recurring_occurrences SET state = 'CANCELED_EXCEPTION', version = version + 1, updated_at = ?
+                WHERE id IN (SELECT occurrence_id FROM recurring_occurrence_reservations WHERE reservation_id = ? AND is_current)
+                AND state <> 'CANCELED_EXCEPTION'
+                """, Timestamp.from(now), reservationId);
     }
     public Reservation insert(String ownerType, String purpose, Long ownerUserId, Long teamId, long creatorId,
             LocalDate date, TimeBlock block, Instant now, long operationId) {

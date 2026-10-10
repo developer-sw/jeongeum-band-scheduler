@@ -2,7 +2,7 @@
 
 작성일: 2026-10-09 / 기준 시간대: `Asia/Seoul` / 기본 경로: `/api/v1`
 
-이 문서는 업무 기능의 설계 계약이다. 인증·초대에 가입 전 명단·계정 연결과 회원·팀·팀장·곡 관리를 추가했다. 인증 계약·검증은 [AUTHENTICATION](AUTHENTICATION.md), 명단·팀 DTO·검증은 [MEMBER_TEAM_MANAGEMENT](MEMBER_TEAM_MANAGEMENT.md)을 따른다. 이번 예약 기본 단계의 실제 DTO·재시도·검증은 [RESERVATION_FOUNDATION](RESERVATION_FOUNDATION.md)을 따른다. 아래의 batch·PATCH·교환·반복·고장 관리·알림 API와 OpenAPI 산출물은 후속 단계의 설계 계약이며 이번에 제공하는 API와 구분한다. 사용자 정책은 [PROJECT_CONTEXT](PROJECT_CONTEXT.md)와 [RESERVATION_RULES](RESERVATION_RULES.md), 저장 모델은 [ERD](ERD.md)를 따른다.
+이 문서는 업무 기능의 설계 계약이다. 인증·초대에 가입 전 명단·계정 연결과 회원·팀·팀장·곡 관리를 추가했다. 인증 계약·검증은 [AUTHENTICATION](AUTHENTICATION.md), 명단·팀 DTO·검증은 [MEMBER_TEAM_MANAGEMENT](MEMBER_TEAM_MANAGEMENT.md), 예약 기본의 실제 DTO·재시도·검증은 [RESERVATION_FOUNDATION](RESERVATION_FOUNDATION.md), 이번 반복 배정·날짜 개방은 [RECURRING_ASSIGNMENTS](RECURRING_ASSIGNMENTS.md)를 따른다. 아래의 batch·예약 PATCH·교환·고장 관리·알림 API와 OpenAPI 산출물은 후속 단계의 설계 계약이며 이번에 제공하는 API와 구분한다. 사용자 정책은 [PROJECT_CONTEXT](PROJECT_CONTEXT.md)와 [RESERVATION_RULES](RESERVATION_RULES.md), 저장 모델은 [ERD](ERD.md)를 따른다.
 
 Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 반환한다. CSRF는 `data.headerName=X-CSRF-TOKEN`, `data.token`을 반환한다. 두 응답은 공통 `meta`와 `Cache-Control: no-store`를 사용한다. 초기 보안 계층의 CSRF 누락·위조는 `403 CSRF_INVALID`, 미인증 보호 API 접근은 `401 AUTHENTICATION_REQUIRED`다.
 
@@ -142,7 +142,7 @@ Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 �
 
 조회 응답을 받은 뒤에도 실제 mutation은 현재 상태를 다시 검사한다. 예약하지 않은 미래 날짜를 조회할 수 있더라도 개방 범위 밖의 생성은 거절한다. 무인증 공개 일정은 현재 설계에 포함하지 않는다. 개인 이름 등 공개 범위는 정책 확정사항과 구분한다.
 
-기본 단계의 일정 조회는 오늘~오늘+14일 안의 최대 15일 구간을 제공한다. 과거 이력은 예약 목록의 별도 날짜 구간으로 조회한다. 이는 조회량을 제한하는 기술 설정이며 예약 한도를 추가하는 정책이 아니다. 아직 고정 배정 기능이 없어 이 단계의 `OPEN`은 고정 회차 반영 검증 완료를 뜻하지 않는다.
+일정 조회는 오늘~오늘+14일 안의 최대 15일 구간을 제공한다. 과거 이력은 예약 목록의 별도 날짜 구간으로 조회한다. 이는 조회량을 제한하는 기술 설정이며 예약 한도를 추가하는 정책이 아니다. 반복 배정 단계에서는 `OPEN`과 V5의 고정 반영 완료 표식을 함께 확인한다. 반영 중·실패한 날짜는 `PREPARING`이며 일반 예약을 생성할 수 없다. 상세 계약은 [RECURRING_ASSIGNMENTS](RECURRING_ASSIGNMENTS.md)를 따른다.
 
 고장 등록은 여섯 점유 행에 가짜 예약을 생성하는 동작이 아니다. 팀 예약은 고장 안내와 함께 허용한다. 고장 등록과 신규 예약의 경합은 동일 악기 잠금으로 선후를 결정한다.
 
@@ -156,6 +156,14 @@ Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 �
 | GET /reservations/{id} | 본인·해당 팀원·전체 관리자 | 현재 권한별 상세·후속 예약 안내 |
 | PATCH /reservations/{id} | 예약자·해당 팀장·전체 관리자 | 시작 전 동일 주체의 날짜·블록·개인 악기 변경 |
 | POST /reservations/{id}/cancel | 예약자·해당 팀장·전체 관리자 | 시작 전·진행 중 예약 전체 취소 |
+
+### 현재 구현: 내 공연조 일정 조회
+
+`/my-schedule`은 기존 `GET /api/v1/reservations?scope=mine&from=YYYY-MM-DD&to=YYYY-MM-DD`를 재사용한다. 기간은 양 끝을 포함하며 한 요청 최대 31일이다. 서버는 현재 활성 회원의 개인 예약과 현재 소속 팀 예약·이력을 반환한다. 소속 팀의 예약은 생성자가 다른 팀원이어도 반환하며 전체 관리자라는 이유로 `mine` 범위에 미소속 팀을 추가하지 않는다.
+
+프론트는 `/api/v1/schedule`의 `today/bookableThrough/days[].openingStatus`와 현재 소속을 기준으로 `TEAM + CONFIRMED + OPEN 날짜`만 일정에 남긴다. 날짜·`startsAt` 오름차순으로 정렬하고 팀별 필터를 제공한다. 직접 고정 회차는 실제 예약의 `originKind=FIXED`로 구분하며 관리자 패턴 API에서 미개방 미래 회차를 합성하지 않는다. `CANCELED/REPLACED`와 개인 예약은 기존 `/reservations`의 날짜별 예약·이력에서 확인한다.
+
+표시 데이터는 기존 예약 DTO의 `date/startsAt/endsAt/teamId/teamName/purpose/status/originKind`를 사용한다. `purpose=REGULAR/ADDITIONAL`은 정규조·추가조이며 `status=CONFIRMED`인 예약의 예정·진행 중·종료 구분은 시작/종료 시각과 서버 기준 Clock으로 계산한다. 정상 종료를 취소 상태로 바꾸지 않는다. 일정 선택은 `/reservations?date=YYYY-MM-DD`로 연결하고 해당 화면의 서버 조회와 권한 검사를 따른다. 이 기능을 위한 신규 API·DB 모델은 없다.
 
 개인 생성 예시:
 
@@ -282,6 +290,10 @@ Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 �
 - Push 실패는 이미 성공한 교환을 rollback하지 않는다.
 
 ## 7. 반복 고정 배정
+
+이번 구현의 요청·응답·재시도·개방 작업자 계약은 [RECURRING_ASSIGNMENTS](RECURRING_ASSIGNMENTS.md)를 따른다. 생성·수정·종료에 `Idempotency-Key`를 사용하며 preview는 동일한 미리보기 입력만 검사한다. `weekday`는 월요일 1~일요일 7, `endDate`는 포함 날짜다. 조회는 기본 오늘~오늘+14일, 최대 31일의 회차 구간을 사용한다.
+
+기본 예약과 반복 배정은 재시도 키를 기능별로 저장한다. 동일 실행자의 키에 대해 반복 배정 내부의 다른 경로·본문 재사용은 거절하며, 기본 예약 키와 교차 비교하지 않는다. UI는 각 mutation마다 새 키를 발급한다.
 
 | Method / 경로 | 권한 | 계약 |
 |---|---|---|

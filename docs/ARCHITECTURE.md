@@ -4,7 +4,7 @@
 
 ## 1. 문서 범위와 상태
 
-이 문서는 jeongeum-band-scheduler의 구현을 위한 설계 기준이다. 초기 구성·인증·명단·계정 연결과 회원·팀·팀장·곡 관리를 준비했고 예약 기본 기능을 구현한다. 초기 구성은 [INITIAL_SETUP.md](INITIAL_SETUP.md), 인증 설정·검증은 [AUTHENTICATION.md](AUTHENTICATION.md), 명단·팀 단계는 [MEMBER_TEAM_MANAGEMENT.md](MEMBER_TEAM_MANAGEMENT.md), 이번 단계는 [RESERVATION_FOUNDATION.md](RESERVATION_FOUNDATION.md)에 기록한다. 예약 변경·교환·반복 배정·공지·Push와 운영 서버·배포는 후속 단계다.
+이 문서는 jeongeum-band-scheduler의 구현을 위한 설계 기준이다. 초기 구성·인증·명단·계정 연결과 회원·팀·팀장·곡 관리 및 예약 기본 기능을 준비했고 반복 고정 배정·날짜 개방을 구현한다. 초기 구성은 [INITIAL_SETUP.md](INITIAL_SETUP.md), 인증 설정·검증은 [AUTHENTICATION.md](AUTHENTICATION.md), 명단·팀 단계는 [MEMBER_TEAM_MANAGEMENT.md](MEMBER_TEAM_MANAGEMENT.md), 예약 기본은 [RESERVATION_FOUNDATION.md](RESERVATION_FOUNDATION.md), 이번 단계는 [RECURRING_ASSIGNMENTS.md](RECURRING_ASSIGNMENTS.md)에 기록한다. 예약 변경·교환·공지·Push와 운영 서버·배포는 후속 단계다.
 
 운영 정책의 기준 문서는 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md)와 [RESERVATION_RULES.md](RESERVATION_RULES.md)이다. 이 문서의 **확정 정책**은 사용자 결정의 요약이고, **기술 설계안**은 그 정책을 구현하기 위한 구조다. 세부 버전·성능 한도·설정 수치는 구현과 검증을 거쳐 고정한다.
 

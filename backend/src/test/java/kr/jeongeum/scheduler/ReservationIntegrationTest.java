@@ -144,6 +144,74 @@ class ReservationIntegrationTest {
     }
 
     @Test
+    void mineIncludesAllCurrentTeamsAcrossTheWindowWithoutExpandingAdministratorOrFormerMemberAccess() throws Exception {
+        Person viewer = person("MEMBER");
+        Person creator = person("MEMBER");
+        Person outsider = person("MEMBER");
+        Person noTeam = person("MEMBER");
+        long regular = team("REGULAR");
+        long additional = team("ADDITIONAL");
+        long unrelated = team("REGULAR");
+        join(regular, viewer, false);
+        join(additional, viewer, false);
+        join(regular, creator, false);
+        join(additional, creator, false);
+        join(unrelated, outsider, false);
+        join(regular, administrator, false);
+
+        JsonNode firstWeek = success(create(creator.client(), teamBody(TODAY, "B07", regular)), 201);
+        JsonNode secondWeek = success(create(creator.client(), teamBody(TODAY.plusDays(7), "B07", regular)), 201);
+        JsonNode lastDate = success(create(creator.client(), teamBody(TODAY.plusDays(14), "B08", additional)), 201);
+        JsonNode ownPersonal = success(create(viewer.client(), personal(TODAY.plusDays(1), "B01", "DRUMS")), 201);
+        JsonNode adminPersonal = success(create(administrator.client(), personal(TODAY.plusDays(2), "B09", "VOCAL")), 201);
+        JsonNode unrelatedBooking = success(create(outsider.client(), teamBody(TODAY.plusDays(3), "B10", unrelated)), 201);
+        JsonNode otherPersonal = success(create(outsider.client(), personal(TODAY.plusDays(4), "B09", "KEYBOARD")), 201);
+        String window = "/api/v1/reservations?scope=mine&from=" + TODAY + "&to=" + TODAY.plusDays(14);
+
+        JsonNode mine = success(viewer.client().get(window), 200);
+        assertEquals(Set.of(firstWeek.get("id").asString(), secondWeek.get("id").asString(),
+                lastDate.get("id").asString(), ownPersonal.get("id").asString()), strings(mine, "id"));
+        assertTrue(mine.valueStream().allMatch(booking -> booking.get("isMine").asBoolean()));
+        assertTrue(mine.valueStream().filter(booking -> "TEAM".equals(booking.get("subjectType").asString()))
+                .allMatch(booking -> Long.toString(creator.member().id()).equals(booking.get("creatorUserId").asString())),
+                "A teammate's reservations belong in mine even when the viewer did not create them");
+        assertFalse(strings(mine, "id").contains(unrelatedBooking.get("id").asString()));
+        assertFalse(strings(mine, "id").contains(otherPersonal.get("id").asString()));
+        assertEquals(0, success(noTeam.client().get(window), 200).size());
+        assertEquals(Set.of(firstWeek.get("id").asString(), secondWeek.get("id").asString(),
+                adminPersonal.get("id").asString()), strings(success(administrator.client().get(window), 200), "id"),
+                "Global administration must not widen mine to teams the administrator has not joined");
+        assertEquals(Set.of(firstWeek.get("id").asString(), secondWeek.get("id").asString(),
+                ownPersonal.get("id").asString()), strings(success(viewer.client().get(
+                "/api/v1/reservations?scope=mine&from=" + TODAY + "&to=" + TODAY.plusDays(7)), 200), "id"));
+
+        assertEquals(1, jdbc.update("UPDATE team_memberships SET status = 'REMOVED', version = version + 1 "
+                + "WHERE team_id = ? AND roster_entry_id = ?", regular, viewer.rosterId()));
+        assertEquals(Set.of(lastDate.get("id").asString(), ownPersonal.get("id").asString()),
+                strings(success(viewer.client().get(window), 200), "id"),
+                "Current membership must be checked on every read with the same authenticated session");
+        assertEquals(404, viewer.client().get(reservationPath(firstWeek)).statusCode());
+        assertEquals("CONFIRMED", success(administrator.client().get(reservationPath(firstWeek)), 200).get("status").asString());
+        assertEquals(7, count("reservations"), "Listing and membership removal must preserve all reservations");
+    }
+
+    @Test
+    void mineRequiresAuthenticationAndLimitsItsInclusiveRangeToThirtyOneDays() throws Exception {
+        assertError(new Client().get("/api/v1/reservations?scope=mine&from=" + TODAY + "&to=" + TODAY.plusDays(14)),
+                401, "AUTHENTICATION_REQUIRED");
+        Person viewer = person("MEMBER");
+        JsonNode booking = success(create(viewer.client(), personal(TODAY.plusDays(14), "B07", "DRUMS")), 201);
+        assertEquals(Set.of(booking.get("id").asString()), strings(success(viewer.client().get(
+                "/api/v1/reservations?scope=mine&from=" + TODAY.minusDays(16) + "&to=" + TODAY.plusDays(14)), 200), "id"));
+        for (String query : List.of("scope=mine&from=" + TODAY.minusDays(17) + "&to=" + TODAY.plusDays(14),
+                "scope=mine&from=" + TODAY.plusDays(1) + "&to=" + TODAY,
+                "scope=all&from=" + TODAY + "&to=" + TODAY.plusDays(14))) {
+            assertError(viewer.client().get("/api/v1/reservations?" + query), 400, "INVALID_INPUT");
+        }
+        assertEquals(1, count("reservations"));
+    }
+
+    @Test
     void opensExactlyFifteenKoreanDatesAndAdvancesAtKoreanMidnight() throws Exception {
         Person owner = person("MEMBER");
         success(create(owner.client(), personal(TODAY, "B10", "VOCAL")), 201);
