@@ -1,7 +1,9 @@
 import { ApiError } from "@/lib/api/client";
 import { authErrorMessage } from "@/features/auth/errors";
+import type { ReservationIntent } from "./types";
 
 const messages: Record<string, string> = {
+  VERSION_CONFLICT: "예약이 먼저 변경됐어요. 최신 상세와 시간표를 불러온 뒤 변경 내용을 다시 확인해 주세요.",
   INVALID_BLOCK: "정해진 시간 블록을 선택해 주세요.",
   RESERVATION_CONFLICT: "다른 예약이 먼저 확정됐어요. 최신 시간표를 확인하고 다시 선택해 주세요.",
   PERSONAL_OVERLAP: "이미 같은 시간에 개인 예약이 있어요. 한 사람이 악기 두 개를 각각 예약할 수 없어요.",
@@ -15,6 +17,12 @@ const messages: Record<string, string> = {
   IDEMPOTENCY_KEY_REUSED: "이전 요청과 내용이 달라 처리하지 못했어요. 최신 예약을 확인하고 다시 선택해 주세요.",
 };
 export function reservationErrorMessage(error: unknown) { return error instanceof ApiError && messages[error.code] ? messages[error.code] : authErrorMessage(error); }
+
+export function reservationActionErrorMessage(error: unknown, intent: ReservationIntent): string {
+  const message = reservationErrorMessage(error);
+  return intent.kind === "CHANGE" && error instanceof ApiError && ["RESERVATION_CONFLICT", "PERSONAL_OVERLAP", "DAILY_LIMIT_EXCEEDED", "ASSET_FAULTY", "DATE_NOT_OPEN"].includes(error.code)
+    ? `${message} 이번 변경은 적용되지 않았으며 기존 예약·점유·사용 한도는 유지돼요.` : message;
+}
 
 // A transport/proxy failure can happen after commit. Preserve the exact request
 // and key for an explicit retry; receiving no response is never proof of failure.

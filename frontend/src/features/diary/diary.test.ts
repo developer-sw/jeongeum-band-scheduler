@@ -10,7 +10,7 @@ import { Timetable } from "./timetable";
 const member: Member = { id: "91", loginId: "synthetic.diary", displayName: "가상 회원", status: "ACTIVE", globalRole: "MEMBER", teamMemberships: [{ teamId: "71", teamName: "가상 정규조", kind: "REGULAR", role: "MEMBER" }, { teamId: "72", teamName: "가상 추가조", kind: "ADDITIONAL", role: "MEMBER" }] };
 const block: ScheduleBlock = { blockCode: "B03", startsAt: "2026-10-12T14:00:00+09:00", endsAt: "2026-10-12T15:00:00+09:00", durationMinutes: 60, phase: "FUTURE", remainingMinutes: 60, canReservePersonal: true, canReserveTeam: true, availableInstrumentCodes: ["VOCAL", "KEYBOARD", "ELECTRIC_GUITAR", "BASS", "DRUMS", "ACOUSTIC_GUITAR"], faultyInstrumentCodes: [], teamWarnings: [], reservations: [] };
 const day: ScheduleDay = { date: "2026-10-12", openingStatus: "OPEN", personalQuota: { usedMinutes: 0, remainingMinutes: 120 }, teamQuotas: [], blocks: [block] };
-const personal: ReservationSummary = { id: "51", version: 0, subjectType: "PERSONAL", purpose: "PERSONAL", teamId: null, teamName: null, instrumentCodes: ["VOCAL"], status: "CONFIRMED", phase: "FUTURE", originKind: "MANUAL", quotaExempt: false, isMine: false, canCancel: false };
+const personal: ReservationSummary = { id: "51", version: 0, subjectType: "PERSONAL", purpose: "PERSONAL", teamId: null, teamName: null, instrumentCodes: ["VOCAL"], status: "CONFIRMED", phase: "FUTURE", originKind: "MANUAL", quotaExempt: false, isMine: false, canCancel: false, canChange: false };
 const now = Date.parse("2026-10-12T13:00:00+09:00");
 
 describe("diary calendar uses canonical server dates", () => {

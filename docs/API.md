@@ -1,8 +1,8 @@
 # REST API 설계
 
-작성일: 2026-10-09 / 기준 시간대: `Asia/Seoul` / 기본 경로: `/api/v1`
+갱신일: 2026-10-12 / 기준 시간대: `Asia/Seoul` / 기본 경로: `/api/v1`
 
-이 문서는 업무 기능의 설계 계약이다. 인증·초대에 가입 전 명단·계정 연결과 회원·팀·팀장·곡 관리를 추가했다. 인증 계약·검증은 [AUTHENTICATION](AUTHENTICATION.md), 명단·팀 DTO·검증은 [MEMBER_TEAM_MANAGEMENT](MEMBER_TEAM_MANAGEMENT.md), 예약 기본의 실제 DTO·재시도·검증은 [RESERVATION_FOUNDATION](RESERVATION_FOUNDATION.md), 이번 반복 배정·날짜 개방은 [RECURRING_ASSIGNMENTS](RECURRING_ASSIGNMENTS.md)를 따른다. 아래의 batch·예약 PATCH·교환·고장 관리·알림 API와 OpenAPI 산출물은 후속 단계의 설계 계약이며 이번에 제공하는 API와 구분한다. 사용자 정책은 [PROJECT_CONTEXT](PROJECT_CONTEXT.md)와 [RESERVATION_RULES](RESERVATION_RULES.md), 저장 모델은 [ERD](ERD.md)를 따른다.
+이 문서는 업무 기능의 설계 계약이다. 인증·초대에 가입 전 명단·계정 연결과 회원·팀·팀장·곡 관리를 추가했다. 인증 계약·검증은 [AUTHENTICATION](AUTHENTICATION.md), 명단·팀 DTO·검증은 [MEMBER_TEAM_MANAGEMENT](MEMBER_TEAM_MANAGEMENT.md), 예약 기본의 실제 DTO·재시도·검증은 [RESERVATION_FOUNDATION](RESERVATION_FOUNDATION.md), 반복 배정·날짜 개방은 [RECURRING_ASSIGNMENTS](RECURRING_ASSIGNMENTS.md), 구현한 단건 예약 PATCH는 [RESERVATION_CHANGES](RESERVATION_CHANGES.md)를 따른다. 아래의 batch·교환·고장 관리·알림 API와 OpenAPI 산출물은 후속 단계의 설계 계약이며 이번에 제공하는 API와 구분한다. 사용자 정책은 [PROJECT_CONTEXT](PROJECT_CONTEXT.md)와 [RESERVATION_RULES](RESERVATION_RULES.md), 저장 모델은 [ERD](ERD.md)를 따른다.
 
 Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 반환한다. CSRF는 `data.headerName=X-CSRF-TOKEN`, `data.token`을 반환한다. 두 응답은 공통 `meta`와 `Cache-Control: no-store`를 사용한다. 초기 보안 계층의 CSRF 누락·위조는 `403 CSRF_INVALID`, 미인증 보호 API 접근은 `401 AUTHENTICATION_REQUIRED`다.
 
@@ -195,7 +195,9 @@ Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 �
 
 두 시간 선택 UI는 두 개의 독립 예약을 만든다. batch 권고안은 같은 날짜·인접 60분 블록 두 건을 한 요청에서 전부 성공 또는 전부 실패하도록 처리한다. 개인은 각 항목에 한 악기를 선택할 수 있고 두 항목의 악기는 달라도 된다. 이 기술 계약을 120분 예약 한 건으로 저장하지 않는다. 90분 여러 건은 일반 단건 API를 사용한다.
 
-### 5.1 변경 계약
+### 5.1 변경 계약: 구현
+
+`PATCH /api/v1/reservations/{id}`는 활성 예약자·해당 팀의 현재 예약 작성자/팀장·전체 관리자의 권한을 검사한다. `Idempotency-Key`와 CSRF 헤더가 필요하며 성공 응답은 200이다. 구현·검증 기록은 [RESERVATION_CHANGES](RESERVATION_CHANGES.md)를 따른다.
 
 ```json
 {
@@ -207,25 +209,27 @@ Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 �
 ```
 
 - 주체와 최초 예약자는 요청으로 바꿀 수 없다.
-- 잠금 후 시작 전 여부, 새 날짜, 최종 한도, 제3자·개인·악기 점유, 고장을 재검증한다.
-- 기술안: 원본은 `REPLACED`로 보존하고 후속 예약을 생성한다. 새 ID를 반환하며 계보를 연결한다.
+- 잠금 후 원본의 시작 전 여부, 새 날짜의 개방 상태, 최종 한도, 제3자·개인·악기 점유, 고장을 재검증한다. 원본 시작 시각부터는 `RESERVATION_STARTED`다. 목적지는 종료 전의 진행 중 블록도 허용하며 이용 시작은 `max(서버 현재 시각, 블록 시작)`이다. 남은 시간이 짧아도 60분 블록은 60분 사용량을 소비한다.
+- 원본은 `REPLACED`로 보존하고 후속 예약을 생성한다. 새 ID를 반환하며 V6의 `reservation_lineage`로 연결한다. 주체·purpose·최초 작성자는 유지하고 실행자는 `CHANGE` operation에 별도로 기록한다.
 - 기존 2악기 개인 90분은 90분으로 이동·악기 변경할 때 최대 두 종류 조건을 유지할 수 있다. 일반 한 악기 예약을 PATCH로 두 악기 예약으로 확대하지 않는다.
 - 2악기 개인 90분에서 단일 60분으로 변경하려면 한 종류를 선택한다.
-- 날짜·블록·악기 집합이 완전히 같은 입력은 no-op으로 제안한다. 원본 ID·면제·고장 보존 예외·교환 요청·예정 알림을 그대로 유지한다.
-- 실제 변경에는 `CHANGED` 업무 사건만 만든다. 후속 DB 행 생성에 대한 별도 `CREATED` 알림을 중복 발송하지 않는다.
+- 상세의 `dualAssetException`은 교환에서 유래한 90분 예외 자격이다. 예외 예약을 다른 90분으로 옮길 때 한 종류를 선택해도 이 자격을 유지하며 최대 두 종류를 다시 선택할 수 있다. 60분으로 이동하면 자격을 해제하고 이후 일반 한 악기 제한을 적용한다. 화면은 현재 선택 수를 예외 자격으로 추정하지 않는다.
+- 날짜·블록·악기 집합이 완전히 같은 입력은 no-op이다. 원본 ID·version·면제·고장 보존 예외를 유지하고 재시도 성공 기록만 저장한다. `replacedReservationIds`는 빈 배열이며 `reservations`에 원본을 반환한다.
+- 개인은 `instrumentCodes`를 보내고 팀은 생략한다. 중복·미등록 악기와 주체·작성자 등 계약 외 필드는 거절한다. 같은 키·정규화된 같은 본문은 같은 결과를 반환하며 다른 본문은 `IDEMPOTENCY_KEY_REUSED`다. 재시도에서도 현재 계정·팀·편집 권한을 확인한다.
+- 실제 변경은 하나의 `CHANGE` operation을 남긴다. 교환·알림함·Push는 후속 구현이므로 대기 교환 무효화나 `CHANGED` 알림 전송은 아직 수행하지 않는다. 후속 연동에서는 no-op을 제외하고 변경 사건만 처리하며 별도 `CREATED` 알림을 중복 발송하지 않는다.
 
-변경과 교환 성공 응답의 공통 기술안:
+변경 성공 응답(교환은 같은 구조를 사용할 설계):
 
 ```json
 {
   "data": {
     "replacedReservationIds": ["old-reservation-id"],
-    "reservations": [{"id": "successor-id", "status": "CONFIRMED", "version": 1}]
+    "reservations": [{"id": "successor-id", "status": "CONFIRMED", "version": 0}]
   }
 }
 ```
 
-원본 상세를 조회하면 `successorIds`와 이력 상태를 제공한다. 프론트는 현재 예약으로 이동하거나 여러 후속 예약을 안내한다. 실패 시 원본을 `REPLACED`로 남겨서는 안 된다.
+예약 요약·상세의 `canChange`는 현재 권한·활성 팀·CONFIRMED·원본 시작 전 여부를 반영하며 제출 시 서버가 재검증한다. 상세의 `successorIds`는 직접 연결된 후속 ID 목록이다. 프론트는 원본 이력에서 후속 예약으로 이동한다. 실패 시 원본·점유·한도·계보·회차 상태를 모두 유지한다. 단건 고정 회차의 실제 변경은 `CHANGED_EXCEPTION`과 현재 후속 링크로 남고 원래 주차 키·다음 주 반복 패턴을 유지한다.
 
 ### 5.2 취소 계약
 

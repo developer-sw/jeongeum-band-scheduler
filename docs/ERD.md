@@ -1,8 +1,8 @@
 # ERD와 트랜잭션 설계
 
-기준일: 2026-10-10 (Asia/Seoul)
+기준일: 2026-10-12 (Asia/Seoul)
 
-업무 정책의 기준은 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), [RESERVATION_RULES.md](RESERVATION_RULES.md)다. 이 문서의 업무 테이블·컬럼·상태·잠금은 정책을 구현하는 **기술 설계 권고안**이다. Flyway V1은 Spring Session JDBC, V2는 `users`·`invitation_codes`·`auth_bootstrap_guard`다. V3는 가입 전 명단·팀·소속·곡과 명단 연결용 초대 FK·잠금·역할 변경 이력을 추가했다. V4는 블록·악기·예약 날짜·예약·점유·한도 ledger·작업 이력·재시도 키를 추가했으며 실제 계약은 [RESERVATION_FOUNDATION.md](RESERVATION_FOUNDATION.md)을 따른다. 이번 V5는 반복 배정·패턴 revision·주차 회차·예약 연결·패턴 guard·관리 재시도 키와 날짜의 `recurring_prepared` 표식을 추가하며 V1~V4를 수정하지 않는다. 실제 V5 계약은 [RECURRING_ASSIGNMENTS.md](RECURRING_ASSIGNMENTS.md)를 따른다. 교환·공지·알림 테이블은 후속 구현이며 아래의 전체 ERD는 완료된 migration 목록과 구분한다. 인증 검증은 [AUTHENTICATION.md](AUTHENTICATION.md), 명단·팀 계약은 [MEMBER_TEAM_MANAGEMENT.md](MEMBER_TEAM_MANAGEMENT.md)를 따른다.
+업무 정책의 기준은 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), [RESERVATION_RULES.md](RESERVATION_RULES.md)다. 이 문서의 업무 테이블·컬럼·상태·잠금은 정책을 구현하는 **기술 설계 권고안**이다. Flyway V1은 Spring Session JDBC, V2는 `users`·`invitation_codes`·`auth_bootstrap_guard`다. V3는 가입 전 명단·팀·소속·곡과 명단 연결용 초대 FK·잠금·역할 변경 이력을 추가했다. V4는 블록·악기·예약 날짜·예약·점유·한도 ledger·작업 이력·재시도 키를 추가했으며 실제 계약은 [RESERVATION_FOUNDATION.md](RESERVATION_FOUNDATION.md)을 따른다. V5는 반복 배정·패턴 revision·주차 회차·예약 연결·패턴 guard·관리 재시도 키와 날짜의 `recurring_prepared` 표식을 추가했고 실제 계약은 [RECURRING_ASSIGNMENTS.md](RECURRING_ASSIGNMENTS.md)를 따른다. V6는 단건 변경의 `reservation_lineage`와 인덱스만 추가하며 기존 V1~V5 파일과 업무 데이터를 수정하지 않는다. 실제 V6 계약·검증은 [RESERVATION_CHANGES.md](RESERVATION_CHANGES.md)를 따른다. 교환·공지·알림 테이블은 후속 구현이며 아래의 전체 ERD는 완료된 migration 목록과 구분한다. 인증 검증은 [AUTHENTICATION.md](AUTHENTICATION.md), 명단·팀 계약은 [MEMBER_TEAM_MANAGEMENT.md](MEMBER_TEAM_MANAGEMENT.md)를 따른다.
 
 ## 1. 핵심 설계 선택
 
@@ -349,6 +349,8 @@ erDiagram
 - 변경·교환은 기존/새 날짜 전부를 잠그므로 중간 복구 상태를 다른 요청이 이용할 수 없다.
 
 ### 5.8 reservation_operations / reservation_lineage
+
+V6는 `reservation_lineage`를 추가한다. 실제 컬럼은 `id`, `operation_id`, `source_reservation_id`, `successor_reservation_id`, `created_at`이며 operation/source/successor 조합 unique와 자기 자신 연결 금지, source·successor 조회 인덱스를 둔다. V1~V5와 기존 행을 수정하지 않는다. 단건 변경은 한 원본에서 한 후속으로 연결하며 기존 ERD의 N:M 구조는 후속 교환 확장을 위한 설계다. 현재 구현·잠금·검증은 [RESERVATION_CHANGES](RESERVATION_CHANGES.md)를 따른다.
 
 - `reservation_operations`: CREATE, CANCEL, CHANGE, EXCHANGE, FIXED_GENERATE, SERIES_UPDATE, USER_WITHDRAW, TEAM_DISBAND 같은 논리 업무, 실제 실행자 또는 SYSTEM, 시각, 이유, exchange_request 참조.
 - `reservation_lineage`: operation별 원본 예약과 후속 예약의 방향 있는 연결. source와 successor의 주체·creator는 같다.

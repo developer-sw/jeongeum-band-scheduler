@@ -94,7 +94,7 @@ class BootstrapIntegrationTest {
 
     @Test
     void migratesPostgreSqlAndReturnsMinimalHealthContract() throws Exception {
-        assertEquals(List.of("1", "2", "3", "4", "5"), jdbc.queryForList(
+        assertEquals(List.of("1", "2", "3", "4", "5", "6"), jdbc.queryForList(
                 "SELECT version FROM flyway_schema_history WHERE success = true ORDER BY installed_rank", String.class));
         assertEquals(2, jdbc.queryForObject(
                 "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public' "

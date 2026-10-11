@@ -1,6 +1,6 @@
 # UX 및 반응형 화면 설계
 
-작성 기준: 2026-10-11, Asia/Seoul. 사용자 요청으로 따뜻한 다이어리형 UI를 구현하며 원본 로고 파일과 하단 `JEONGEUM · SENTIMENTAL MUSIC` 문구를 보존한다. 최신 구현·검증 기록은 [DIARY_UI_REDESIGN](DIARY_UI_REDESIGN.md)을 따른다. 인증 화면은 [AUTHENTICATION](AUTHENTICATION.md), 명단·팀 화면은 [MEMBER_TEAM_MANAGEMENT](MEMBER_TEAM_MANAGEMENT.md), 일정·생성·취소 화면은 [RESERVATION_FOUNDATION](RESERVATION_FOUNDATION.md), 반복 배정 관리는 [RECURRING_ASSIGNMENTS](RECURRING_ASSIGNMENTS.md)을 따른다. 변경·교환·공지·Push UI와 배포는 후속 단계다. 아래에서 **확정 정책**과 **UI 제안**을 구분한다. 예약 정책·권한의 상세 계약은 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), [RESERVATION_RULES.md](RESERVATION_RULES.md), [API.md](API.md)를 함께 확인한다.
+작성 기준: 2026-10-12, Asia/Seoul. 사용자 요청으로 따뜻한 다이어리형 UI를 구현하며 원본 로고 파일과 하단 `JEONGEUM · SENTIMENTAL MUSIC` 문구를 보존한다. 다이어리 구현·검증 기록은 [DIARY_UI_REDESIGN](DIARY_UI_REDESIGN.md)을 따른다. 인증 화면은 [AUTHENTICATION](AUTHENTICATION.md), 명단·팀 화면은 [MEMBER_TEAM_MANAGEMENT](MEMBER_TEAM_MANAGEMENT.md), 일정·생성·취소 화면은 [RESERVATION_FOUNDATION](RESERVATION_FOUNDATION.md), 반복 배정 관리는 [RECURRING_ASSIGNMENTS](RECURRING_ASSIGNMENTS.md), 단건 예약 변경 화면은 [RESERVATION_CHANGES](RESERVATION_CHANGES.md)를 따른다. 교환·공지·Push UI와 배포는 후속 단계다. 아래에서 **확정 정책**과 **UI 제안**을 구분한다. 예약 정책·권한의 상세 계약은 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), [RESERVATION_RULES.md](RESERVATION_RULES.md), [API.md](API.md)를 함께 확인한다.
 
 ## 1. 목표와 첫 운영 범위
 
@@ -139,7 +139,15 @@
 
 불확실한 응답에는 새 쓰기를 막고 **같은 요청 결과 다시 확인**을 제공한다. 화면 안에서는 원래 본문과 재시도 키를 사용하며 오프라인 자동 제출은 하지 않는다. 이 임시 요청은 화면 메모리에 보관하므로 페이지 이동·전체 새로고침·탭 종료 뒤에는 복원되지 않는다. 다시 접속하면 최신 배정·예약 목록을 먼저 확인한다. 관리자 역할 상실·비활성화·계정 전환·로그아웃 시 관리 화면과 이전 권한의 Query를 초기화하고 쓰기마다 서버 권한을 재검증한다.
 
-이번 단계의 변경·교환 예외 표시는 후속 기능을 위한 회차 상태 모델이다. 일반 예약 변경·교환과 알림은 아직 별도 구현 단계이며, 실제 API와 검증 결과는 [RECURRING_ASSIGNMENTS](RECURRING_ASSIGNMENTS.md)를 따른다.
+단건 예약 변경은 아래 화면에서 실제 `CHANGED_EXCEPTION`을 기록한다. 교환·알림은 후속 단계다. 패턴 관리의 검증 결과는 [RECURRING_ASSIGNMENTS](RECURRING_ASSIGNMENTS.md), 단건 변경 결과는 [RESERVATION_CHANGES](RESERVATION_CHANGES.md)를 따른다.
+
+### 현재 구현: 단건 예약 변경
+
+`/reservations`의 예약·이력에서 **변경**을 선택한다. 다이어리 예약 상세와 더보기의 **예약 변경**에서도 연결한다. 조회된 `canChange`와 서버 기준 현재 시각으로 시작 전 원본만 제공하며, 관리자에게는 선택 날짜의 다른 회원·팀 예약도 권한에 따라 표시한다.
+
+주체·최초 작성자는 고정하고 목적 날짜·정해진 블록·개인 악기를 선택한다. 현재 예약과 변경 목적지, 잔여 이용 시간·60분 사용량·고정 면제 해제·팀 고장 경고를 확인한 뒤 제출한다. 진행 중 목적지의 잔여 시간은 허용하되 원본은 시작 전이어야 한다. 관리자가 다른 주체를 변경할 때 실행자 자신의 한도를 그 주체의 한도로 표시하지 않는다.
+
+서버 성공과 목록 갱신 후 후속 예약을 표시하고 원본 교체 이력을 남긴다. 동일 배치는 원본을 유지한다. 충돌·낡은 version·시작 경계에서는 최신 상태를 확인한 뒤 다시 선택한다. 불확실한 응답은 본문·키를 유지한 **같은 요청 결과 다시 확인**으로 처리하며 추가 변경을 막고 오프라인 자동 제출은 하지 않는다. 원본 상세의 후속 링크로 여러 번 변경한 이력도 따라갈 수 있다.
 
 ### 현재 구현: 내 공연조 일정 모아보기
 

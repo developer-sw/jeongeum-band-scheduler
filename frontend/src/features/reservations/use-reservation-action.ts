@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { submitReservationIntent } from "./api";
-import { reservationErrorMessage } from "./errors";
+import { reservationActionErrorMessage } from "./errors";
 import { ReservationRequestState, type PendingReservationRequest } from "./request-state";
 import type { ReservationDetail, ReservationIntent } from "./types";
 
@@ -23,7 +23,7 @@ export function useReservationAction() {
       requests.clear(); setUncertain(false); return result;
     } catch (failure) {
       if (!active.signal.aborted) {
-        setUncertain(requests.failed(failure)); setError(reservationErrorMessage(failure));
+        setUncertain(requests.failed(failure)); setError(reservationActionErrorMessage(failure, request.intent));
       }
       return undefined;
     } finally {
@@ -36,5 +36,5 @@ export function useReservationAction() {
     return request ? send(request) : undefined;
   }
   const retry = () => requests.request ? send(requests.request) : Promise.resolve(undefined);
-  return { run, retry, pending, uncertain, error };
+  return { run, retry, pending, uncertain, error, request: requests.request };
 }

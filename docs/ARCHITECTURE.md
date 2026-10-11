@@ -1,10 +1,10 @@
 # 시스템 아키텍처
 
-작성일: 2026-10-09 (Asia/Seoul)
+갱신일: 2026-10-12 (Asia/Seoul)
 
 ## 1. 문서 범위와 상태
 
-이 문서는 jeongeum-band-scheduler의 구현을 위한 설계 기준이다. 초기 구성·인증·명단·계정 연결과 회원·팀·팀장·곡 관리 및 예약 기본 기능을 준비했고 반복 고정 배정·날짜 개방을 구현한다. 초기 구성은 [INITIAL_SETUP.md](INITIAL_SETUP.md), 인증 설정·검증은 [AUTHENTICATION.md](AUTHENTICATION.md), 명단·팀 단계는 [MEMBER_TEAM_MANAGEMENT.md](MEMBER_TEAM_MANAGEMENT.md), 예약 기본은 [RESERVATION_FOUNDATION.md](RESERVATION_FOUNDATION.md), 이번 단계는 [RECURRING_ASSIGNMENTS.md](RECURRING_ASSIGNMENTS.md)에 기록한다. 예약 변경·교환·공지·Push와 운영 서버·배포는 후속 단계다.
+이 문서는 jeongeum-band-scheduler의 구현을 위한 설계 기준이다. 초기 구성·인증·명단·계정 연결과 회원·팀·팀장·곡 관리, 예약 기본, 반복 고정 배정·날짜 개방과 단건 예약 변경을 구현했다. 초기 구성은 [INITIAL_SETUP.md](INITIAL_SETUP.md), 인증 설정·검증은 [AUTHENTICATION.md](AUTHENTICATION.md), 명단·팀 단계는 [MEMBER_TEAM_MANAGEMENT.md](MEMBER_TEAM_MANAGEMENT.md), 예약 기본은 [RESERVATION_FOUNDATION.md](RESERVATION_FOUNDATION.md), 반복 배정은 [RECURRING_ASSIGNMENTS.md](RECURRING_ASSIGNMENTS.md), 이번 단건 변경의 격리 검증·사용자 승인 후 개발 DB V6 적용은 [RESERVATION_CHANGES.md](RESERVATION_CHANGES.md)에 기록한다. 교환·공지·Push와 운영 서버·배포는 후속 단계다.
 
 운영 정책의 기준 문서는 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md)와 [RESERVATION_RULES.md](RESERVATION_RULES.md)이다. 이 문서의 **확정 정책**은 사용자 결정의 요약이고, **기술 설계안**은 그 정책을 구현하기 위한 구조다. 세부 버전·성능 한도·설정 수치는 구현과 검증을 거쳐 고정한다.
 
@@ -145,6 +145,8 @@ DB migration은 Flyway로 관리하고, 운영에 적용된 파일은 수정하�
 [Spring Method Security](https://docs.spring.io/spring-security/reference/servlet/authorization/method-security.html)
 
 ## 8. 예약 트랜잭션과 동시성
+
+단건 예약 변경의 실제 구현은 [RESERVATION_CHANGES](RESERVATION_CHANGES.md)를 따른다. V6 계보와 원본 REPLACED·후속 CHANGE 예약, 점유·quota ledger·회차 예외·재시도 기록을 하나의 10초 트랜잭션으로 저장한다. 아래 교환·알림 outbox 설계는 아직 후속 구현이며 현재 변경 API가 Push 발송을 완료한다는 의미가 아니다.
 
 조회 화면에서 빈 시간을 확인한 뒤 다른 사용자가 선점할 수 있으므로 예약 성공 여부는 DB 커밋에서 결정한다. UI의 예약 가능 표시만으로 중복을 방지하지 않는다.
 

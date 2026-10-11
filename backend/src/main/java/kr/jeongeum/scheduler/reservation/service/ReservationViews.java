@@ -56,6 +56,20 @@ public class ReservationViews {
     public void requireCancel(Context context, Reservation reservation) {
         if (!cancelAuthority(context, reservation)) { throw MemberAccess.forbidden(); }
     }
+    public void requireChange(Context context, Reservation reservation) {
+        requireCancel(context, reservation);
+        if (!activeTeam(reservation)) { throw DirectoryInputs.notFound(); }
+    }
+    public void requireChangeSubject(Reservation reservation) {
+        if (reservation.ownerUserId() != null) { access.active(reservation.ownerUserId()); }
+    }
+    private boolean activeTeam(Reservation reservation) {
+        return reservation.teamId() == null || teams.findById(reservation.teamId()).map(team -> team.active()).orElse(false);
+    }
+    private boolean activeChangeSubject(Reservation reservation) {
+        return reservation.ownerUserId() == null ? activeTeam(reservation)
+                : members.findById(reservation.ownerUserId()).map(Member::active).orElse(false);
+    }
     public void requireCreate(Context context, String subjectType, Long teamId) {
         if ("TEAM".equals(subjectType) && !context.roles().containsKey(teamId)) {
             throw new ApiException(403, "MEMBERSHIP_REQUIRED", "현재 소속된 팀의 예약만 만들 수 있습니다.");
@@ -67,6 +81,8 @@ public class ReservationViews {
                 reservation.purpose(), string(reservation.teamId()), name, codes, reservation.status(),
                 TimeBlock.require(reservation.blockCode()).phase(reservation.date(), now), mine(context, reservation),
                 "CONFIRMED".equals(reservation.status()) && now.isBefore(reservation.endsAt()) && cancelAuthority(context, reservation),
+                "CONFIRMED".equals(reservation.status()) && now.isBefore(reservation.startsAt())
+                        && cancelAuthority(context, reservation) && activeChangeSubject(reservation),
                 reservation.originKind(), reservation.quotaExempt());
     }
     public ReservationResponse detail(Context context, Reservation reservation, Instant now) {
@@ -75,11 +91,11 @@ public class ReservationViews {
     public ReservationResponse detail(Context context, Reservation reservation, List<String> codes, Instant now) {
         ReservationSummary summary = summary(context, reservation, codes, now);
         return new ReservationResponse(summary.id(), summary.version(), summary.subjectType(), summary.purpose(), summary.teamId(),
-                summary.teamName(), codes, summary.status(), summary.phase(), summary.isMine(), summary.canCancel(),
+                summary.teamName(), codes, summary.status(), summary.phase(), summary.isMine(), summary.canCancel(), summary.canChange(),
                 string(reservation.ownerUserId()), Long.toString(reservation.creatorUserId()), reservation.date(), reservation.blockCode(),
                 reservation.startsAt(), reservation.endsAt(), reservation.usableFrom(), reservations.reservedQuota(reservation.id()),
-                reservation.quotaExempt(), reservation.originKind(), reservation.teamId() == null ? List.of() : context.faults(),
-                reservation.canceledAt(), reservation.cancelReason());
+                reservation.quotaExempt(), reservation.dualAssetException(), reservation.originKind(), reservation.teamId() == null ? List.of() : context.faults(),
+                reservation.canceledAt(), reservation.cancelReason(), reservations.successorIds(reservation.id()).stream().map(Object::toString).toList());
     }
     private static String string(Long value) { return value == null ? null : Long.toString(value); }
 }

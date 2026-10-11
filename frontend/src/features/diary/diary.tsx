@@ -107,7 +107,7 @@ export function Diary({ member, scope }: { member: Member; scope: string }) {
           <DateStrip days={days} selected={selectedDate} today={today} disabled={busy} onSelect={selectDate} /><TimetableLegend />
           <p className="diary-block-guide">12~18시 60분 · 18~24시 90분 / 점유된 시간도 눌러 상세 상태를 확인할 수 있어요.</p>
           <Timetable days={days} week={week} selectedDate={selectedDate} selectedCode={selectedBlock?.blockCode} member={member} now={now} highlight={highlight} disabled={busy} onDate={selectDate} onSelect={selectBlock} />
-          <div className="diary-timetable-footer"><Link href={`/reservations?date=${selectedDate}`}>선택 날짜 예약 상세·취소·이력 →</Link><span>개인과 팀의 60분 한도는 따로 계산해요.</span></div>
+          <div className="diary-timetable-footer"><Link href={`/reservations?date=${selectedDate}`}>선택 날짜 예약 상세·변경·취소·이력 →</Link><span>개인과 팀의 60분 한도는 따로 계산해요.</span></div>
         </section>
         <aside className="diary-side"><TeamSummary member={member} scope={scope} schedule={schedule} today={today} now={now} highlight={highlight} onDate={selectDate} disabled={busy} />
           <div className="diary-booking-host">
@@ -122,7 +122,7 @@ export function Diary({ member, scope }: { member: Member; scope: string }) {
             }}>
               <div className="diary-dialog-toolbar"><p className="diary-eyebrow">SAVE YOUR PRACTICE</p><button type="button" className="diary-dialog-close" aria-label="예약 선택 닫기" disabled={busy} onClick={clearSelection}>닫기 ×</button></div>
               {selectedBlock && day && <><BookingForm key={`${selectedDate}-${selectedBlock.blockCode}`} member={member} schedule={schedule} day={day} block={selectedBlock} now={now} disabled={busy || query.isError} disabledLabel={action.uncertain ? "예약 결과 재확인 필요" : query.isError ? "연결을 확인해 주세요" : undefined} onCreate={(input) => void create(input)} compact />{actionFeedback}
-                {selectedBlock.reservations.length > 0 && <div className="diary-slot-details"><h3>이 시간의 예약</h3><ul>{selectedBlock.reservations.filter((item) => item.status === "CONFIRMED").map((reservation) => <li key={reservation.id}>{subjectLabel(reservation)}{reservation.originKind === "FIXED" && " · 고정 배정"}{reservation.quotaExempt && " · 원래 60분 한도 면제"}{reservation.subjectType === "PERSONAL" && reservation.isMine && " · 내 예약"}</li>)}</ul><Link href={`/reservations?date=${selectedDate}`}>예약 상세·취소는 예약 화면에서 →</Link></div>}
+                {selectedBlock.reservations.length > 0 && <div className="diary-slot-details"><h3>이 시간의 예약</h3><ul>{selectedBlock.reservations.filter((item) => item.status === "CONFIRMED").map((reservation) => <li key={reservation.id}>{subjectLabel(reservation)}{reservation.originKind === "FIXED" && " · 고정 배정"}{reservation.quotaExempt && " · 원래 60분 한도 면제"}{reservation.subjectType === "PERSONAL" && reservation.isMine && " · 내 예약"}{(reservation.isMine || reservation.canCancel || reservation.canChange) && <Link href={`/reservations?date=${selectedDate}&reservationId=${encodeURIComponent(reservation.id)}`}>상세·변경·취소 →</Link>}</li>)}</ul><Link href={`/reservations?date=${selectedDate}`}>예약 상세·변경·취소는 예약 화면에서 →</Link></div>}
               </>}
             </dialog>
           </div>

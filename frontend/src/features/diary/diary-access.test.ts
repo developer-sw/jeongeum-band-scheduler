@@ -49,9 +49,9 @@ const snapshot: ScheduleSnapshot = {
 function booking(team: TeamMembership, id: string): ReservationDetail {
   return {
     id, version: 0, subjectType: "TEAM", purpose: team.kind, teamId: team.teamId, teamName: team.teamName,
-    instrumentCodes, status: "CONFIRMED", phase: "FUTURE", originKind: "MANUAL", quotaExempt: false, isMine: true, canCancel: true,
+    instrumentCodes, status: "CONFIRMED", phase: "FUTURE", originKind: "MANUAL", quotaExempt: false, isMine: true, canCancel: true, canChange: true,
     ownerUserId: null, creatorUserId: member.id, date: today, blockCode: "B01", startsAt: `${today}T12:00:00+09:00`, endsAt: `${today}T13:00:00+09:00`, usableFrom: `${today}T12:00:00+09:00`,
-    quotaMinutes: 60, teamFaultWarnings: [], canceledAt: null, cancelReason: null,
+    quotaMinutes: 60, teamFaultWarnings: [], canceledAt: null, cancelReason: null, successorIds: [], dualAssetException: false,
   };
 }
 
@@ -160,6 +160,9 @@ describe("diary routes preserve session, membership and role boundaries", () => 
     }
     expect(ordinary).not.toContain("악기 고장 등록·복구");
     expect(admin).toContain("악기 고장 등록·복구");
+    expect(ordinary).toContain("예약 조회·변경·취소·이력");
+    expect(ordinary).toContain("예약 교환");
+    expect(ordinary).not.toContain("예약 변경·교환");
   });
 
   it("preserves account identification, logout access, navigation and the user-edited brand footer", () => {

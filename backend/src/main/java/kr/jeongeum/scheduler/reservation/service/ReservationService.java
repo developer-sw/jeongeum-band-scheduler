@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Objects;
 import java.util.TreeSet;
 import kr.jeongeum.scheduler.common.api.ApiException;
 import kr.jeongeum.scheduler.common.api.DirectoryInputs;
@@ -12,6 +13,7 @@ import kr.jeongeum.scheduler.common.concurrency.DirectoryMutationGuard;
 import kr.jeongeum.scheduler.member.repository.MemberRepository;
 import kr.jeongeum.scheduler.recurring.service.RecurringOpeningService;
 import kr.jeongeum.scheduler.reservation.api.ReservationRequests;
+import kr.jeongeum.scheduler.reservation.api.ReservationChangeResponse;
 import kr.jeongeum.scheduler.reservation.api.ReservationResponse;
 import kr.jeongeum.scheduler.reservation.domain.Instrument;
 import kr.jeongeum.scheduler.reservation.domain.Reservation;
@@ -111,6 +113,122 @@ public class ReservationService {
                 reservation.id(), operationId, now);
         return new Result(views.detail(context, reservation, now), 201);
     }
+    public ReservationChangeResponse change(long actorId, long id, String key, ReservationRequests.Change input) {
+        String digest = ReservationInputs.keyDigest(key);
+        long version = DirectoryInputs.version(input.expectedVersion());
+        LocalDate date = ReservationInputs.date(input.date());
+        TimeBlock block = TimeBlock.require(input.blockCode());
+        List<String> codes = ReservationInputs.changeInstruments(input.instrumentCodes());
+        String route = "/api/v1/reservations/" + id;
+        String fingerprint = ReservationInputs.digest("PATCH|" + route + "|" + version + "|" + date + "|" + block.name()
+                + "|" + (codes == null ? "TEAM" : String.join(",", codes)));
+        ReservationChangeResponse result = writes.execute(status -> changeTransactional(actorId, id, digest, version, date, block, codes, route, fingerprint, true));
+        if (result != null) { return result; }
+        // Only a new, eligible request can ask for preparation. Replays never materialize dates.
+        // Date materialization owns an independent transaction, after the planning guard has been released.
+        opening.prepareDate(date);
+        return writes.execute(status -> changeTransactional(actorId, id, digest, version, date, block, codes, route, fingerprint, false));
+    }
+    /** A null result requests independent preparation; that planning transaction has made no writes. */
+    private ReservationChangeResponse changeTransactional(long actorId, long id, String digest, long version,
+            LocalDate date, TimeBlock block, List<String> codes, String route, String fingerprint, boolean allowPreparation) {
+        guard.lock();
+        ReservationViews.Context context = views.context(actorId);
+        var replay = reservations.idempotency(actorId, digest).orElse(null);
+        if (replay != null) {
+            requireFingerprint(replay, fingerprint);
+            Reservation source = reservations.find(id).orElseThrow(DirectoryInputs::notFound);
+            views.requireChange(context, source);
+            Reservation result = reservations.find(replay.reservationId()).orElseThrow(DirectoryInputs::notFound);
+            views.requireRead(context, result);
+            return changeResponse(replay.operationId() == null ? List.of() : List.of(Long.toString(id)),
+                    context, result, now());
+        }
+        Reservation planned = reservations.find(id).orElseThrow(DirectoryInputs::notFound);
+        views.requireChange(context, planned);
+        views.requireChangeSubject(planned);
+        requireChangeInstruments(planned, block, codes);
+        DirectoryInputs.sameVersion(planned.version(), version);
+        Instant plannedNow = now();
+        if (!"CONFIRMED".equals(planned.status())) { throw versionConflict(); }
+        if (!plannedNow.isBefore(planned.startsAt())) { throw started(); }
+        ReservationInputs.openDate(date, LocalDate.ofInstant(plannedNow, TimeBlock.SEOUL));
+        if (!plannedNow.isBefore(block.endsAt(date))) { throw finished(); }
+        if (allowPreparation && !reservations.prepared(date)) { return null; }
+        lockUsers(actorId, planned.creatorUserId(), planned.ownerUserId() == null ? planned.creatorUserId() : planned.ownerUserId());
+        if (planned.teamId() != null) { lockTeam(planned.teamId()); }
+        List<Instrument> instruments = reservations.lockInstruments();
+        TreeSet<LocalDate> dates = new TreeSet<>(List.of(planned.date(), date));
+        boolean targetOpen = false;
+        for (LocalDate lockedDate : dates) {
+            String state = reservations.ensureAndLockDay(lockedDate, now());
+            if (lockedDate.equals(date)) { targetOpen = "OPEN".equals(state); }
+        }
+        Reservation source = reservations.lock(id).orElseThrow(DirectoryInputs::notFound);
+        // A future path that changes a planned lock target must restart rather than acquire locks out of order.
+        if (!source.date().equals(planned.date()) || !source.blockCode().equals(planned.blockCode())
+                || !Objects.equals(source.teamId(), planned.teamId()) || !Objects.equals(source.ownerUserId(), planned.ownerUserId())
+                || source.creatorUserId() != planned.creatorUserId()) { throw versionConflict(); }
+        context = views.context(actorId);
+        context = new ReservationViews.Context(context.actor(), context.memberships(), context.roles(), instruments);
+        views.requireChange(context, source);
+        views.requireChangeSubject(source);
+        DirectoryInputs.sameVersion(source.version(), version);
+        Instant now = now();
+        if (!"CONFIRMED".equals(source.status())) { throw versionConflict(); }
+        if (!now.isBefore(source.startsAt())) { throw started(); }
+        ReservationInputs.openDate(date, LocalDate.ofInstant(now, TimeBlock.SEOUL));
+        if (!targetOpen) { throw notOpen(); }
+        if (!now.isBefore(block.endsAt(date))) { throw finished(); }
+        requireChangeInstruments(source, block, codes);
+        boolean personal = source.ownerUserId() != null;
+        List<Instrument> selected = personal ? instruments.stream().filter(instrument -> codes.contains(instrument.code())).toList() : instruments;
+        if (selected.size() != (personal ? codes.size() : 6)) { throw ApiException.invalidInput(); }
+        List<String> sourceCodes = reservations.instrumentCodes(id);
+        boolean unchanged = source.date().equals(date) && source.blockCode().equals(block.name())
+                && (!personal || new TreeSet<>(sourceCodes).equals(new TreeSet<>(codes)));
+        if (unchanged) {
+            // No operation, lineage, release, quota or recurring exception is written for an identical placement.
+            reservations.recordIdempotency(actorId, digest, fingerprint, "PATCH", route, 200, id, null, now);
+            return changeResponse(List.of(), context, source, now);
+        }
+        if (personal && selected.stream().anyMatch(Instrument::faulty)) { throw faulty(); }
+        if (personal && reservations.personalOverlap(source.ownerUserId(), date, block.name(), id)) {
+            throw new ApiException(409, "PERSONAL_OVERLAP", "같은 시간에 개인 예약을 두 건 만들 수 없습니다.");
+        }
+        List<String> occupied = reservations.occupiedCodes(date, block.name(), id);
+        if (selected.stream().anyMatch(instrument -> occupied.contains(instrument.code()))) {
+            throw new ApiException(409, "RESERVATION_CONFLICT", "선택한 시간이나 악기에 예약이 있습니다.");
+        }
+        int consumed = reservations.reservedQuota(id);
+        int consumption = block.durationMinutes() == 60 ? 60 : 0;
+        int finalUsage = reservations.usedMinutes(date, source.ownerUserId(), source.teamId()) + consumption
+                - (source.date().equals(date) ? consumed : 0);
+        if (finalUsage > 120) {
+            throw new ApiException(409, "DAILY_LIMIT_EXCEEDED", "60분 예약은 주체별 하루 두 블록까지 가능합니다.");
+        }
+        // One logical CHANGE operation is the future exchange invalidation / notification integration point.
+        long operationId = reservations.operation("CHANGE", actorId, now, null);
+        reservations.replace(id, now);
+        if (consumed > 0) { reservations.quota(source, operationId, -consumed, "RELEASE", now); }
+        Reservation successor = reservations.insertChanged(source, date, block, now, operationId);
+        for (Instrument instrument : selected) { reservations.claim(successor, instrument, now); }
+        reservations.quota(successor, operationId, consumption, "RESERVE", now);
+        reservations.lineage(operationId, id, successor.id(), now);
+        reservations.changeOccurrence(id, successor.id(), now);
+        reservations.recordIdempotency(actorId, digest, fingerprint, "PATCH", route, 200, successor.id(), operationId, now);
+        return changeResponse(List.of(Long.toString(id)), context, successor, now);
+    }
+    private ReservationChangeResponse changeResponse(List<String> replacedIds, ReservationViews.Context context,
+            Reservation result, Instant now) {
+        return new ReservationChangeResponse(replacedIds, List.of(views.detail(context, result, now)));
+    }
+    private static void requireChangeInstruments(Reservation source, TimeBlock target, List<String> codes) {
+        if (source.ownerUserId() == null) {
+            if (codes != null) { throw ApiException.invalidInput(); }
+        } else if (codes == null || (codes.size() != 1 && !(source.dualAssetException()
+                && target.durationMinutes() == 90 && codes.size() == 2))) { throw ApiException.invalidInput(); }
+    }
     @Transactional(timeout = 10)
     public Result cancel(long actorId, long id, String key, ReservationRequests.Cancel input) {
         String digest = ReservationInputs.keyDigest(key);
@@ -194,6 +312,7 @@ public class ReservationService {
     }
     private static ApiException notOpen() { return new ApiException(409, "DATE_NOT_OPEN", "아직 개방되지 않은 날짜입니다."); }
     private static ApiException finished() { return new ApiException(409, "RESERVATION_FINISHED", "이미 종료된 시간은 예약하거나 취소할 수 없습니다."); }
+    private static ApiException started() { return new ApiException(409, "RESERVATION_STARTED", "이미 시작한 예약은 변경할 수 없습니다."); }
     private static ApiException faulty() { return new ApiException(409, "ASSET_FAULTY", "고장 안내가 있는 악기는 새 개인 예약을 할 수 없습니다."); }
     private static ApiException versionConflict() { return new ApiException(409, "VERSION_CONFLICT", "예약이 변경되었습니다. 새로고침 후 다시 시도해 주세요."); }
 }

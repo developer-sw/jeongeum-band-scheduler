@@ -14,4 +14,8 @@ public final class ReservationRequests {
         @JsonAnySetter
         public void rejectUnknown(String field, Object value) { throw ApiException.invalidInput(); }
     }
+    public record Change(Long expectedVersion, String date, String blockCode, List<String> instrumentCodes) {
+        @JsonAnySetter
+        public void rejectUnknown(String field, Object value) { throw ApiException.invalidInput(); }
+    }
 }

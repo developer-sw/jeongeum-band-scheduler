@@ -6,6 +6,7 @@ import kr.jeongeum.scheduler.auth.security.MemberPrincipal;
 import kr.jeongeum.scheduler.common.api.ApiResponse;
 import kr.jeongeum.scheduler.common.api.DirectoryInputs;
 import kr.jeongeum.scheduler.reservation.api.InstrumentResponse;
+import kr.jeongeum.scheduler.reservation.api.ReservationChangeResponse;
 import kr.jeongeum.scheduler.reservation.api.ReservationRequests;
 import kr.jeongeum.scheduler.reservation.api.ReservationResponse;
 import kr.jeongeum.scheduler.reservation.api.ScheduleResponse;
@@ -17,6 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -62,6 +64,11 @@ public class ReservationController {
             @RequestHeader(name = "Idempotency-Key", required = false) String key, @RequestBody ReservationRequests.Cancel input) {
         ReservationService.Result result = reservations.cancel(actor.memberId(), DirectoryInputs.id(id), key, input);
         return response(result.reservation(), result.status());
+    }
+    @PatchMapping("/api/v1/reservations/{id}")
+    public ResponseEntity<ApiResponse<ReservationChangeResponse>> change(@AuthenticationPrincipal MemberPrincipal actor, @PathVariable String id,
+            @RequestHeader(name = "Idempotency-Key", required = false) String key, @RequestBody ReservationRequests.Change input) {
+        return response(reservations.change(actor.memberId(), DirectoryInputs.id(id), key, input), 200);
     }
     private <T> ResponseEntity<ApiResponse<T>> response(T data, int status) {
         return ResponseEntity.status(status).cacheControl(CacheControl.noStore()).body(ApiResponse.of(data, clock));
