@@ -23,7 +23,7 @@ const member: Member = { id: "9007199254740993", loginId: "fixture.reservation",
 const block: ScheduleBlock = { blockCode: "B03", startsAt: "2026-10-12T14:00:00+09:00", endsAt: "2026-10-12T15:00:00+09:00", durationMinutes: 60, phase: "IN_PROGRESS", remainingMinutes: 50, canReservePersonal: true, canReserveTeam: true, availableInstrumentCodes: ["DRUMS", "KEYBOARD"], faultyInstrumentCodes: [], teamWarnings: [], reservations: [] };
 const day: ScheduleDay = { date: "2026-10-12", openingStatus: "OPEN", personalQuota: { usedMinutes: 60, remainingMinutes: 60 }, teamQuotas: [{ teamId: "17", teamName: "가상 정규조", usedMinutes: 120, remainingMinutes: 0 }], blocks: [block] };
 const snapshot: ScheduleSnapshot = { today: day.date, bookableThrough: "2026-10-26", serverTime: meta.serverTime, timeZone: "Asia/Seoul", instruments: [{ code: "DRUMS", name: "드럼", status: "NORMAL", version: 0 }, { code: "KEYBOARD", name: "건반", status: "NORMAL", version: 0 }], days: [day], receivedAtMillis: 5_000 };
-const reservation: ReservationDetail = { id: "9007199254740994", version: 7, subjectType: "PERSONAL", purpose: "PERSONAL", teamId: null, teamName: null, instrumentCodes: ["DRUMS"], status: "CONFIRMED", phase: "IN_PROGRESS", isMine: true, canCancel: true, ownerUserId: member.id, creatorUserId: member.id, date: day.date, blockCode: "B03", startsAt: block.startsAt, endsAt: block.endsAt, usableFrom: meta.serverTime, quotaMinutes: 60, quotaExempt: false, originKind: "MANUAL", teamFaultWarnings: [], canceledAt: null, cancelReason: null };
+const reservation: ReservationDetail = { id: "9007199254740994", version: 7, subjectType: "PERSONAL", purpose: "PERSONAL", teamId: null, teamName: null, instrumentCodes: ["DRUMS"], status: "CONFIRMED", phase: "IN_PROGRESS", isMine: true, canCancel: true, canChange: true, ownerUserId: member.id, creatorUserId: member.id, date: day.date, blockCode: "B03", startsAt: block.startsAt, endsAt: block.endsAt, usableFrom: meta.serverTime, quotaMinutes: 60, quotaExempt: false, originKind: "MANUAL", teamFaultWarnings: [], canceledAt: null, cancelReason: null, successorIds: [], dualAssetException: false };
 const now = Date.parse(meta.serverTime);
 afterEach(() => vi.unstubAllGlobals());
 
@@ -160,7 +160,7 @@ describe("reservation views and cache permissions", () => {
   it("only renders cancellation for server-authorized active reservations before their end", () => {
     const render = (detail: ReservationDetail, clock = now) => renderToStaticMarkup(createElement(ReservationCard, { reservation: detail, now: clock, disabled: false, onCancel: vi.fn() }));
     expect(render(reservation)).toContain("취소 확인</button>");
-    expect(render({ ...reservation, canCancel: false })).not.toContain("취소 확인</button>");
+    expect(render({ ...reservation, canCancel: false, canChange: false })).not.toContain("취소 확인</button>");
     expect(render({ ...reservation, status: "CANCELED" })).not.toContain("취소 확인</button>");
     expect(render(reservation, Date.parse(block.endsAt))).not.toContain("취소 확인</button>");
     expect(quotaHistoryLabel({ ...reservation, status: "CANCELED", canceledAt: "2026-10-12T13:59:59+09:00" })).toContain("한도 복원");

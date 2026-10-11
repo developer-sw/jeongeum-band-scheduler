@@ -65,16 +65,23 @@ public class ReservationRepository {
                 RESERVATION, from, to);
     }
     public boolean personalOverlap(long userId, LocalDate date, String blockCode) {
+        return personalOverlap(userId, date, blockCode, null);
+    }
+    public boolean personalOverlap(long userId, LocalDate date, String blockCode, Long excludedReservationId) {
         return Boolean.TRUE.equals(jdbc.queryForObject("""
                 SELECT EXISTS(SELECT 1 FROM reservations WHERE owner_user_id = ? AND reservation_date = ?
-                AND time_block_code = ? AND status = 'CONFIRMED')
-                """, Boolean.class, userId, date, blockCode));
+                AND time_block_code = ? AND status = 'CONFIRMED' AND (?::bigint IS NULL OR id <> ?))
+                """, Boolean.class, userId, date, blockCode, excludedReservationId, excludedReservationId));
     }
     public List<String> occupiedCodes(LocalDate date, String blockCode) {
+        return occupiedCodes(date, blockCode, null);
+    }
+    public List<String> occupiedCodes(LocalDate date, String blockCode, Long excludedReservationId) {
         return jdbc.queryForList("""
                 SELECT a.code FROM reservation_assets c JOIN assets a ON a.id = c.asset_id
-                WHERE c.reservation_date = ? AND c.time_block_code = ? AND c.released_at IS NULL ORDER BY a.id
-                """, String.class, date, blockCode);
+                WHERE c.reservation_date = ? AND c.time_block_code = ? AND c.released_at IS NULL
+                AND (?::bigint IS NULL OR c.reservation_id <> ?) ORDER BY a.id
+                """, String.class, date, blockCode, excludedReservationId, excludedReservationId);
     }
     public List<String> instrumentCodes(long reservationId) {
         return jdbc.queryForList("""
@@ -149,6 +156,19 @@ public class ReservationRepository {
                 block.startMinute(), block.endMinute(), block.durationMinutes(), Timestamp.from(start),
                 Timestamp.from(block.endsAt(date)), Timestamp.from(usableFrom), Timestamp.from(now), operationId).getFirst();
     }
+    public Reservation insertChanged(Reservation source, LocalDate date, TimeBlock block, Instant now, long operationId) {
+        Instant start = block.startsAt(date);
+        Instant usableFrom = now.isAfter(start) ? now : start;
+        return jdbc.query("""
+                INSERT INTO reservations(owner_type, purpose, owner_user_id, team_id, creator_user_id,
+                reservation_date, time_block_code, block_start_minute, block_end_minute, duration_minutes,
+                block_start_at, block_end_at, usable_from, origin_kind, quota_exempt, dual_asset_exception, created_at, created_operation_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'CHANGE', FALSE, ?, ?, ?) RETURNING *
+                """, RESERVATION, source.ownerType(), source.purpose(), source.ownerUserId(), source.teamId(), source.creatorUserId(),
+                date, block.name(), block.startMinute(), block.endMinute(), block.durationMinutes(), Timestamp.from(start),
+                Timestamp.from(block.endsAt(date)), Timestamp.from(usableFrom), source.dualAssetException() && block.durationMinutes() == 90,
+                Timestamp.from(now), operationId).getFirst();
+    }
     public void claim(Reservation reservation, Instrument instrument, Instant now) {
         jdbc.update("""
                 INSERT INTO reservation_assets(reservation_id, reservation_date, time_block_code, asset_id, claim_kind, created_at)
@@ -175,6 +195,32 @@ public class ReservationRepository {
         jdbc.update("UPDATE reservation_assets SET released_at = ? WHERE reservation_id = ? AND released_at IS NULL",
                 Timestamp.from(now), id);
     }
+    public void replace(long id, Instant now) {
+        jdbc.update("UPDATE reservations SET status = 'REPLACED', version = version + 1 WHERE id = ?", id);
+        jdbc.update("UPDATE reservation_assets SET released_at = ? WHERE reservation_id = ? AND released_at IS NULL", Timestamp.from(now), id);
+    }
+    public void lineage(long operationId, long sourceId, long successorId, Instant now) {
+        jdbc.update("""
+                INSERT INTO reservation_lineage(operation_id, source_reservation_id, successor_reservation_id, created_at)
+                VALUES (?, ?, ?, ?)
+                """, operationId, sourceId, successorId, Timestamp.from(now));
+    }
+    public List<Long> successorIds(long sourceId) {
+        return jdbc.queryForList("SELECT DISTINCT successor_reservation_id FROM reservation_lineage WHERE source_reservation_id = ? ORDER BY successor_reservation_id",
+                Long.class, sourceId);
+    }
+    public void changeOccurrence(long sourceId, long successorId, Instant now) {
+        List<Long> occurrenceIds = jdbc.queryForList("SELECT occurrence_id FROM recurring_occurrence_reservations WHERE reservation_id = ? AND is_current ORDER BY occurrence_id",
+                Long.class, sourceId);
+        for (long occurrenceId : occurrenceIds) {
+            jdbc.update("UPDATE recurring_occurrences SET state = 'CHANGED_EXCEPTION', version = version + 1, updated_at = ? WHERE id = ?",
+                    Timestamp.from(now), occurrenceId);
+            jdbc.update("UPDATE recurring_occurrence_reservations SET is_current = FALSE WHERE occurrence_id = ? AND reservation_id = ? AND is_current",
+                    occurrenceId, sourceId);
+            jdbc.update("INSERT INTO recurring_occurrence_reservations(occurrence_id, reservation_id, link_role, is_current) VALUES (?, ?, 'SUCCESSOR', TRUE)",
+                    occurrenceId, successorId);
+        }
+    }
     public record Idempotency(String fingerprint, long reservationId, int responseStatus, Long operationId) {}
     public Optional<Idempotency> idempotency(long actorId, String digest) {
         return jdbc.query("SELECT * FROM idempotency_requests WHERE actor_user_id = ? AND key_digest = ? FOR UPDATE",
@@ -183,10 +229,14 @@ public class ReservationRepository {
     }
     public void recordIdempotency(long actorId, String digest, String fingerprint, String route, int status,
             long reservationId, Long operationId, Instant now) {
+        recordIdempotency(actorId, digest, fingerprint, "POST", route, status, reservationId, operationId, now);
+    }
+    public void recordIdempotency(long actorId, String digest, String fingerprint, String method, String route, int status,
+            long reservationId, Long operationId, Instant now) {
         jdbc.update("""
                 INSERT INTO idempotency_requests(actor_user_id, key_digest, request_fingerprint, http_method, route,
-                response_status, result_reservation_id, operation_id, created_at) VALUES (?, ?, ?, 'POST', ?, ?, ?, ?, ?)
-                """, actorId, digest, fingerprint, route, status, reservationId, operationId, Timestamp.from(now));
+                response_status, result_reservation_id, operation_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, actorId, digest, fingerprint, method, route, status, reservationId, operationId, Timestamp.from(now));
     }
     private static Instant instant(Timestamp timestamp) { return timestamp == null ? null : timestamp.toInstant(); }
 }

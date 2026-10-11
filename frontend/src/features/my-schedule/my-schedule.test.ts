@@ -28,7 +28,7 @@ const snapshot: ScheduleSnapshot = { today, bookableThrough: "2026-10-26", serve
   days: Array.from({ length: 15 }, (_, index) => ({ date: addDate(today, index), openingStatus: "OPEN", personalQuota: { usedMinutes: 0, remainingMinutes: 120 }, teamQuotas: [], blocks: [] })),
 };
 const now = Date.parse(snapshot.serverTime);
-const base: ReservationDetail = { id: "71", version: 0, subjectType: "TEAM", purpose: "REGULAR", teamId: "17", teamName: "가상 정규조 하나", instrumentCodes: ["DRUMS"], status: "CONFIRMED", phase: "FUTURE", isMine: true, canCancel: true, ownerUserId: null, creatorUserId: member.id, date: today, blockCode: "B03", startsAt: `${today}T14:00:00+09:00`, endsAt: `${today}T15:00:00+09:00`, usableFrom: `${today}T14:00:00+09:00`, quotaMinutes: 60, quotaExempt: false, originKind: "MANUAL", teamFaultWarnings: [], canceledAt: null, cancelReason: null };
+const base: ReservationDetail = { id: "71", version: 0, subjectType: "TEAM", purpose: "REGULAR", teamId: "17", teamName: "가상 정규조 하나", instrumentCodes: ["DRUMS"], status: "CONFIRMED", phase: "FUTURE", isMine: true, canCancel: true, canChange: true, ownerUserId: null, creatorUserId: member.id, date: today, blockCode: "B03", startsAt: `${today}T14:00:00+09:00`, endsAt: `${today}T15:00:00+09:00`, usableFrom: `${today}T14:00:00+09:00`, quotaMinutes: 60, quotaExempt: false, originKind: "MANUAL", teamFaultWarnings: [], canceledAt: null, cancelReason: null, successorIds: [], dualAssetException: false };
 const booking = (id: string, overrides: Partial<ReservationDetail> = {}): ReservationDetail => ({ ...base, id, ...overrides });
 afterEach(() => { navigation.date = ""; vi.unstubAllGlobals(); });
 

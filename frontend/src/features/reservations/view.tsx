@@ -1,6 +1,7 @@
 "use client";
 
 import { secondaryButton } from "@/components/auth-ui";
+import Link from "next/link";
 import { blockLabel, dateLabel, phaseAt, remainingMinutes } from "./time";
 import type { Instrument, InstrumentCode, ReservationDetail, ReservationSummary, ScheduleBlock, ScheduleDay } from "./types";
 
@@ -10,7 +11,7 @@ export const subjectLabel = (reservation: ReservationSummary) => reservation.sub
 export const phaseLabels = { FUTURE: "시작 전", IN_PROGRESS: "진행 중", ENDED: "종료" } as const;
 
 export function quotaHistoryLabel(reservation: ReservationDetail): string {
-  if (reservation.status === "REPLACED") return "이전 예약 이력";
+  if (reservation.status === "REPLACED") return "원본 예약 기록 보존 · 현재 한도 합산 없음";
   if (reservation.quotaExempt) return "60분 한도 면제 (관리자 원래 배정)";
   if (reservation.quotaMinutes === 0) return `${reservation.status === "CANCELED" ? "취소 · " : ""}60분 한도 합산 없음 (90분 블록)`;
   if (reservation.status === "CANCELED" && reservation.canceledAt) {
@@ -66,7 +67,7 @@ export function DesktopSchedule({ days, now, selectedDate, selectedBlockCode, on
   </div></section>;
 }
 
-export function ReservationCard({ reservation, now, disabled, onCancel }: { reservation: ReservationDetail; now: number; disabled: boolean; onCancel: (id: string) => void }) {
+export function ReservationCard({ reservation, now, disabled, onCancel, onChange, onDetail }: { reservation: ReservationDetail; now: number; disabled: boolean; onCancel: (id: string) => void; onChange?: (id: string) => void; onDetail?: (id: string) => void }) {
   const phase = phaseAt(reservation.startsAt, reservation.endsAt, now);
-  return <li className="rounded-2xl border border-navy/15 p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h3 className="font-bold break-words">{subjectLabel(reservation)}</h3><p className="mt-2 text-sm">{dateLabel(reservation.date)} · {blockLabel(reservation)}</p><p className="mt-1 text-sm break-words">{reservation.subjectType === "TEAM" ? "합주실 전체 독점" : instrumentNames(reservation.instrumentCodes)}</p><p className="mt-2 text-xs leading-6 text-navy-soft">예약 #{reservation.id} · {reservation.status === "CANCELED" ? "취소됨" : reservation.status === "REPLACED" ? "이전 예약 이력" : phaseLabels[phase]} · {quotaHistoryLabel(reservation)}</p>{reservation.status === "CONFIRMED" && phase === "IN_PROGRESS" && <p className="mt-2 text-xs leading-6">이용 가능 약 {remainingMinutes(reservation, now)}분 · 이용 시작 {new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(reservation.usableFrom))}</p>}{reservation.teamFaultWarnings.length > 0 && <p className="mt-2 text-xs leading-6 text-red-800">고장 안내: {instrumentNames(reservation.teamFaultWarnings)}</p>}</div>{reservation.status === "CONFIRMED" && reservation.canCancel && phase !== "ENDED" && <button type="button" className={secondaryButton} disabled={disabled} onClick={() => onCancel(reservation.id)} aria-label={`예약 #${reservation.id} 취소 확인`}>취소 확인</button>}</div></li>;
+  return <li className="rounded-2xl border border-navy/15 p-5"><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h3 className="font-bold break-words">{subjectLabel(reservation)}</h3><p className="mt-2 text-sm">{dateLabel(reservation.date)} · {blockLabel(reservation)}</p><p className="mt-1 text-sm break-words">{reservation.subjectType === "TEAM" ? "합주실 전체 독점" : instrumentNames(reservation.instrumentCodes)}</p><p className="mt-2 text-xs leading-6 text-navy-soft">예약 #{reservation.id} · {reservation.status === "CANCELED" ? "취소됨" : reservation.status === "REPLACED" ? "이전 예약 이력" : phaseLabels[phase]} · {quotaHistoryLabel(reservation)}</p>{reservation.status === "CONFIRMED" && phase === "IN_PROGRESS" && <p className="mt-2 text-xs leading-6">이용 가능 약 {remainingMinutes(reservation, now)}분 · 이용 시작 {new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(reservation.usableFrom))}</p>}{reservation.teamFaultWarnings.length > 0 && <p className="mt-2 text-xs leading-6 text-red-800">고장 안내: {instrumentNames(reservation.teamFaultWarnings)}</p>}</div><div className="flex flex-wrap gap-2">{onDetail ? <button type="button" className={secondaryButton} disabled={disabled} onClick={() => onDetail(reservation.id)}>상세·이력</button> : <Link className={secondaryButton} href={`/reservations?date=${reservation.date}&reservationId=${encodeURIComponent(reservation.id)}`}>상세·이력</Link>}{onChange && reservation.status === "CONFIRMED" && reservation.canChange && phase === "FUTURE" && <button type="button" className={secondaryButton} disabled={disabled} onClick={() => onChange(reservation.id)} aria-label={`예약 #${reservation.id} 변경`}>예약 변경</button>}{reservation.status === "CONFIRMED" && reservation.canCancel && phase !== "ENDED" && <button type="button" className={secondaryButton} disabled={disabled} onClick={() => onCancel(reservation.id)} aria-label={`예약 #${reservation.id} 취소 확인`}>취소 확인</button>}</div></div></li>;
 }

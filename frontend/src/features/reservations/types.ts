@@ -19,8 +19,10 @@ export interface ReservationSummary {
   quotaExempt: boolean;
   isMine: boolean;
   canCancel: boolean;
+  canChange: boolean;
 }
 export interface ReservationDetail extends ReservationSummary {
+  dualAssetException: boolean;
   ownerUserId: string | null;
   creatorUserId: string;
   date: string;
@@ -34,6 +36,7 @@ export interface ReservationDetail extends ReservationSummary {
   teamFaultWarnings: InstrumentCode[];
   canceledAt: string | null;
   cancelReason: string | null;
+  successorIds: string[];
 }
 export interface ScheduleBlock {
   blockCode: BlockCode;
@@ -54,4 +57,6 @@ export interface Schedule { today: string; bookableThrough: string; serverTime: 
 export interface ScheduleSnapshot extends Schedule { receivedAtMillis: number }
 export type CreateReservationInput = { subjectType: "PERSONAL"; date: string; blockCode: BlockCode; instrumentCodes: [InstrumentCode] } | { subjectType: "TEAM"; date: string; blockCode: BlockCode; teamId: string };
 export interface CancelReservationInput { expectedVersion: number; reason?: string }
-export type ReservationIntent = { kind: "CREATE"; input: CreateReservationInput } | { kind: "CANCEL"; reservationId: string; input: CancelReservationInput };
+export interface ChangeReservationInput { expectedVersion: number; date: string; blockCode: BlockCode; instrumentCodes?: InstrumentCode[] }
+export interface ChangeReservationResult { replacedReservationIds: string[]; reservations: ReservationDetail[] }
+export type ReservationIntent = { kind: "CREATE"; input: CreateReservationInput } | { kind: "CANCEL"; reservationId: string; input: CancelReservationInput } | { kind: "CHANGE"; reservationId: string; input: ChangeReservationInput };

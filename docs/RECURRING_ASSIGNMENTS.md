@@ -2,6 +2,8 @@
 
 작성 기준: 2026-10-10, Asia/Seoul. 구현 브랜치: `codex/recurring-assignments`, 구현 시작 기준 main: `cf02718`(예약 기본 PR #6 병합). 반복 배정 관리자 UI의 최종 검증과 내 공연조 일정 구현·검증 결과를 보고한 뒤 사용자 승인으로 [PR #7](https://github.com/developer-sw/jeongeum-band-scheduler/pull/7)을 정식 전환·main 병합했다. 병합 커밋 `4fccdc7`의 [main CI](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/38060582682)가 통과했다.
 
+2026-10-12 후속 단건 예약 변경은 [RESERVATION_CHANGES](RESERVATION_CHANGES.md)에 별도로 기록했다. 고정 회차 변경·후속 취소의 예외와 원본 주차 링크, 다른 주차로 이동한 회차의 재생성 방지, 다음 주 패턴 보존을 격리 PostgreSQL에서 검증했다. 아래 기존 단계의 범위·검증 기록은 당시 결과로 유지한다.
+
 ## 1. 범위와 확정 정책
 
 - 전체 관리자가 정규조·추가조의 매주 반복하는 요일·canonical 블록을 배정한다. 팀 소속이 없어도 이 관리 기능을 사용할 수 있다. 일반 팀 예약 생성 권한은 기존 소속 조건을 유지한다.

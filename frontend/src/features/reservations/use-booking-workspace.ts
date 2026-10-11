@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { refreshReservations, scheduleQuery } from "./queries";
 import { blockLabel, dateLabel, seoulDate } from "./time";
-import type { CreateReservationInput, ReservationDetail } from "./types";
+import type { ChangeReservationInput, CreateReservationInput, ReservationDetail, ReservationIntent } from "./types";
 import { useReservationAction } from "./use-reservation-action";
 import { useServerClock } from "./use-server-clock";
 
@@ -25,9 +25,11 @@ export function useBookingWorkspace(scope: string) {
     }
   }, [client, today, schedule, scope]);
 
-  async function completed(result?: ReservationDetail) {
+  async function completed(result?: ReservationDetail, intent?: ReservationIntent) {
     if (result) {
-      setNotice(result.status === "CANCELED"
+      setNotice(intent?.kind === "CHANGE"
+        ? result.id === intent.reservationId ? `변경 없이 요청한 예약 #${result.id}의 현재 상태를 확인했어요.` : `예약 #${intent.reservationId}의 변경 결과는 예약 #${result.id}에서 확인해요. ${dateLabel(result.date)} ${blockLabel(result)}`
+        : result.status === "CANCELED"
         ? `예약 #${result.id}의 취소 상태를 확인했어요.`
         : `예약 #${result.id}이 확정됐어요. ${dateLabel(result.date)} ${blockLabel(result)}`);
     }
@@ -37,13 +39,13 @@ export function useBookingWorkspace(scope: string) {
 
   // Keep the form locked until both the write and its cache refresh finish.
   // The ref also rejects another call before React has rendered the busy state.
-  async function perform(request: () => Promise<ReservationDetail | undefined>, clearNotice: boolean): Promise<ReservationDetail | undefined> {
+  async function perform(request: () => Promise<ReservationDetail | undefined>, clearNotice: boolean, intent?: ReservationIntent): Promise<ReservationDetail | undefined> {
     if (processingRef.current) return undefined;
     processingRef.current = true;
     setProcessing(true);
     if (clearNotice) setNotice(null);
     try {
-      return await completed(await request());
+      return await completed(await request(), intent);
     } finally {
       processingRef.current = false;
       setProcessing(false);
@@ -61,14 +63,20 @@ export function useBookingWorkspace(scope: string) {
     }), true);
   }
 
+  async function change(reservation: ReservationDetail, input: ChangeReservationInput): Promise<ReservationDetail | undefined> {
+    const intent: ReservationIntent = { kind: "CHANGE", reservationId: reservation.id, input };
+    return perform(() => action.run(intent), true, intent);
+  }
+
   async function retry(): Promise<ReservationDetail | undefined> {
-    return perform(() => action.retry(), false);
+    return perform(() => action.retry(), false, action.request?.intent);
   }
 
   return {
     query, schedule, now, today, action,
     busy: processing || action.pending || action.uncertain,
-    notice, setNotice, create, cancel, retry,
+    processing: processing || action.pending,
+    notice, setNotice, create, cancel, change, retry,
     refresh: () => refreshReservations(client),
   };
 }

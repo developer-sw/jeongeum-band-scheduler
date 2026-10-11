@@ -1,6 +1,6 @@
 # 테스트 및 운영 검증 계획
 
-작성 기준: 2026-10-10, Asia/Seoul. 이 문서는 업무 테스트의 기준이다. 로컬 DB·초기 앱 검증은 [DEV_ENVIRONMENT.md](DEV_ENVIRONMENT.md), [INITIAL_SETUP.md](INITIAL_SETUP.md), 초대·가입·세션·권한 회수·경합은 [AUTHENTICATION.md](AUTHENTICATION.md), 명단·팀·곡 단계는 [MEMBER_TEAM_MANAGEMENT.md](MEMBER_TEAM_MANAGEMENT.md), 이번 예약 기본 단계의 실제 결과는 [RESERVATION_FOUNDATION.md](RESERVATION_FOUNDATION.md)에 기록한다. 기본 예약 검증을 변경·교환·반복 배정·Push 등 후속 항목의 통과로 간주하지 않는다. [RESERVATION_RULES.md](RESERVATION_RULES.md), [API.md](API.md), [ERD.md](ERD.md), [UX.md](UX.md), [NOTIFICATIONS.md](NOTIFICATIONS.md)와 함께 검토한다.
+작성 기준: 2026-10-12, Asia/Seoul. 이 문서는 업무 테스트의 기준이다. 로컬 DB·초기 앱 검증은 [DEV_ENVIRONMENT.md](DEV_ENVIRONMENT.md), [INITIAL_SETUP.md](INITIAL_SETUP.md), 초대·가입·세션·권한 회수·경합은 [AUTHENTICATION.md](AUTHENTICATION.md), 명단·팀·곡 단계는 [MEMBER_TEAM_MANAGEMENT.md](MEMBER_TEAM_MANAGEMENT.md), 예약 기본 단계는 [RESERVATION_FOUNDATION.md](RESERVATION_FOUNDATION.md), 반복 배정·개방은 [RECURRING_ASSIGNMENTS.md](RECURRING_ASSIGNMENTS.md), 단건 변경·V6의 실제 결과는 [RESERVATION_CHANGES.md](RESERVATION_CHANGES.md)에 기록한다. 기본 예약이나 단건 변경 검증을 교환·Push 등 후속 항목의 통과로 간주하지 않는다. [RESERVATION_RULES.md](RESERVATION_RULES.md), [API.md](API.md), [ERD.md](ERD.md), [UX.md](UX.md), [NOTIFICATIONS.md](NOTIFICATIONS.md)와 함께 검토한다.
 
 ## 1. 목표와 우선순위
 
@@ -53,6 +53,10 @@ DB 동시성 증거를 H2·SQLite·Repository mock으로 대체하지 않는다.
 - 이미 다른 60분 예약이 있는 상대에게 120분 묶음이 도착해 한도가 초과하면 교환 전체를 거절한다.
 
 ## 5. 변경·취소·계보
+
+단건 변경의 실행 기록은 [RESERVATION_CHANGES](RESERVATION_CHANGES.md)를 따른다. `ReservationChangeIntegrationTest`는 격리 PostgreSQL에서 원본·점유·quota·operation·lineage·회차·멱등 기록의 집계 상태를 실패 전후 대조한다. 원본은 시작 전이어야 하며 목적지는 종료 전 잔여 시간도 허용한다. 개인 owner 비활성화는 관리자 대리 새 변경도 막고, 존속 팀의 비활성 최초 작성자는 이력으로 유지한다. 완료 재시도는 새 날짜 개방이나 후속 예약을 만들지 않는다.
+
+V6는 빈 테스트 DB에서 전체 Flyway 적용과, 데이터가 있는 V1~V5 DB의 V6 업그레이드를 구분해 검증한다. 실제 개발 DB에 V6를 적용하거나 계정·예약 fixture를 넣지 않는다. 실제 PostgreSQL 잠금으로 시작 경계 통과·10초 timeout·동시 변경/취소/예약/한도/고장 경합을 확인하며 timeout 후 원본을 유지하는지 대조한다. 프론트는 권한·no-op·원본 사용량 제외·다른 주체의 관리자 한도·불확실한 동일 요청 재시도와 성공 후 공통 Query 갱신을 검사한다.
 
 | ID | 시나리오 | 기대 결과 |
 | --- | --- | --- |
