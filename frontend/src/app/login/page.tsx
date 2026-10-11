@@ -28,7 +28,7 @@ export default function LoginPage() {
   };
 
   return <AppShell><FormCard title="다시 만나서 반가워요" description="정음의 개인 계정으로 로그인해 주세요.">
-    {session.loading ? <p role="status">현재 계정을 확인하고 있어요.</p> : session.member ? <><p className="mb-5 text-sm">이미 {session.member.displayName} 계정으로 로그인했어요.</p><Link className={primaryButton} href="/">내 정보로 이동</Link></> : <form method="post" onSubmit={onSubmit} className="space-y-5" aria-busy={action.pending}>
+    {session.loading ? <p role="status">현재 계정을 확인하고 있어요.</p> : session.member ? <><p className="mb-5 text-sm">이미 {session.member.displayName} 계정으로 로그인했어요.</p><Link className={primaryButton} href="/account">내 계정으로 이동</Link></> : <form method="post" onSubmit={onSubmit} className="space-y-5" aria-busy={action.pending}>
       <Suspense fallback={null}><JoinedNotice /></Suspense>
       <Field id="login-id" label="아이디"><input id="login-id" name="username" className={inputClass} autoComplete="username" autoCapitalize="none" spellCheck={false} required maxLength={32} value={loginId} onChange={(event) => setLoginId(event.target.value)} disabled={action.pending} /></Field>
       <Field id="login-password" label="비밀번호"><input id="login-password" name="password" type="password" className={inputClass} autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} disabled={action.pending} /></Field>

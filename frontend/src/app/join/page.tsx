@@ -31,7 +31,7 @@ export default function JoinPage() {
   }
 
   return <AppShell><FormCard title={joined ? "정음에 오신 걸 환영해요" : "초대로 시작해요"} description={joined ? "가입을 마쳤어요. 본인 계정으로 로그인해 주세요." : "관리자에게 받은 개인 초대를 입력해 주세요. 초대는 한 번만 사용할 수 있어요."}>
-    {loading ? <p role="status">현재 계정을 확인하고 있어요.</p> : member ? <><p className="mb-5 text-sm">가입하려면 현재 계정에서 먼저 로그아웃해 주세요.</p><Link href="/" className={primaryButton}>내 정보로 이동</Link></> : joined ? <Link href="/login" className={primaryButton}>로그인하러 가기</Link> : !expiresAt ? <form method="post" onSubmit={inspect} className="space-y-5" aria-busy={action.pending}>
+    {loading ? <p role="status">현재 계정을 확인하고 있어요.</p> : member ? <><p className="mb-5 text-sm">가입하려면 현재 계정에서 먼저 로그아웃해 주세요.</p><Link href="/account" className={primaryButton}>내 계정으로 이동</Link></> : joined ? <Link href="/login" className={primaryButton}>로그인하러 가기</Link> : !expiresAt ? <form method="post" onSubmit={inspect} className="space-y-5" aria-busy={action.pending}>
       <Field id="invitation-token" label="개인 초대 코드" hint="주소에 붙이지 않고 이 입력칸에만 입력해 주세요."><input id="invitation-token" type="password" className={inputClass} autoComplete="off" required maxLength={512} spellCheck={false} aria-describedby="invitation-token-hint" value={token} onChange={(event) => setToken(event.target.value)} disabled={action.pending} /></Field>
       <FormError message={action.error} /><button type="submit" className={`${primaryButton} w-full`} disabled={action.pending}>{action.pending ? "초대 확인 중…" : "초대 확인"}</button><p className="text-sm text-navy-soft">초대를 받지 못했다면 관리자에게 문의해 주세요.</p>
     </form> : <form method="post" onSubmit={submit} className="space-y-5" aria-busy={action.pending}>

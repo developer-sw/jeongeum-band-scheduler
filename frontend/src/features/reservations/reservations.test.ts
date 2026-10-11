@@ -10,7 +10,9 @@ import type { Member } from "@/features/auth/types";
 import { directoryScope, pruneDirectoryCache } from "@/features/directory/queries";
 import { cancelReservation, createReservation } from "./api";
 import { bookingInput } from "./booking";
+import { BookingForm } from "./booking-form";
 import { reservationErrorMessage } from "./errors";
+import { myReservationsQuery, refreshReservations, reservationQuery, scheduleQuery } from "./queries";
 import { ReservationRequestState } from "./request-state";
 import { addDate, blockLabel, phaseAt, remainingMinutes, seoulDate, serverNow } from "./time";
 import type { ReservationDetail, ReservationIntent, ScheduleBlock, ScheduleDay, ScheduleSnapshot } from "./types";
@@ -51,6 +53,53 @@ describe("booking input follows the current server snapshot", () => {
     expect(bookingInput(member, day, { ...block, blockCode: "B07", durationMinutes: 90 }, "17", "DRUMS", now)).toEqual({ subjectType: "TEAM", date: day.date, blockCode: "B07", teamId: "17" });
     expect(typeof bookingInput({ ...member, globalRole: "GLOBAL_ADMIN" }, day, block, "unsubscribed-team", "", now)).toBe("string");
     expect(typeof bookingInput(member, { ...day, personalQuota: { usedMinutes: 120, remainingMinutes: 0 } }, block, "PERSONAL", "DRUMS", now)).toBe("string");
+  });
+  it("keeps each membership's quota independent from the exhausted personal and other-team quotas", () => {
+    const multiple: Member = { ...member, teamMemberships: [...member.teamMemberships, { teamId: "18", teamName: "가상 추가조", kind: "ADDITIONAL", role: "LEADER" }] };
+    const quotas: ScheduleDay = { ...day, personalQuota: { usedMinutes: 120, remainingMinutes: 0 }, teamQuotas: [...day.teamQuotas, { teamId: "18", teamName: "가상 추가조", usedMinutes: 60, remainingMinutes: 60 }] };
+    expect(bookingInput(multiple, quotas, block, "18", "", now)).toEqual({ subjectType: "TEAM", date: day.date, blockCode: "B03", teamId: "18" });
+    expect(typeof bookingInput(multiple, quotas, block, "17", "", now)).toBe("string");
+    expect(typeof bookingInput(multiple, quotas, block, "PERSONAL", "DRUMS", now)).toBe("string");
+    expect(typeof bookingInput({ ...multiple, teamMemberships: multiple.teamMemberships.slice(0, 1) }, quotas, block, "18", "", now)).toBe("string");
+  });
+  it("permits warned team practice and an ordinary 90-minute personal block without spending the 60-minute quota", () => {
+    const faulty = { ...block, durationMinutes: 90 as const, faultyInstrumentCodes: ["DRUMS" as const], teamWarnings: ["DRUMS" as const], availableInstrumentCodes: ["KEYBOARD" as const] };
+    const exhausted = { ...day, personalQuota: { usedMinutes: 120, remainingMinutes: 0 } };
+    expect(bookingInput(member, exhausted, faulty, "17", "", now)).toMatchObject({ subjectType: "TEAM", teamId: "17" });
+    expect(bookingInput(member, exhausted, faulty, "PERSONAL", "KEYBOARD", now)).toMatchObject({ subjectType: "PERSONAL", instrumentCodes: ["KEYBOARD"] });
+    expect(typeof bookingInput(member, exhausted, faulty, "PERSONAL", "DRUMS", now)).toBe("string");
+    expect(typeof bookingInput(member, exhausted, faulty, "PERSONAL", "KEYBOARD", Date.parse(block.endsAt))).toBe("string");
+  });
+});
+
+describe("shared booking form preserves server-backed choices", () => {
+  it("shows only current memberships for an admin and offers a separate confirmation step in compact mode", () => {
+    const markup = renderToStaticMarkup(createElement(BookingForm, { member: { ...member, globalRole: "GLOBAL_ADMIN" }, schedule: snapshot, day: { ...day, teamQuotas: [...day.teamQuotas, { teamId: "99", teamName: "가상 미소속 조", usedMinutes: 0, remainingMinutes: 120 }] }, block, now, disabled: false, onCreate: vi.fn(), compact: true }));
+    expect(markup).toContain("가상 정규조 · 정규조");
+    expect(markup).not.toContain("가상 미소속 조");
+    expect(markup).toContain("예약 내용 확인</button>");
+    expect(markup).not.toContain("예약 확정 요청</button>");
+    expect(markup).toContain("잔여 시간만 이용해도 60분 한 칸으로 계산");
+    expect(markup).toContain("2시간은 60분 예약 두 건으로 각각 처리");
+  });
+  it("does not offer an occupied or faulty personal instrument and disables submission while opening or checking a request", () => {
+    const selected = { ...block, availableInstrumentCodes: ["KEYBOARD" as const], faultyInstrumentCodes: ["DRUMS" as const] };
+    const render = (openingStatus: ScheduleDay["openingStatus"], disabled: boolean) => renderToStaticMarkup(createElement(BookingForm, { member, schedule: { ...snapshot, instruments: snapshot.instruments.map((instrument) => instrument.code === "DRUMS" ? { ...instrument, status: "FAULTY" as const } : instrument) }, day: { ...day, openingStatus }, block: selected, now, disabled, onCreate: vi.fn() }));
+    const preparing = render("PREPARING", false);
+    const options = preparing.match(/<select id="reservation-instrument"[\s\S]*?<\/select>/)?.[0];
+    expect(options).toContain('<option value="KEYBOARD">건반</option>');
+    expect(options).not.toContain('<option value="DRUMS">');
+    expect(preparing).toMatch(/<button type="submit"[^>]*disabled=""/);
+    expect(render("OPEN", true)).toContain("요청 확인 중…");
+  });
+  it("refreshes schedule, team summaries, reservation details, and the current member after an action", async () => {
+    const client = new QueryClient();
+    const scope = directoryScope(member);
+    const keys = [scheduleQuery(scope).queryKey, myReservationsQuery(scope, day.date, snapshot.bookableThrough).queryKey, reservationQuery(scope, reservation.id).queryKey, memberQueryKey];
+    for (const key of keys) client.setQueryData(key, {});
+    await refreshReservations(client);
+    for (const key of keys) expect(client.getQueryState(key)?.isInvalidated).toBe(true);
+    client.clear();
   });
 });
 

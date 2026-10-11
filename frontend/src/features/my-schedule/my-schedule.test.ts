@@ -16,7 +16,7 @@ import { myTeamSchedule } from "./schedule";
 import { MyTeamScheduleList } from "./view";
 
 const navigation = vi.hoisted(() => ({ date: "" }));
-vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams(navigation.date ? { date: navigation.date } : {}) }));
+vi.mock("next/navigation", () => ({ usePathname: () => "/my-schedule", useSearchParams: () => new URLSearchParams(navigation.date ? { date: navigation.date } : {}) }));
 
 const member: Member = { id: "9007199254740993", loginId: "fixture.schedule", displayName: "가상 회원", globalRole: "MEMBER", status: "ACTIVE", teamMemberships: [
   { teamId: "17", teamName: "가상 정규조 하나", kind: "REGULAR", role: "MEMBER" },
