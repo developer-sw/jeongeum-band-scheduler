@@ -3,7 +3,7 @@
 import { FormError, primaryButton, secondaryButton } from "./auth-ui";
 import { authErrorMessage } from "@/features/auth/errors";
 
-export const panelClass = "rounded-3xl border border-navy/15 p-6 sm:p-8";
+export const panelClass = "warm-panel rounded-3xl p-6 sm:p-8";
 export const teamKindLabel = (kind: "REGULAR" | "ADDITIONAL") => kind === "REGULAR" ? "정규조" : "추가조";
 
 export function QueryState({ pending, error, retry }: { pending: boolean; error: unknown; retry: () => void }) {
