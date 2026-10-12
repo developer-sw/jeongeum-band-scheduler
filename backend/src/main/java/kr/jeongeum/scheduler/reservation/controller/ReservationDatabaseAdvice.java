@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /** Keep transient database diagnostics out of responses without changing other feature handlers. */
-@RestControllerAdvice(assignableTypes = ReservationController.class)
+@RestControllerAdvice(assignableTypes = {ReservationController.class, kr.jeongeum.scheduler.exchange.controller.ExchangeController.class})
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class ReservationDatabaseAdvice {
     @ExceptionHandler({QueryTimeoutException.class, TransactionTimedOutException.class, PessimisticLockingFailureException.class})

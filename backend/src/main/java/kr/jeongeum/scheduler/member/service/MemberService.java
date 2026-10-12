@@ -19,8 +19,10 @@ public class MemberService {
     private final MemberAccess access;
     private final DirectoryMutationGuard guard;
     private final Clock clock;
-    public MemberService(MemberRepository members, MemberAccess access, DirectoryMutationGuard guard, Clock clock) {
-        this.members = members; this.access = access; this.guard = guard; this.clock = clock;
+    private final kr.jeongeum.scheduler.exchange.service.ExchangeService exchanges;
+    public MemberService(MemberRepository members, MemberAccess access, DirectoryMutationGuard guard, Clock clock,
+            kr.jeongeum.scheduler.exchange.service.ExchangeService exchanges) {
+        this.members = members; this.access = access; this.guard = guard; this.clock = clock; this.exchanges = exchanges;
     }
     @Transactional(readOnly = true)
     public MemberResponse current(long userId) {
@@ -29,7 +31,7 @@ public class MemberService {
     }
     @Transactional(readOnly = true)
     public List<AdminMemberResponse> list(long actorId) { access.administrator(actorId); return members.listAdminMembers(); }
-    @Transactional
+    @Transactional(timeout = 10)
     public AdminMemberResponse changeRole(long actorId, long userId, String role, long version) {
         if (!"MEMBER".equals(role) && !"GLOBAL_ADMIN".equals(role)) { throw ApiException.invalidInput(); }
         guard.lock(); access.administratorForMutation(actorId);
@@ -42,6 +44,7 @@ public class MemberService {
             }
             members.changeRole(userId, role);
             members.auditRole(userId, actorId, target.globalRole(), role, clock.instant());
+            exchanges.refreshPendingUnderGuard();
         }
         return members.adminResponse(userId);
     }

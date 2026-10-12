@@ -152,11 +152,12 @@ describe("diary routes preserve session, membership and role boundaries", () => 
   it("keeps unimplemented functions explicitly disabled without fake routes or notification counts", () => {
     const ordinary = render(seededClient(member), MorePage, "/more");
     const admin = render(seededClient({ ...member, globalRole: "GLOBAL_ADMIN" }), MorePage, "/more");
-    for (const [markup, count] of [[ordinary, 6], [admin, 7]] as const) {
+    for (const [markup, count] of [[ordinary, 5], [admin, 6]] as const) {
       const buttons = markup.match(/<button[^>]*class="planned-feature"[^>]*>[\s\S]*?<\/button>/g) ?? [];
       expect(buttons).toHaveLength(count);
       for (const button of buttons) { expect(button).toContain('disabled=""'); expect(button).toContain("준비 중"); }
-      for (const route of ["/notifications", "/announcements", "/exchanges", "/pwa"]) expect(markup).not.toContain(`href="${route}"`);
+      for (const route of ["/notifications", "/announcements", "/pwa"]) expect(markup).not.toContain(`href="${route}"`);
+      expect(markup).toContain('href="/exchanges"');
     }
     expect(ordinary).not.toContain("악기 고장 등록·복구");
     expect(admin).toContain("악기 고장 등록·복구");

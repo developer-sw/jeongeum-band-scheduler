@@ -2,7 +2,7 @@
 
 갱신일: 2026-10-12 / 기준 시간대: `Asia/Seoul` / 기본 경로: `/api/v1`
 
-이 문서는 업무 기능의 설계 계약이다. 인증·초대에 가입 전 명단·계정 연결과 회원·팀·팀장·곡 관리를 추가했다. 인증 계약·검증은 [AUTHENTICATION](AUTHENTICATION.md), 명단·팀 DTO·검증은 [MEMBER_TEAM_MANAGEMENT](MEMBER_TEAM_MANAGEMENT.md), 예약 기본의 실제 DTO·재시도·검증은 [RESERVATION_FOUNDATION](RESERVATION_FOUNDATION.md), 반복 배정·날짜 개방은 [RECURRING_ASSIGNMENTS](RECURRING_ASSIGNMENTS.md), 구현한 단건 예약 PATCH는 [RESERVATION_CHANGES](RESERVATION_CHANGES.md)를 따른다. 아래의 batch·교환·고장 관리·알림 API와 OpenAPI 산출물은 후속 단계의 설계 계약이며 이번에 제공하는 API와 구분한다. 사용자 정책은 [PROJECT_CONTEXT](PROJECT_CONTEXT.md)와 [RESERVATION_RULES](RESERVATION_RULES.md), 저장 모델은 [ERD](ERD.md)를 따른다.
+이 문서는 업무 기능의 설계 계약이다. 인증·초대에 가입 전 명단·계정 연결과 회원·팀·팀장·곡 관리를 추가했다. 인증 계약·검증은 [AUTHENTICATION](AUTHENTICATION.md), 명단·팀 DTO·검증은 [MEMBER_TEAM_MANAGEMENT](MEMBER_TEAM_MANAGEMENT.md), 예약 기본의 실제 DTO·재시도·검증은 [RESERVATION_FOUNDATION](RESERVATION_FOUNDATION.md), 반복 배정·날짜 개방은 [RECURRING_ASSIGNMENTS](RECURRING_ASSIGNMENTS.md), 구현한 단건 예약 PATCH는 [RESERVATION_CHANGES](RESERVATION_CHANGES.md)를 따른다. 교환 요청·후보·승인은 [RESERVATION_EXCHANGES](RESERVATION_EXCHANGES.md)의 개발·검증 기록을 따른다. 아래의 batch·고장 관리·알림 API와 OpenAPI 산출물은 후속 단계의 설계 계약이며 이번에 제공하는 API와 구분한다. 사용자 정책은 [PROJECT_CONTEXT](PROJECT_CONTEXT.md)와 [RESERVATION_RULES](RESERVATION_RULES.md), 저장 모델은 [ERD](ERD.md)를 따른다.
 
 Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 반환한다. CSRF는 `data.headerName=X-CSRF-TOKEN`, `data.token`을 반환한다. 두 응답은 공통 `meta`와 `Cache-Control: no-store`를 사용한다. 초기 보안 계층의 CSRF 누락·위조는 `403 CSRF_INVALID`, 미인증 보호 API 접근은 `401 AUTHENTICATION_REQUIRED`다.
 
@@ -239,8 +239,11 @@ Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 �
 
 ## 6. 교환 요청과 승인
 
+2026-10-12 교환 API 로컬 구현·격리 검증을 완료했으며 이후 사용자 승인으로 실제 개발 DB V7 적용·최신 서버 기동·데이터 보존을 확인했다. 실제 DTO·재시도·후보 조회·검증 기록은 [RESERVATION_EXCHANGES](RESERVATION_EXCHANGES.md)를 따른다. 기존 일반 개인 상세 조회 권한을 확대하지 않고 별도 후보 응답에 필요한 배치 정보와 불투명 묶음 식별만 제공한다.
+
 | Method / 경로 | 권한 | 계약 |
 |---|---|---|
+| GET /exchange-candidates?from=&to= | 현재 활성 회원 | 열린 예약 가능 기간 내 시작 전 확정 후보; 최소 배치 정보·bundleKey, 개인 로그인 ID/이름/메모/취소 이력 제외 |
 | POST /exchange-requests | 본인 측 모든 예약에 변경 권한 보유 | 양측 예약 ID·버전, 필요한 악기 배분을 기록 |
 | GET /exchange-requests | 관련 활성 회원 또는 전체 관리자 | 본인·소속 팀 관련 요청과 상태 |
 | GET /exchange-requests/{id} | 관련 활성 회원 또는 전체 관리자 | 원본·예상 결과·현재 승인 가능 여부 |

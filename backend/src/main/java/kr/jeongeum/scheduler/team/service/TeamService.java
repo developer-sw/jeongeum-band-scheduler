@@ -25,10 +25,11 @@ public class TeamService {
     private final DirectoryMutationGuard guard;
     private final MemberAccess access;
     private final Clock clock;
+    private final kr.jeongeum.scheduler.exchange.service.ExchangeService exchanges;
     public TeamService(TeamRepository teams, TeamSongRepository songs, RosterRepository roster,
-            DirectoryMutationGuard guard, MemberAccess access, Clock clock) {
+            DirectoryMutationGuard guard, MemberAccess access, Clock clock, kr.jeongeum.scheduler.exchange.service.ExchangeService exchanges) {
         this.teams = teams; this.songs = songs; this.roster = roster;
-        this.guard = guard; this.access = access; this.clock = clock;
+        this.guard = guard; this.access = access; this.clock = clock; this.exchanges = exchanges;
     }
     @Transactional(readOnly = true)
     public List<TeamResponse> list(long actorId) {
@@ -68,20 +69,22 @@ public class TeamService {
         teams.touch(id, clock.instant());
         return response(actor, teams.findById(id).orElseThrow(DirectoryInputs::notFound));
     }
-    @Transactional
+    @Transactional(timeout = 10)
     public void removeMember(long actorId, long id, long rosterId) {
         guard.lock(); access.administratorForMutation(actorId);
         lockActiveTeam(id);
         if (teams.removeMember(id, rosterId, clock.instant()) == 0) { throw DirectoryInputs.notFound(); }
         teams.touch(id, clock.instant());
+        exchanges.refreshPendingUnderGuard();
     }
-    @Transactional
+    @Transactional(timeout = 10)
     public TeamDetailResponse assignLeader(long actorId, long id, Long rosterId) {
         guard.lock(); Member actor = access.administratorForMutation(actorId);
         lockActiveTeam(id);
         if (rosterId != null && !teams.membershipExists(id, rosterId)) { throw ApiException.invalidInput(); }
         teams.assignLeader(id, rosterId, clock.instant());
         teams.touch(id, clock.instant());
+        exchanges.refreshPendingUnderGuard();
         return response(actor, teams.findById(id).orElseThrow(DirectoryInputs::notFound));
     }
     private Team lockActiveTeam(long id) { return activeTeam(teams.lockById(id).orElseThrow(DirectoryInputs::notFound)); }

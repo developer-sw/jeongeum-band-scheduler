@@ -1,6 +1,6 @@
 # UX 및 반응형 화면 설계
 
-작성 기준: 2026-10-12, Asia/Seoul. 사용자 요청으로 따뜻한 다이어리형 UI를 구현하며 원본 로고 파일과 하단 `JEONGEUM · SENTIMENTAL MUSIC` 문구를 보존한다. 다이어리 구현·검증 기록은 [DIARY_UI_REDESIGN](DIARY_UI_REDESIGN.md)을 따른다. 인증 화면은 [AUTHENTICATION](AUTHENTICATION.md), 명단·팀 화면은 [MEMBER_TEAM_MANAGEMENT](MEMBER_TEAM_MANAGEMENT.md), 일정·생성·취소 화면은 [RESERVATION_FOUNDATION](RESERVATION_FOUNDATION.md), 반복 배정 관리는 [RECURRING_ASSIGNMENTS](RECURRING_ASSIGNMENTS.md), 단건 예약 변경 화면은 [RESERVATION_CHANGES](RESERVATION_CHANGES.md)를 따른다. 교환·공지·Push UI와 배포는 후속 단계다. 아래에서 **확정 정책**과 **UI 제안**을 구분한다. 예약 정책·권한의 상세 계약은 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), [RESERVATION_RULES.md](RESERVATION_RULES.md), [API.md](API.md)를 함께 확인한다.
+작성 기준: 2026-10-12, Asia/Seoul. 사용자 요청으로 따뜻한 다이어리형 UI를 구현하며 원본 로고 파일과 하단 `JEONGEUM · SENTIMENTAL MUSIC` 문구를 보존한다. 다이어리 구현·검증 기록은 [DIARY_UI_REDESIGN](DIARY_UI_REDESIGN.md)을 따른다. 인증 화면은 [AUTHENTICATION](AUTHENTICATION.md), 명단·팀 화면은 [MEMBER_TEAM_MANAGEMENT](MEMBER_TEAM_MANAGEMENT.md), 일정·생성·취소 화면은 [RESERVATION_FOUNDATION](RESERVATION_FOUNDATION.md), 반복 배정 관리는 [RECURRING_ASSIGNMENTS](RECURRING_ASSIGNMENTS.md), 단건 예약 변경 화면은 [RESERVATION_CHANGES](RESERVATION_CHANGES.md)를 따른다. 교환 화면은 [RESERVATION_EXCHANGES](RESERVATION_EXCHANGES.md)에서 개발·검증하며 공지·Push UI와 배포는 후속 단계다. 아래에서 **확정 정책**과 **UI 제안**을 구분한다. 예약 정책·권한의 상세 계약은 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), [RESERVATION_RULES.md](RESERVATION_RULES.md), [API.md](API.md)를 함께 확인한다.
 
 ## 1. 목표와 첫 운영 범위
 
@@ -139,7 +139,7 @@
 
 불확실한 응답에는 새 쓰기를 막고 **같은 요청 결과 다시 확인**을 제공한다. 화면 안에서는 원래 본문과 재시도 키를 사용하며 오프라인 자동 제출은 하지 않는다. 이 임시 요청은 화면 메모리에 보관하므로 페이지 이동·전체 새로고침·탭 종료 뒤에는 복원되지 않는다. 다시 접속하면 최신 배정·예약 목록을 먼저 확인한다. 관리자 역할 상실·비활성화·계정 전환·로그아웃 시 관리 화면과 이전 권한의 Query를 초기화하고 쓰기마다 서버 권한을 재검증한다.
 
-단건 예약 변경은 아래 화면에서 실제 `CHANGED_EXCEPTION`을 기록한다. 교환·알림은 후속 단계다. 패턴 관리의 검증 결과는 [RECURRING_ASSIGNMENTS](RECURRING_ASSIGNMENTS.md), 단건 변경 결과는 [RESERVATION_CHANGES](RESERVATION_CHANGES.md)를 따른다.
+단건 예약 변경은 아래 화면에서 실제 `CHANGED_EXCEPTION`을 기록한다. 교환 개발은 [RESERVATION_EXCHANGES](RESERVATION_EXCHANGES.md)를 따르며 알림은 후속 단계다. 패턴 관리의 검증 결과는 [RECURRING_ASSIGNMENTS](RECURRING_ASSIGNMENTS.md), 단건 변경 결과는 [RESERVATION_CHANGES](RESERVATION_CHANGES.md)를 따른다.
 
 ### 현재 구현: 단건 예약 변경
 
@@ -160,6 +160,8 @@
 PC·모바일 모두 읽을 수 있는 카드 목록과 공통 Query 계층을 사용한다. 20초 주기·화면 포커스·재연결·수동 갱신으로 서버 상태를 확인하고 예약 mutation과 반복 배정 적용 후 같은 예약 Query를 무효화한다. 계정·현재 소속·역할 변경 시 Query 범위를 바꾸어 이전 권한의 목록을 유지하지 않는다. 미로그인은 기존 로그인 안내로 진입을 보호하고 쓰기 동작을 이 목록에 새로 추가하지 않는다.
 
 ## 7. 교환 사용자 흐름
+
+2026-10-12 로컬 구현·검증한 `/exchanges`는 기존 다이어리 UI·예약 화면·더보기에서 연결한다. 후보 API는 시작 전 확정 예약의 최소 배치 정보와 묶음 식별을 제공하며 다른 개인 예약 상세의 일반 조회를 허용하지 않는다. 실제 화면·상태·재시도·검증 기록은 [RESERVATION_EXCHANGES](RESERVATION_EXCHANGES.md)를 따른다. 알림함·Push 없이도 목록을 직접 조회해 현재 요청 상태를 확인하며 Push 구현 완료로 간주하지 않는다.
 
 1. 변경 권한이 있는 시작 전 예약을 선택한다. 두 60분 묶음은 같은 날 연속, 같은 개인/팀, 같은 작성자여야 한다. 개인의 두 예약은 악기가 달라도 된다.
 2. 상대 예약을 선택한다. 정규조·추가조·개인 간 교환을 지원하되, 양쪽 최종 자원 점유·한도·개인 중복 조건을 만족해야 한다.

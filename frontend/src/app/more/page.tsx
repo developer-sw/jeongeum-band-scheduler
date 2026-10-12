@@ -11,6 +11,7 @@ const serviceLinks = [
   { href: "/my-schedule", title: "내 공연조 일정", description: "현재 소속된 정규조·추가조의 확정 합주를 모아 봐요." },
   { href: "/teams", title: "공연조·연습곡", description: "공연조 구성과 각 공연조의 연습곡을 확인해요." },
   { href: "/reservations", title: "예약 조회·변경·취소·이력", description: "시작 전 예약의 날짜·시간·악기를 변경하고, 취소와 지난 이용 이력을 확인해요." },
+  { href: "/exchanges", title: "예약 교환", description: "시작 전 예약의 교환을 요청하고, 받은 요청의 시간·악기를 확인해 승인·거절해요." },
   { href: "/account", title: "내 계정·로그아웃", description: "계정 정보와 소속 공연조를 확인하고 로그아웃해요." },
 ];
 
@@ -20,7 +21,7 @@ const managementLinks = [
   { href: "/admin/invitations", title: "개인 초대 관리", description: "회원 한 명씩 사용할 수 있는 가입 초대를 발급해요." },
 ];
 
-const plannedFeatures = ["예약 교환", "전체 공지", "내 알림함·시작 전 알림", "Web Push 알림", "PWA 설치", "탈퇴·팀 해체 예약 정리"];
+const plannedFeatures = ["전체 공지", "내 알림함·시작 전 알림", "Web Push 알림", "PWA 설치", "탈퇴·팀 해체 예약 정리"];
 
 function MenuLink({ href, title, description }: { href: string; title: string; description: string }) {
   return <li><Link href={href} className="more-link"><span><span className="block font-bold break-words">{title}</span><span className="mt-1 block text-sm leading-6 text-navy-soft">{description}</span></span><span aria-hidden="true" className="shrink-0 text-lg">→</span></Link></li>;
