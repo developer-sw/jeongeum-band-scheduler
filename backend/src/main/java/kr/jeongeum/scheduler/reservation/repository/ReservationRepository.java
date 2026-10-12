@@ -169,6 +169,32 @@ public class ReservationRepository {
                 Timestamp.from(block.endsAt(date)), Timestamp.from(usableFrom), source.dualAssetException() && block.durationMinutes() == 90,
                 Timestamp.from(now), operationId).getFirst();
     }
+    public Reservation insertExchanged(Reservation source, LocalDate date, TimeBlock block, boolean dualException, Instant now, long operationId) {
+        return jdbc.query("""
+                INSERT INTO reservations(owner_type,purpose,owner_user_id,team_id,creator_user_id,reservation_date,time_block_code,
+                block_start_minute,block_end_minute,duration_minutes,block_start_at,block_end_at,usable_from,
+                origin_kind,quota_exempt,dual_asset_exception,created_at,created_operation_id)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,'EXCHANGE',FALSE,?,?,?) RETURNING *
+                """, RESERVATION,source.ownerType(),source.purpose(),source.ownerUserId(),source.teamId(),source.creatorUserId(),
+                date,block.name(),block.startMinute(),block.endMinute(),block.durationMinutes(),Timestamp.from(block.startsAt(date)),
+                Timestamp.from(block.endsAt(date)),Timestamp.from(block.startsAt(date)),dualException,Timestamp.from(now),operationId).getFirst();
+    }
+    /** Each source keeps all of its recurring roots when a group merges or splits. */
+    public void exchangeOccurrences(List<Long> sourceIds, List<Long> successorIds, Instant now) {
+        java.util.TreeSet<Long> occurrenceIds = new java.util.TreeSet<>();
+        for (long sourceId : sourceIds) {
+            occurrenceIds.addAll(jdbc.queryForList("SELECT occurrence_id FROM recurring_occurrence_reservations WHERE reservation_id=? AND is_current ORDER BY occurrence_id",Long.class,sourceId));
+        }
+        for (long occurrenceId : occurrenceIds) {
+            jdbc.update("UPDATE recurring_occurrences SET state='EXCHANGED_EXCEPTION',version=version+1,updated_at=? WHERE id=?",Timestamp.from(now),occurrenceId);
+            for (long sourceId : sourceIds) {
+                jdbc.update("UPDATE recurring_occurrence_reservations SET is_current=FALSE WHERE occurrence_id=? AND reservation_id=? AND is_current",occurrenceId,sourceId);
+            }
+            for (long successorId : successorIds) {
+                jdbc.update("INSERT INTO recurring_occurrence_reservations(occurrence_id,reservation_id,link_role,is_current) VALUES (?,?,'SUCCESSOR',TRUE) ON CONFLICT (occurrence_id,reservation_id) DO UPDATE SET is_current=TRUE",occurrenceId,successorId);
+            }
+        }
+    }
     public void claim(Reservation reservation, Instrument instrument, Instant now) {
         jdbc.update("""
                 INSERT INTO reservation_assets(reservation_id, reservation_date, time_block_code, asset_id, claim_kind, created_at)
@@ -194,10 +220,22 @@ public class ReservationRepository {
                 """, Timestamp.from(now), actorId, reason, operationId, id);
         jdbc.update("UPDATE reservation_assets SET released_at = ? WHERE reservation_id = ? AND released_at IS NULL",
                 Timestamp.from(now), id);
+        invalidateExchanges(id, now, null);
     }
     public void replace(long id, Instant now) {
+        replaceForExchange(id, now, null);
+    }
+    public void replaceForExchange(long id, Instant now, Long completingRequestId) {
         jdbc.update("UPDATE reservations SET status = 'REPLACED', version = version + 1 WHERE id = ?", id);
         jdbc.update("UPDATE reservation_assets SET released_at = ? WHERE reservation_id = ? AND released_at IS NULL", Timestamp.from(now), id);
+        invalidateExchanges(id, now, completingRequestId);
+    }
+    private void invalidateExchanges(long reservationId, Instant now, Long excludedRequestId) {
+        jdbc.update("""
+                UPDATE exchange_requests SET status='INVALIDATED',processed_at=?,state_reason='SOURCE_CHANGED',version=version+1
+                WHERE status='PENDING' AND (?::bigint IS NULL OR id<>?)
+                AND id IN (SELECT exchange_request_id FROM exchange_request_items WHERE reservation_id=?)
+                """,Timestamp.from(now),excludedRequestId,excludedRequestId,reservationId);
     }
     public void lineage(long operationId, long sourceId, long successorId, Instant now) {
         jdbc.update("""

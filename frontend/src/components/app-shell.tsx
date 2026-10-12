@@ -16,6 +16,7 @@ const mainLinks = [
   { href: "/my-schedule", label: "내 공연조 일정" },
   { href: "/teams", label: "공연조·곡" },
   { href: "/reservations", label: "예약·이력" },
+  { href: "/exchanges", label: "예약 교환" },
 ];
 
 const adminLinks = [
