@@ -1,8 +1,8 @@
 # REST API 설계
 
-갱신일: 2026-10-12 / 기준 시간대: `Asia/Seoul` / 기본 경로: `/api/v1`
+갱신일: 2026-10-13 / 기준 시간대: `Asia/Seoul` / 기본 경로: `/api/v1`
 
-이 문서는 업무 기능의 설계 계약이다. 인증·초대에 가입 전 명단·계정 연결과 회원·팀·팀장·곡 관리를 추가했다. 인증 계약·검증은 [AUTHENTICATION](AUTHENTICATION.md), 명단·팀 DTO·검증은 [MEMBER_TEAM_MANAGEMENT](MEMBER_TEAM_MANAGEMENT.md), 예약 기본의 실제 DTO·재시도·검증은 [RESERVATION_FOUNDATION](RESERVATION_FOUNDATION.md), 반복 배정·날짜 개방은 [RECURRING_ASSIGNMENTS](RECURRING_ASSIGNMENTS.md), 구현한 단건 예약 PATCH는 [RESERVATION_CHANGES](RESERVATION_CHANGES.md)를 따른다. 교환 요청·후보·승인은 [RESERVATION_EXCHANGES](RESERVATION_EXCHANGES.md)의 개발·검증 기록을 따른다. 아래의 batch·고장 관리·알림 API와 OpenAPI 산출물은 후속 단계의 설계 계약이며 이번에 제공하는 API와 구분한다. 사용자 정책은 [PROJECT_CONTEXT](PROJECT_CONTEXT.md)와 [RESERVATION_RULES](RESERVATION_RULES.md), 저장 모델은 [ERD](ERD.md)를 따른다.
+이 문서는 업무 기능의 설계 계약이다. 인증·초대에 가입 전 명단·계정 연결과 회원·팀·팀장·곡 관리를 추가했다. 인증 계약·검증은 [AUTHENTICATION](AUTHENTICATION.md), 명단·팀 DTO·검증은 [MEMBER_TEAM_MANAGEMENT](MEMBER_TEAM_MANAGEMENT.md), 예약 기본의 실제 DTO·재시도·검증은 [RESERVATION_FOUNDATION](RESERVATION_FOUNDATION.md), 반복 배정·날짜 개방은 [RECURRING_ASSIGNMENTS](RECURRING_ASSIGNMENTS.md), 구현한 단건 예약 PATCH는 [RESERVATION_CHANGES](RESERVATION_CHANGES.md)를 따른다. 교환 요청·후보·승인은 [RESERVATION_EXCHANGES](RESERVATION_EXCHANGES.md), 관리자 악기 고장 등록·복구·이력은 [INSTRUMENT_FAULTS](INSTRUMENT_FAULTS.md)를 따른다. 아래의 batch·알림 API와 OpenAPI 산출물은 후속 단계의 설계 계약이며 현재 제공하는 API와 구분한다. 사용자 정책은 [PROJECT_CONTEXT](PROJECT_CONTEXT.md)와 [RESERVATION_RULES](RESERVATION_RULES.md), 저장 모델은 [ERD](ERD.md)를 따른다.
 
 Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 반환한다. CSRF는 `data.headerName=X-CSRF-TOKEN`, `data.token`을 반환한다. 두 응답은 공통 `meta`와 `Cache-Control: no-store`를 사용한다. 초기 보안 계층의 CSRF 누락·위조는 `403 CSRF_INVALID`, 미인증 보호 API 접근은 `401 AUTHENTICATION_REQUIRED`다.
 
@@ -128,6 +128,7 @@ Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 �
 |---|---|---|
 | GET /schedule?from={date}&to={date} | 활성 회원 | 블록별 점유·고장·개방 상태·예약 가능 행동 |
 | GET /instruments | 활성 회원 | 여섯 악기의 코드·현재 고장 정보 |
+| GET /instrument-faults | 전체 관리자 | instrumentCode·beforeId·limit(기본 20, 최대 50)으로 고장·복구 이력 조회 |
 | POST /instrument-faults | 전체 관리자 | 악기 고장 등록, 기존 예약 유지 |
 | POST /instrument-faults/{id}/resolve | 전체 관리자 | 고장 해제와 실행자 기록 |
 
@@ -145,6 +146,8 @@ Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 �
 일정 조회는 오늘~오늘+14일 안의 최대 15일 구간을 제공한다. 과거 이력은 예약 목록의 별도 날짜 구간으로 조회한다. 이는 조회량을 제한하는 기술 설정이며 예약 한도를 추가하는 정책이 아니다. 반복 배정 단계에서는 `OPEN`과 V5의 고정 반영 완료 표식을 함께 확인한다. 반영 중·실패한 날짜는 `PREPARING`이며 일반 예약을 생성할 수 없다. 상세 계약은 [RECURRING_ASSIGNMENTS](RECURRING_ASSIGNMENTS.md)를 따른다.
 
 고장 등록은 여섯 점유 행에 가짜 예약을 생성하는 동작이 아니다. 팀 예약은 고장 안내와 함께 허용한다. 고장 등록과 신규 예약의 경합은 동일 악기 잠금으로 선후를 결정한다.
+
+고장 등록 본문은 `instrumentCode/expectedAssetVersion/description`, 복구 본문은 `expectedVersion/expectedAssetVersion/resolutionNote?`다. 사유는 1~1000자, 선택 복구 메모는 최대 1000자로 정규화하며 실행자는 인증 계정에서 결정한다. 두 쓰기는 `Idempotency-Key`, 현재 관리자 권한과 버전을 확인한다. 등록은 201, 복구는 200이며 같은 키·본문의 성공 재확인도 현재 권한을 검사한다. 이력은 `{serverTime, incidents, nextBeforeId}`이고 각 이력의 `assetVersion`은 조회 시점 현재 악기 버전이다. `INSTRUMENT_ALREADY_FAULTY`·`INSTRUMENT_FAULT_RESOLVED`·`VERSION_CONFLICT`는 409, 처리 지연은 민감 진단 없이 503 `INSTRUMENT_FAULT_TEMPORARILY_UNAVAILABLE`다. 이전 FAULTY 상태의 LEGACY 이력은 최초 등록자·시각을 새로 꾸미지 않는다. 상세 필드·잠금·실행한 검증은 [INSTRUMENT_FAULTS](INSTRUMENT_FAULTS.md)를 따른다.
 
 ## 5. 예약 생성과 조회
 

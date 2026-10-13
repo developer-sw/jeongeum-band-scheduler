@@ -20,6 +20,7 @@ const mainLinks = [
 ];
 
 const adminLinks = [
+  { href: "/admin/instrument-faults", label: "악기 고장 관리" },
   { href: "/admin/recurring-assignments", label: "반복 고정 배정" },
   { href: "/admin/members", label: "회원·명단 관리" },
   { href: "/admin/invitations", label: "개인 초대 관리" },

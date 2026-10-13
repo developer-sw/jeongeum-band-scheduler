@@ -284,10 +284,13 @@ erDiagram
 
 ### 5.3 time_blocks / assets / asset_incidents
 
+V8의 관리자 고장·복구·재시도 모델은 [INSTRUMENT_FAULTS](INSTRUMENT_FAULTS.md)에서 구현·격리 검증했다. 이후 사용자 승인으로 실제 개발 DB 백업·V8 한 건 적용·기존 업무 데이터 보존을 확인했다. 실제 고장 등록·복구 검증은 임시 DB의 합성 데이터에서 수행한 결과와 구분한다.
+
 - `time_blocks`: B01~B10, start_minute, end_minute, duration_minutes. [고정 열 블록](RESERVATION_RULES.md#2-운영-시간과-고정-블록)의 매핑을 그대로 저장한다.
 - 운영 앱은 블록을 수정·추가하지 않는다. FK와 코드별 정확한 시각 매핑, `end-start=duration`을 개념 제약으로 둔다.
 - `assets`: 보컬·건반·일렉기타·베이스·드럼·통기타의 여섯 자원 코드와 표시 이름, 현재 `NORMAL/FAULTY`, version.
-- `asset_incidents`: 악기, 내용, 등록자·등록 시각, 복구자·복구 시각, version. 활성 고장 상태와 이력 갱신은 같은 트랜잭션이다.
+- V8 `asset_incidents`: 악기, OPEN/RESOLVED, 사유, ADMIN/LEGACY, 등록자·등록 시각, 복구자·복구 시각·선택 메모, version. 악기별 열린 고장 partial unique와 FK를 유지하며 활성 고장 상태·악기 버전·이력 갱신은 같은 트랜잭션이다. LEGACY 등록자는 null이며 시각은 V8 도입 시 기존 상태 확인 시각이다. V1~V7 및 기존 assets 상태·버전을 수정하지 않는다.
+- V8 `instrument_fault_idempotency_requests`: 실행자·키 digest unique, 경로·정규화 본문 fingerprint, 응답 코드·결과 이력 ID. 성공한 등록·복구와 함께 확정하며 현재 관리자 권한으로 재확인한다. 실제 기술 계약과 검증은 [INSTRUMENT_FAULTS](INSTRUMENT_FAULTS.md)를 따른다.
 - 악기 종류 추가는 여섯 자원 전체 점유 불변조건에 영향을 주므로 임의 관리 CRUD로 추가하지 않는다.
 - 고장 행은 `reservation_assets`의 점유행이 아니다. 신규 개인 예약은 현재 상태로 검증하고 팀 예약은 안내만 제공한다.
 
