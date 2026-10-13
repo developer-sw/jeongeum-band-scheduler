@@ -2,7 +2,7 @@
 
 갱신일: 2026-10-13 / 기준 시간대: `Asia/Seoul` / 기본 경로: `/api/v1`
 
-이 문서는 업무 기능의 설계 계약이다. 인증·초대에 가입 전 명단·계정 연결과 회원·팀·팀장·곡 관리를 추가했다. 인증 계약·검증은 [AUTHENTICATION](AUTHENTICATION.md), 명단·팀 DTO·검증은 [MEMBER_TEAM_MANAGEMENT](MEMBER_TEAM_MANAGEMENT.md), 예약 기본의 실제 DTO·재시도·검증은 [RESERVATION_FOUNDATION](RESERVATION_FOUNDATION.md), 반복 배정·날짜 개방은 [RECURRING_ASSIGNMENTS](RECURRING_ASSIGNMENTS.md), 구현한 단건 예약 PATCH는 [RESERVATION_CHANGES](RESERVATION_CHANGES.md)를 따른다. 교환 요청·후보·승인은 [RESERVATION_EXCHANGES](RESERVATION_EXCHANGES.md), 관리자 악기 고장 등록·복구·이력은 [INSTRUMENT_FAULTS](INSTRUMENT_FAULTS.md)를 따른다. 아래의 batch·알림 API와 OpenAPI 산출물은 후속 단계의 설계 계약이며 현재 제공하는 API와 구분한다. 사용자 정책은 [PROJECT_CONTEXT](PROJECT_CONTEXT.md)와 [RESERVATION_RULES](RESERVATION_RULES.md), 저장 모델은 [ERD](ERD.md)를 따른다.
+이 문서는 업무 기능의 설계 계약이다. 인증·초대에 가입 전 명단·계정 연결과 회원·팀·팀장·곡 관리를 추가했다. 인증 계약·검증은 [AUTHENTICATION](AUTHENTICATION.md), 명단·팀 DTO·검증은 [MEMBER_TEAM_MANAGEMENT](MEMBER_TEAM_MANAGEMENT.md), 예약 기본의 실제 DTO·재시도·검증은 [RESERVATION_FOUNDATION](RESERVATION_FOUNDATION.md), 반복 배정·날짜 개방은 [RECURRING_ASSIGNMENTS](RECURRING_ASSIGNMENTS.md), 구현한 단건 예약 PATCH는 [RESERVATION_CHANGES](RESERVATION_CHANGES.md)를 따른다. 교환 요청·후보·승인은 [RESERVATION_EXCHANGES](RESERVATION_EXCHANGES.md), 관리자 악기 고장 등록·복구·이력은 [INSTRUMENT_FAULTS](INSTRUMENT_FAULTS.md)를 따른다. 공지·사이트 내 알림함의 구현 계약은 [NOTICES_NOTIFICATIONS](NOTICES_NOTIFICATIONS.md)를 따른다. batch·Push API와 OpenAPI 산출물은 후속 단계의 설계 계약이며 현재 제공하는 API와 구분한다. 사용자 정책은 [PROJECT_CONTEXT](PROJECT_CONTEXT.md)와 [RESERVATION_RULES](RESERVATION_RULES.md), 저장 모델은 [ERD](ERD.md)를 따른다.
 
 Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 반환한다. CSRF는 `data.headerName=X-CSRF-TOKEN`, `data.token`을 반환한다. 두 응답은 공통 `meta`와 `Cache-Control: no-store`를 사용한다. 초기 보안 계층의 CSRF 누락·위조는 `403 CSRF_INVALID`, 미인증 보호 API 접근은 `401 AUTHENTICATION_REQUIRED`다.
 
@@ -219,7 +219,7 @@ Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 �
 - 상세의 `dualAssetException`은 교환에서 유래한 90분 예외 자격이다. 예외 예약을 다른 90분으로 옮길 때 한 종류를 선택해도 이 자격을 유지하며 최대 두 종류를 다시 선택할 수 있다. 60분으로 이동하면 자격을 해제하고 이후 일반 한 악기 제한을 적용한다. 화면은 현재 선택 수를 예외 자격으로 추정하지 않는다.
 - 날짜·블록·악기 집합이 완전히 같은 입력은 no-op이다. 원본 ID·version·면제·고장 보존 예외를 유지하고 재시도 성공 기록만 저장한다. `replacedReservationIds`는 빈 배열이며 `reservations`에 원본을 반환한다.
 - 개인은 `instrumentCodes`를 보내고 팀은 생략한다. 중복·미등록 악기와 주체·작성자 등 계약 외 필드는 거절한다. 같은 키·정규화된 같은 본문은 같은 결과를 반환하며 다른 본문은 `IDEMPOTENCY_KEY_REUSED`다. 재시도에서도 현재 계정·팀·편집 권한을 확인한다.
-- 실제 변경은 하나의 `CHANGE` operation을 남긴다. 교환·알림함·Push는 후속 구현이므로 대기 교환 무효화나 `CHANGED` 알림 전송은 아직 수행하지 않는다. 후속 연동에서는 no-op을 제외하고 변경 사건만 처리하며 별도 `CREATED` 알림을 중복 발송하지 않는다.
+- 실제 변경은 하나의 `CHANGE` operation을 남긴다. 관련 대기 교환의 무효화와 `CHANGED`·`EXCHANGE_INVALIDATED` 알림함 기록을 같은 트랜잭션에서 처리한다. no-op은 새 사건이 아니며 변경 후속 예약의 별도 `CREATED` 알림을 중복 생성하지 않는다. Web Push는 후속 구현이다.
 
 변경 성공 응답(교환은 같은 구조를 사용할 설계):
 
@@ -324,16 +324,24 @@ preview는 자원 확보가 아니다. 실제 적용 시 잠금과 충돌 검사
 | Method / 경로 | 권한 | 계약 |
 |---|---|---|
 | GET /notices, GET /notices/{id} | 활성 회원 | 전체 공지, 중요 고정 표시 |
-| POST /notices | 전체 관리자 | 제목·본문·중요 여부 |
-| PATCH /notices/{id} | 전체 관리자 | 공지 수정·고정 여부 변경 |
-| DELETE /notices/{id} | 전체 관리자 | 공지 삭제, 이력 보관 방식은 기술안 |
-| GET /notifications | 활성 회원 | 본인의 알림함, cursor·읽지 않은 항목 필터 |
+| POST /notices | 전체 관리자 | 제목·본문·중요 여부, 처음 중요 작성 시 활성 회원 알림함 기록 |
+| PATCH /notices/{id} | 전체 관리자 | expectedVersion·제목·본문·고정 여부 변경; 재알림 없음 |
+| DELETE /notices/{id} | 전체 관리자 | expectedVersion 본문, soft delete·이력/재시도 보존 |
+| GET /notifications | 활성 회원 | 본인의 알림함, beforeId·unreadOnly·limit·읽지 않은 건수 |
 | PATCH /notifications/{id}/read | 해당 수신자 | 멱등 읽음 처리 |
 | POST /notifications/read-all | 활성 회원 | 본인 목록을 기준 시각까지 읽음 처리 |
 | GET /push/public-key | 활성 회원 | VAPID 공개 키, 비밀키 제외 |
 | GET /push-subscriptions | 활성 회원 | 본인 기기 목록, endpoint 원문을 최소화 |
 | POST /push-subscriptions | 활성 회원 | 현재 브라우저의 구독 등록·갱신 |
 | DELETE /push-subscriptions/{id} | 해당 소유자 | 해당 기기 구독 해제 |
+
+공지·알림함의 V9 구현 계약: 공지 입력은 `{title, body, pinned}`, 수정은 `expectedVersion`을 추가하고 삭제도 JSON `{expectedVersion}`을 보낸다. 제목 1~120자·본문 1~10000자의 trim한 일반 텍스트이며 공지 쓰기는 `Idempotency-Key`를 요구한다. 현재 활성 전체 관리자·버전을 잠금 후 다시 검사한다. 동일 실행자·경로·정규화 본문·키는 같은 공지를 재확인하고 다른 재사용은 409 `IDEMPOTENCY_KEY_REUSED`다. 삭제는 기존 항목을 보존하며 성공 재확인은 `deleted=true` 응답을 반환할 수 있다.
+
+공지 목록은 중요 고정·작성 시각·ID 내림차순이며 opaque `cursor`와 `limit`을 받는다. `{serverTime, notices, nextCursor}`와 공지 `{id, title, body, pinned, authorUserId, createdAt, updatedAt, version, deleted}`를 반환한다. 공개 조회는 삭제된 항목을 제외하며 삭제된 상세는 404다. 일반 공지·수정·중요 전환·재고정은 알림함 재알림을 만들지 않는다.
+
+본인 알림 목록은 `{serverTime, notifications, unreadCount, nextBeforeId}`를 반환하고 항목은 `{id, eventType, title, body, targetPath, createdAt, readAt}`다. 다른 수신자의 ID를 지정한 읽음 처리는 404이며 반복 읽음은 기존 시각을 보존한다. 전체 읽음은 `{through: ISOInstant}`의 서버 시각 이하 기준까지 처리해 `{through, readCount, unreadCount}`를 반환한다. 미래 기준 시각을 거절하며 microsecond보다 세밀한 소수점은 아래 방향으로 절삭해 PostgreSQL 반올림으로 다음 알림까지 읽지 않는다. 프론트는 서버 기준 시각의 소수점 정밀도를 보존한다. 내부 이동 대상에서 기존 예약·교환·공지 API의 현재 권한을 다시 검사하며 알림 수신으로 새 편집/승인 권한을 부여하지 않는다.
+
+위 Push 경로는 후속 구현 계획이며 이번 사이트 내 공지·알림함에서 Push·미래 시작 알림 계획이나 실제 단말 수신 완료를 제공하지 않는다. 상세 실행 기록은 [NOTICES_NOTIFICATIONS](NOTICES_NOTIFICATIONS.md)를 따른다.
 
 구독 본문은 브라우저 PushSubscription의 endpoint와 keys를 받는다. 사용자 ID는 서버가 정하고 HTTPS 발송 대상·길이·키 형태를 검증한다. 임의 내부 URL로 서버가 발송하지 않도록 한다.
 

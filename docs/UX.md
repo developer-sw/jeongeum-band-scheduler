@@ -1,6 +1,6 @@
 # UX 및 반응형 화면 설계
 
-작성 기준: 2026-10-12, Asia/Seoul. 사용자 요청으로 따뜻한 다이어리형 UI를 구현하며 원본 로고 파일과 하단 `JEONGEUM · SENTIMENTAL MUSIC` 문구를 보존한다. 다이어리 구현·검증 기록은 [DIARY_UI_REDESIGN](DIARY_UI_REDESIGN.md)을 따른다. 인증 화면은 [AUTHENTICATION](AUTHENTICATION.md), 명단·팀 화면은 [MEMBER_TEAM_MANAGEMENT](MEMBER_TEAM_MANAGEMENT.md), 일정·생성·취소 화면은 [RESERVATION_FOUNDATION](RESERVATION_FOUNDATION.md), 반복 배정 관리는 [RECURRING_ASSIGNMENTS](RECURRING_ASSIGNMENTS.md), 단건 예약 변경 화면은 [RESERVATION_CHANGES](RESERVATION_CHANGES.md)를 따른다. 교환 화면은 [RESERVATION_EXCHANGES](RESERVATION_EXCHANGES.md)에서 개발·검증하며 공지·Push UI와 배포는 후속 단계다. 아래에서 **확정 정책**과 **UI 제안**을 구분한다. 예약 정책·권한의 상세 계약은 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), [RESERVATION_RULES.md](RESERVATION_RULES.md), [API.md](API.md)를 함께 확인한다.
+작성 기준: 2026-10-12, Asia/Seoul. 사용자 요청으로 따뜻한 다이어리형 UI를 구현하며 원본 로고 파일과 하단 `JEONGEUM · SENTIMENTAL MUSIC` 문구를 보존한다. 다이어리 구현·검증 기록은 [DIARY_UI_REDESIGN](DIARY_UI_REDESIGN.md)을 따른다. 인증 화면은 [AUTHENTICATION](AUTHENTICATION.md), 명단·팀 화면은 [MEMBER_TEAM_MANAGEMENT](MEMBER_TEAM_MANAGEMENT.md), 일정·생성·취소 화면은 [RESERVATION_FOUNDATION](RESERVATION_FOUNDATION.md), 반복 배정 관리는 [RECURRING_ASSIGNMENTS](RECURRING_ASSIGNMENTS.md), 단건 예약 변경 화면은 [RESERVATION_CHANGES](RESERVATION_CHANGES.md)를 따른다. 교환 화면은 [RESERVATION_EXCHANGES](RESERVATION_EXCHANGES.md), 전체 공지·사이트 내 알림함은 [NOTICES_NOTIFICATIONS](NOTICES_NOTIFICATIONS.md)의 구현·검증을 따른다. Push UI와 배포는 후속 단계다. 아래에서 **확정 정책**과 **UI 제안**을 구분한다. 예약 정책·권한의 상세 계약은 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), [RESERVATION_RULES.md](RESERVATION_RULES.md), [API.md](API.md)를 함께 확인한다.
 
 ## 1. 목표와 첫 운영 범위
 
@@ -205,6 +205,10 @@ PC·모바일 모두 읽을 수 있는 카드 목록과 공통 Query 계층을 �
 전체 관리자는 **관리 → 악기 고장 관리**, 모바일 **더보기 → 악기 고장 관리**의 `/admin/instrument-faults`에서 여섯 악기 상태와 등록·복구 이력을 확인한다. 정상 악기는 사유를 입력하고 등록 내용을 확인한 뒤 처리하며, 고장 악기는 최신 이력을 확인하고 선택 복구 메모와 함께 복구한다. 다른 관리자의 변경으로 버전이 오래되면 최신 상태를 다시 확인한다. 응답 유실 시 같은 본문·키의 결과를 명시적으로 재확인할 때까지 다른 쓰기를 막고 오프라인 자동 실행을 하지 않는다. 계정·권한 변경 시 이력과 작성 상태를 분리한다. LEGACY는 기존 고장 상태의 확인 기록이며 해당 시각을 최초 등록 시각으로 표시하지 않는다. 상세 계약·검증은 [INSTRUMENT_FAULTS](INSTRUMENT_FAULTS.md)를 따른다.
 
 ## 9. 공지·알림함·설치 흐름
+
+2026-10-13 공지·알림함 구현은 기존 다이어리 헤더와 더보기에서 `/notices`, `/notifications`로 연결한다. 공지 상세 `/notices/{id}`는 활성 회원이 조회하고 전체 관리자에게만 작성·수정·삭제 조작을 제공한다. 일반 텍스트 줄바꿈을 보존하고 HTML을 실행하지 않는다. 중요 공지는 목록 위에 고정하며, 사용자가 확정한 대로 **처음 중요 공지로 작성할 때만** 전체 활성 회원의 알림함에 안내한다. 작성 확인에 이 시점을 설명하며 수정·고정 변경으로 재알림하지 않는다.
+
+알림함은 읽지 않은 건수·전체/미읽음 필터·이전 항목·개별/전체 읽음을 제공한다. 전체 읽음은 조회 응답의 서버 시각까지만 처리한다. 알림 이동 대상은 내부 공지·예약·교환 경로만 허용하고 이동 후 해당 API의 현재 권한을 검사한다. 삭제된 공지·바뀐 예약·무효화된 교환의 오래된 알림은 기존 수신함 이력을 보존하며 새 변경 권한을 부여하지 않는다. 계정·역할·소속·비활성화 시 Query와 작성·재시도 상태를 분리한다. 공지 쓰기의 성공 응답이 유실되면 같은 본문·키 재확인 전 다른 쓰기를 막고 오프라인 자동 제출하지 않는다. 실제 검증 상태는 [NOTICES_NOTIFICATIONS](NOTICES_NOTIFICATIONS.md)를 따른다.
 
 전체관리자만 전체 공지를 작성하며 제목·본문·중요 공지 고정을 제공한다. 조별 공지는 추가하지 않는다. 공지 목록과 상세에서 중요 공지를 구분하고 상단에 고정한다. 중요 공지 알림은 전체 활성 회원에게 전달한다. 일반 공지의 Push 범위는 [NOTIFICATIONS.md](NOTIFICATIONS.md)의 확정 이벤트 표와 제안을 따른다.
 
