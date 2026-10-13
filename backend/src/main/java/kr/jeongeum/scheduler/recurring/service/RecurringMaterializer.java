@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import kr.jeongeum.scheduler.common.concurrency.DirectoryMutationGuard;
+import kr.jeongeum.scheduler.exchange.service.ExchangeNotificationTransitions;
+import kr.jeongeum.scheduler.notification.service.NotificationPublisher;
 import kr.jeongeum.scheduler.recurring.api.RecurringResponse;
 import kr.jeongeum.scheduler.recurring.domain.RecurringOccurrence;
 import kr.jeongeum.scheduler.recurring.repository.RecurringRepository;
@@ -32,10 +34,14 @@ public class RecurringMaterializer {
     private final DirectoryMutationGuard guard;
     private final TeamRepository teams;
     private final Clock clock;
+    private final NotificationPublisher notifications;
+    private final ExchangeNotificationTransitions exchangeNotifications;
     public RecurringMaterializer(RecurringRepository recurring, ReservationRepository reservations, RecurringPlanning planning,
-            RecurringLocks locks, DirectoryMutationGuard guard, TeamRepository teams, Clock clock) {
+            RecurringLocks locks, DirectoryMutationGuard guard, TeamRepository teams, Clock clock,
+            NotificationPublisher notifications, ExchangeNotificationTransitions exchangeNotifications) {
         this.recurring = recurring; this.reservations = reservations; this.planning = planning; this.locks = locks;
         this.guard = guard; this.teams = teams; this.clock = clock;
+        this.notifications = notifications; this.exchangeNotifications = exchangeNotifications;
     }
     @Transactional(propagation = Propagation.REQUIRES_NEW, timeout = 10)
     public void openDate(LocalDate date) {
@@ -143,16 +149,19 @@ public class RecurringMaterializer {
     public void apply(RecurringPlanning.Series series, List<Action> actions, List<Instrument> instruments,
             long actorId, long operationId, Instant now) {
         // Release every old location before allocating any new location, in the same transaction.
+        List<Long> pendingExchanges = exchangeNotifications.pendingForReservations(new ArrayList<>(reservationIds(actions)));
         for (Action action : actions) {
             if (action.preserved()) { continue; }
             for (Reservation current : planning.current(action.occurrence())) {
                 if (!RecurringPlanning.sameLocation(action.plan(), current) && "CONFIRMED".equals(current.status())
                         && "FIXED".equals(current.originKind()) && now.isBefore(current.startsAt())) {
                     reservations.cancel(current.id(), actorId, operationId, now, "관리자 고정 시간표 변경 또는 종료");
+                    notifications.reservationCancelled(reservations.find(current.id()).orElseThrow(), operationId, now);
                     recurring.replaceLinks(action.occurrence().id());
                 }
             }
         }
+        exchangeNotifications.invalidated(pendingExchanges, now);
         LocalDate today = LocalDate.ofInstant(now, TimeBlock.SEOUL);
         for (Action action : actions) {
             if (action.preserved()) { continue; }
@@ -187,6 +196,7 @@ public class RecurringMaterializer {
         for (Instrument instrument : instruments) { reservations.claim(created, instrument, now); }
         reservations.quota(created, operationId, 0, "RESERVE", now);
         recurring.link(stored.id(), created.id());
+        notifications.reservationCreated(created, operationId, now);
     }
     private RecurringOccurrence saveOccurrence(RecurringPlanning.Series series, RecurringOccurrence occurrence,
             RecurringPlanning.Plan plan, String state, Instant now) {

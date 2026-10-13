@@ -2,7 +2,7 @@
 
 기준일: 2026-10-12 (Asia/Seoul)
 
-업무 정책의 기준은 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), [RESERVATION_RULES.md](RESERVATION_RULES.md)다. 이 문서의 업무 테이블·컬럼·상태·잠금은 정책을 구현하는 **기술 설계 권고안**이다. Flyway V1은 Spring Session JDBC, V2는 `users`·`invitation_codes`·`auth_bootstrap_guard`다. V3는 가입 전 명단·팀·소속·곡과 명단 연결용 초대 FK·잠금·역할 변경 이력을 추가했다. V4는 블록·악기·예약 날짜·예약·점유·한도 ledger·작업 이력·재시도 키를 추가했으며 실제 계약은 [RESERVATION_FOUNDATION.md](RESERVATION_FOUNDATION.md)을 따른다. V5는 반복 배정·패턴 revision·주차 회차·예약 연결·패턴 guard·관리 재시도 키와 날짜의 `recurring_prepared` 표식을 추가했고 실제 계약은 [RECURRING_ASSIGNMENTS.md](RECURRING_ASSIGNMENTS.md)를 따른다. V6는 단건 변경의 `reservation_lineage`와 인덱스만 추가하며 기존 V1~V5 파일과 업무 데이터를 수정하지 않는다. 실제 V6 계약·검증은 [RESERVATION_CHANGES.md](RESERVATION_CHANGES.md)를 따른다. V7 교환 요청·항목·배분·재시도 모델은 [RESERVATION_EXCHANGES](RESERVATION_EXCHANGES.md)에서 개발·격리 검증한다. 공지·알림 테이블은 후속 구현이며 아래의 전체 ERD는 완료된 migration 목록과 구분한다. 인증 검증은 [AUTHENTICATION.md](AUTHENTICATION.md), 명단·팀 계약은 [MEMBER_TEAM_MANAGEMENT.md](MEMBER_TEAM_MANAGEMENT.md)를 따른다.
+업무 정책의 기준은 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), [RESERVATION_RULES.md](RESERVATION_RULES.md)다. 이 문서의 업무 테이블·컬럼·상태·잠금은 정책을 구현하는 **기술 설계 권고안**이다. Flyway V1은 Spring Session JDBC, V2는 `users`·`invitation_codes`·`auth_bootstrap_guard`다. V3는 가입 전 명단·팀·소속·곡과 명단 연결용 초대 FK·잠금·역할 변경 이력을 추가했다. V4는 블록·악기·예약 날짜·예약·점유·한도 ledger·작업 이력·재시도 키를 추가했으며 실제 계약은 [RESERVATION_FOUNDATION.md](RESERVATION_FOUNDATION.md)을 따른다. V5는 반복 배정·패턴 revision·주차 회차·예약 연결·패턴 guard·관리 재시도 키와 날짜의 `recurring_prepared` 표식을 추가했고 실제 계약은 [RECURRING_ASSIGNMENTS.md](RECURRING_ASSIGNMENTS.md)를 따른다. V6는 단건 변경의 `reservation_lineage`와 인덱스만 추가하며 기존 V1~V5 파일과 업무 데이터를 수정하지 않는다. 실제 V6 계약·검증은 [RESERVATION_CHANGES.md](RESERVATION_CHANGES.md)를 따른다. V7 교환 요청·항목·배분·재시도 모델은 [RESERVATION_EXCHANGES](RESERVATION_EXCHANGES.md)에서 개발·격리 검증한다. V8 악기 고장 이력은 [INSTRUMENT_FAULTS](INSTRUMENT_FAULTS.md), V9 전체 공지·사이트 내 알림함의 신규 3개 테이블은 [NOTICES_NOTIFICATIONS](NOTICES_NOTIFICATIONS.md)를 따른다. 시작 알림 계획·Push·발송 작업 모델은 후속 구현이며 아래 전체 ERD와 적용된 migration 목록을 구분한다. 인증 검증은 [AUTHENTICATION.md](AUTHENTICATION.md), 명단·팀 계약은 [MEMBER_TEAM_MANAGEMENT.md](MEMBER_TEAM_MANAGEMENT.md)를 따른다.
 
 ## 1. 핵심 설계 선택
 
@@ -202,9 +202,14 @@ erDiagram
 
 ## 4. 공지·알림 ERD
 
+2026-10-13 V9 구현 범위는 `announcements`, `notice_idempotency_requests`, `notifications`다. 아래 `notification_jobs`·`push_subscriptions`는 후속 계획이다. V1~V8을 수정하거나 기존 예약에 알림을 소급 생성하지 않는다. 실제 개발 DB는 V8을 유지하며 V9 적용 검증은 별도 합성 PostgreSQL에서 수행한다.
+
 ```mermaid
 erDiagram
     users ||--o{ announcements : writes
+    users ||--o{ notice_idempotency_requests : retries
+    announcements ||--o{ notice_idempotency_requests : confirms
+    announcements o|--o{ notifications : informs
     users ||--o{ notifications : receives
     users ||--o{ push_subscriptions : owns
     notifications o|--o{ notification_jobs : delivers
@@ -219,7 +224,21 @@ erDiagram
         string title
         string body
         boolean pinned
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at
         bigint version
+    }
+    notice_idempotency_requests {
+        bigint id PK
+        bigint actor_user_id FK
+        string key_digest
+        string request_fingerprint
+        string http_method
+        string route
+        int response_status
+        bigint result_notice_id FK
+        timestamptz created_at
     }
     notifications {
         bigint id PK
@@ -227,9 +246,13 @@ erDiagram
         string event_key
         string event_type
         bigint operation_id FK
+        bigint reservation_id FK
+        bigint exchange_request_id FK
+        bigint announcement_id FK
         string title
         string body
         string target_path
+        timestamptz created_at
         timestamptz read_at
     }
     notification_jobs {
@@ -395,6 +418,8 @@ V7 교환 구현은 기존 V1~V6와 예약 계보를 보존하면서 `exchange_r
 - 승인은 업무 전체 commit 시에만 COMPLETED다. APPROVED 후 별도 비원자적 이동 단계는 두지 않는다.
 
 ### 5.11 announcements / notifications / notification_jobs / push_subscriptions
+
+V9 구현 계약: `announcements.deleted_at`으로 공개 목록·상세에서 제외하고 참조와 재시도 기록을 보존한다. `notice_idempotency_requests`는 실행자+key_digest unique, method/route/정규화 본문 fingerprint와 결과 ID를 같은 트랜잭션에서 저장한다. `notifications`는 event_key+user_id unique와 수신자/ID·미읽음 부분 index를 갖는다. 알림은 업무 트랜잭션 안에서만 저장하며 논리 CREATED/CHANGED/CANCELED나 교환의 한 상태 변경을 후속 예약 행 수만큼 중복 생성하지 않는다.
 
 - `announcements`: 제목·본문·중요 고정, 전체 관리자 작성자, 작성·수정 시각, version. 조별 공지를 추가하지 않는다.
 - `notifications`: 사용자별 업무 알림, event_key·유형, 논리 operation/교환/공지 참조, 표시 문구, 내부 이동 대상, read_at. `(event_key, user_id)` 중복을 금지한다.

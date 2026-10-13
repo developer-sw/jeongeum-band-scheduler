@@ -35,6 +35,14 @@ public class ExchangeRepository {
     }
     public List<Long> allIds() { return jdbc.queryForList("SELECT id FROM exchange_requests ORDER BY id DESC", Long.class); }
     public List<Long> pendingIds() { return jdbc.queryForList("SELECT id FROM exchange_requests WHERE status = 'PENDING' ORDER BY id", Long.class); }
+    /** The caller holds the directory guard; capture before reservation writes invalidate these requests. */
+    public List<Long> pendingForReservations(List<Long> reservationIds) {
+        if (reservationIds.isEmpty()) { return List.of(); }
+        String placeholders = String.join(",", java.util.Collections.nCopies(reservationIds.size(), "?"));
+        return jdbc.queryForList("SELECT DISTINCT r.id FROM exchange_requests r JOIN exchange_request_items i ON i.exchange_request_id=r.id "
+                + "WHERE r.status='PENDING' AND i.reservation_id IN (" + placeholders + ") ORDER BY r.id",
+                Long.class, reservationIds.toArray());
+    }
     public List<Item> items(long id) {
         return jdbc.query("SELECT * FROM exchange_request_items WHERE exchange_request_id = ? ORDER BY side DESC,sequence_no",
                 (row, index) -> new Item(row.getLong("reservation_id"), row.getLong("expected_reservation_version"),

@@ -48,12 +48,14 @@ public class ExchangeService {
     private final DirectoryMutationGuard guard;
     private final JdbcTemplate jdbc;
     private final Clock clock;
+    private final ExchangeNotificationTransitions notifications;
     private final TransactionTemplate writes;
     public ExchangeService(ExchangeRepository exchanges,ExchangePolicy policy,ReservationRepository reservations,
             ReservationViews views,MemberRepository members,TeamRepository teams,DirectoryMutationGuard guard,
-            JdbcTemplate jdbc,Clock clock,PlatformTransactionManager transactions) {
+            JdbcTemplate jdbc,Clock clock,ExchangeNotificationTransitions notifications,PlatformTransactionManager transactions) {
         this.exchanges=exchanges;this.policy=policy;this.reservations=reservations;this.views=views;
         this.members=members;this.teams=teams;this.guard=guard;this.jdbc=jdbc;this.clock=clock;
+        this.notifications=notifications;
         this.writes=new TransactionTemplate(transactions);this.writes.setTimeout(10);
     }
     public Result create(long actorId,String key,ExchangeRequests.Create input) {
@@ -89,6 +91,7 @@ public class ExchangeService {
             ExchangeRequest request=exchanges.insert(actorId,expires,now);
             insertItems(request.id(),"REQUESTER",groups.offered());insertItems(request.id(),"COUNTERPART",groups.requested());
             exchanges.remember(actorId,digest,fingerprint,"POST","/api/v1/exchange-requests",201,request.id(),now);
+            notifications.publish(request,"EXCHANGE_REQUESTED",List.of(),now);
             return new Result(response(context,request,groups),201);
         });
     }
@@ -160,12 +163,14 @@ public class ExchangeService {
                 // Re-read time immediately before writes. Expiry is persisted even when approval returns 409.
                 now=now();request=refresh(request,now);terminal=terminalError(request);
                 if (terminal!=null) { return new Outcome(null,terminal); }
+                List<Long> pendingExchanges=notifications.pendingForReservations(groups.all().stream().map(Reservation::id).toList());
                 long operationId=exchanges.operation(id,actorId,now);
                 for (Reservation source:groups.all()) {
                     int consumed=reservations.reservedQuota(source.id());reservations.replaceForExchange(source.id(),now,id);
                     if (consumed>0) { reservations.quota(source,operationId,-consumed,"RELEASE",now); }
                 }
                 Map<String,List<Long>> successors=new HashMap<>();
+                List<Reservation> results=new ArrayList<>();
                 for (ExchangePolicy.Placement placement:placements) {
                     Reservation successor=reservations.insertExchanged(placement.subject(),placement.date(),placement.block(),placement.dualException(),now,operationId);
                     for (Instrument instrument:reservations.instruments()) {
@@ -174,12 +179,18 @@ public class ExchangeService {
                     reservations.quota(successor,operationId,placement.consumption(),"RESERVE",now);
                     for (Reservation source:placement.sources()) { reservations.lineage(operationId,source.id(),successor.id(),now); }
                     successors.computeIfAbsent(placement.side(),ignored -> new ArrayList<>()).add(successor.id());
+                    results.add(successor);
                 }
                 reservations.exchangeOccurrences(groups.offered().stream().map(Reservation::id).toList(),successors.get("REQUESTER"),now);
                 reservations.exchangeOccurrences(groups.requested().stream().map(Reservation::id).toList(),successors.get("COUNTERPART"),now);
                 exchanges.terminal(id,"COMPLETED",actorId,now,null);
                 exchanges.invalidateReservations(groups.all().stream().map(Reservation::id).toList(),now);
-            } else { exchanges.terminal(id,"reject".equals(action)?"REJECTED":"CANCELED",actorId,now,null); }
+                notifications.publish(exchanges.find(id).orElseThrow(),"EXCHANGE_COMPLETED",results,now);
+                notifications.invalidated(pendingExchanges,now);
+            } else {
+                exchanges.terminal(id,"reject".equals(action)?"REJECTED":"CANCELED",actorId,now,null);
+                notifications.publish(exchanges.find(id).orElseThrow(),"reject".equals(action)?"EXCHANGE_REJECTED":"EXCHANGE_WITHDRAWN",List.of(),now);
+            }
             exchanges.remember(actorId,digest,fingerprint,"POST",route,200,id,now);
             return new Outcome(response(context,exchanges.find(id).orElseThrow(DirectoryInputs::notFound),groups(id)),null);
         });
@@ -237,8 +248,13 @@ public class ExchangeService {
                 reason="REQUESTER_PERMISSION_LOST";
             }
         }
-        if (reason!=null) { exchanges.terminal(request.id(),"INVALIDATED",null,now,reason); }
-        else if (!now.isBefore(request.expiresAt())) { exchanges.terminal(request.id(),"EXPIRED",null,now,"EARLIEST_START_REACHED"); }
+        if (reason!=null) {
+            exchanges.terminal(request.id(),"INVALIDATED",null,now,reason);
+            notifications.publish(exchanges.find(request.id()).orElseThrow(),"EXCHANGE_INVALIDATED",List.of(),now);
+        } else if (!now.isBefore(request.expiresAt())) {
+            exchanges.terminal(request.id(),"EXPIRED",null,now,"EARLIEST_START_REACHED");
+            notifications.publish(exchanges.find(request.id()).orElseThrow(),"EXCHANGE_EXPIRED",List.of(),now);
+        }
         return exchanges.find(request.id()).orElseThrow(DirectoryInputs::notFound);
     }
     private void validatePlacements(List<ExchangePolicy.Placement> placements,List<Reservation> sources) {

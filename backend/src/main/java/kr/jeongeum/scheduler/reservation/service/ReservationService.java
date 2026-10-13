@@ -11,6 +11,8 @@ import kr.jeongeum.scheduler.common.api.ApiException;
 import kr.jeongeum.scheduler.common.api.DirectoryInputs;
 import kr.jeongeum.scheduler.common.concurrency.DirectoryMutationGuard;
 import kr.jeongeum.scheduler.member.repository.MemberRepository;
+import kr.jeongeum.scheduler.exchange.service.ExchangeNotificationTransitions;
+import kr.jeongeum.scheduler.notification.service.NotificationPublisher;
 import kr.jeongeum.scheduler.recurring.service.RecurringOpeningService;
 import kr.jeongeum.scheduler.reservation.api.ReservationRequests;
 import kr.jeongeum.scheduler.reservation.api.ReservationChangeResponse;
@@ -38,13 +40,17 @@ public class ReservationService {
     private final Clock clock;
     private final JdbcTemplate jdbc;
     private final RecurringOpeningService opening;
+    private final NotificationPublisher notifications;
+    private final ExchangeNotificationTransitions exchangeNotifications;
     private final TransactionTemplate writes;
     public ReservationService(ReservationRepository reservations, ReservationViews views, MemberRepository members,
             TeamRepository teams, DirectoryMutationGuard guard, Clock clock, JdbcTemplate jdbc,
-            RecurringOpeningService opening, PlatformTransactionManager transactionManager) {
+            RecurringOpeningService opening, NotificationPublisher notifications,
+            ExchangeNotificationTransitions exchangeNotifications, PlatformTransactionManager transactionManager) {
         this.reservations = reservations; this.views = views; this.members = members;
         this.teams = teams; this.guard = guard; this.clock = clock; this.jdbc = jdbc;
         this.opening = opening; this.writes = new TransactionTemplate(transactionManager); this.writes.setTimeout(10);
+        this.notifications = notifications; this.exchangeNotifications = exchangeNotifications;
     }
     public record Result(ReservationResponse reservation, int status) {}
     public Result create(long actorId, String key, ReservationRequests.Create input) {
@@ -111,6 +117,7 @@ public class ReservationService {
         reservations.quota(reservation, operationId, consumption, "RESERVE", now);
         reservations.recordIdempotency(actorId, digest, fingerprint, "/api/v1/reservations", 201,
                 reservation.id(), operationId, now);
+        notifications.reservationCreated(reservation, operationId, now);
         return new Result(views.detail(context, reservation, now), 201);
     }
     public ReservationChangeResponse change(long actorId, long id, String key, ReservationRequests.Change input) {
@@ -207,7 +214,7 @@ public class ReservationService {
         if (finalUsage > 120) {
             throw new ApiException(409, "DAILY_LIMIT_EXCEEDED", "60분 예약은 주체별 하루 두 블록까지 가능합니다.");
         }
-        // One logical CHANGE operation is the future exchange invalidation / notification integration point.
+        List<Long> pendingExchanges = exchangeNotifications.pendingForReservations(List.of(id));
         long operationId = reservations.operation("CHANGE", actorId, now, null);
         reservations.replace(id, now);
         if (consumed > 0) { reservations.quota(source, operationId, -consumed, "RELEASE", now); }
@@ -217,6 +224,8 @@ public class ReservationService {
         reservations.lineage(operationId, id, successor.id(), now);
         reservations.changeOccurrence(id, successor.id(), now);
         reservations.recordIdempotency(actorId, digest, fingerprint, "PATCH", route, 200, successor.id(), operationId, now);
+        notifications.reservationChanged(source, successor, operationId, now);
+        exchangeNotifications.invalidated(pendingExchanges, now);
         return changeResponse(List.of(Long.toString(id)), context, successor, now);
     }
     private ReservationChangeResponse changeResponse(List<String> replacedIds, ReservationViews.Context context,
@@ -265,12 +274,15 @@ public class ReservationService {
         if ("CONFIRMED".equals(reservation.status())) {
             if (!now.isBefore(reservation.endsAt())) { throw finished(); }
             operationId = reservations.operation("CANCEL", actorId, now, reason);
+            List<Long> pendingExchanges = exchangeNotifications.pendingForReservations(List.of(id));
             int consumed = reservations.reservedQuota(id);
             if (now.isBefore(reservation.startsAt()) && consumed > 0) {
                 reservations.quota(reservation, operationId, -consumed, "RELEASE", now);
             }
             reservations.cancel(id, actorId, operationId, now, reason);
             reservations.cancelOccurrence(id, now);
+            notifications.reservationCancelled(reservations.find(id).orElseThrow(), operationId, now);
+            exchangeNotifications.invalidated(pendingExchanges, now);
         } else if (!"CANCELED".equals(reservation.status())) { throw versionConflict(); }
         reservations.recordIdempotency(actorId, digest, fingerprint, route, 200, id, operationId, now);
         return new Result(views.detail(context, reservations.find(id).orElseThrow(DirectoryInputs::notFound), now), 200);

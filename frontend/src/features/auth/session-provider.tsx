@@ -39,6 +39,8 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       client.removeQueries({ queryKey: ["directory"] });
       client.removeQueries({ queryKey: ["reservations"] });
       client.removeQueries({ queryKey: ["exchanges"] });
+      client.removeQueries({ queryKey: ["notices"] });
+      client.removeQueries({ queryKey: ["notifications"] });
       void client.invalidateQueries({ queryKey: memberQueryKey });
     }
   }), [client]);
