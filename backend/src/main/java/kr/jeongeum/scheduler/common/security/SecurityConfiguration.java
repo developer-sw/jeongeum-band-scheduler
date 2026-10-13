@@ -51,6 +51,7 @@ public class SecurityConfiguration {
                                 .hasRole("GLOBAL_ADMIN")
                         .requestMatchers("/api/v1/teams", "/api/v1/teams/**").authenticated()
                         .requestMatchers("/api/v1/recurring-assignments", "/api/v1/recurring-assignments/**").hasRole("GLOBAL_ADMIN")
+                        .requestMatchers("/api/v1/instrument-faults", "/api/v1/instrument-faults/**").hasRole("GLOBAL_ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/v1/schedule", "/api/v1/instruments").authenticated()
                         .requestMatchers("/api/v1/reservations", "/api/v1/reservations/**").authenticated()
                         .requestMatchers(HttpMethod.GET, "/api/v1/exchange-candidates").authenticated()

@@ -24,9 +24,10 @@ export async function refreshDirectory(client: QueryClient) {
 }
 
 export async function pruneDirectoryCache(client: QueryClient, member: Member | null) {
-  const scope = member ? directoryScope(member) : null;
+  const activeMember = member?.status === "ACTIVE" ? member : null;
+  const scope = activeMember ? directoryScope(activeMember) : null;
   const predicate = (query: { queryKey: readonly unknown[] }) => ((query.queryKey[0] === "directory" || query.queryKey[0] === "reservations" || query.queryKey[0] === "exchanges") && query.queryKey[1] !== scope)
-    || (query.queryKey[0] === "admin" && (member?.globalRole !== "GLOBAL_ADMIN" || (query.queryKey[1] === "recurring" && query.queryKey[2] !== scope)));
+    || (query.queryKey[0] === "admin" && (activeMember?.globalRole !== "GLOBAL_ADMIN" || (["recurring", "instrument-faults"].includes(String(query.queryKey[1])) && query.queryKey[2] !== scope)));
   await client.cancelQueries({ predicate });
   client.removeQueries({ predicate });
 }

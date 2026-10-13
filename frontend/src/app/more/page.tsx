@@ -16,6 +16,7 @@ const serviceLinks = [
 ];
 
 const managementLinks = [
+  { href: "/admin/instrument-faults", title: "악기 고장 관리", description: "악기별 고장 등록·복구와 처리 이력을 관리해요." },
   { href: "/admin/recurring-assignments", title: "반복 고정 배정", description: "매주 고정 시간과 적용 회차를 관리해요." },
   { href: "/admin/members", title: "회원·명단 관리", description: "가입 전 명단과 계정 연결, 전체 관리자 역할을 관리해요." },
   { href: "/admin/invitations", title: "개인 초대 관리", description: "회원 한 명씩 사용할 수 있는 가입 초대를 발급해요." },
@@ -36,6 +37,6 @@ export default function MorePage() {
     <section className={panelClass} aria-labelledby="service-menu-title"><h2 id="service-menu-title" className="text-xl font-bold">정음의 공간</h2><ul className="mt-5 grid gap-3 sm:grid-cols-2">{serviceLinks.map((link) => <MenuLink key={link.href} {...link} />)}</ul></section>
     {leaderMemberships.length > 0 && <section className={panelClass} aria-labelledby="leader-menu-title"><h2 id="leader-menu-title" className="text-xl font-bold">내가 이끄는 공연조</h2><p className="mt-3 text-sm leading-7 text-navy-soft">팀장은 소속 공연조의 상세 화면에서 연습곡을 관리할 수 있어요.</p><ul className="mt-5 grid gap-3 sm:grid-cols-2">{leaderMemberships.map((membership) => <MenuLink key={membership.teamId} href={`/teams/${encodeURIComponent(membership.teamId)}`} title={membership.teamName} description={`${membership.kind === "REGULAR" ? "정규조" : "추가조"} · 공연조 상세와 연습곡 관리`} />)}</ul></section>}
     {member.globalRole === "GLOBAL_ADMIN" && <section className={panelClass} aria-labelledby="admin-menu-title"><h2 id="admin-menu-title" className="text-xl font-bold">관리자 메뉴</h2><ul className="mt-5 grid gap-3 sm:grid-cols-2">{managementLinks.map((link) => <MenuLink key={link.href} {...link} />)}</ul><p className="mt-4 text-sm leading-7 text-navy-soft">공연조 생성·구성·팀장 지정은 공연조 목록과 상세 화면에서 관리해요.</p></section>}
-    <section className={panelClass} aria-labelledby="planned-menu-title"><h2 id="planned-menu-title" className="text-xl font-bold">함께 준비하는 기능</h2><p className="mt-3 text-sm leading-7 text-navy-soft">아래 기능은 준비 중이에요. 아직 신청하거나 변경할 수 없어요.</p><ul className="mt-5 grid gap-3 sm:grid-cols-2">{[...plannedFeatures, ...(member.globalRole === "GLOBAL_ADMIN" ? ["악기 고장 등록·복구"] : [])].map((title) => <li key={title}><button type="button" disabled className="planned-feature"><span className="text-sm font-semibold">{title}</span><span className="planned-feature-status">준비 중</span></button></li>)}</ul></section>
+    <section className={panelClass} aria-labelledby="planned-menu-title"><h2 id="planned-menu-title" className="text-xl font-bold">함께 준비하는 기능</h2><p className="mt-3 text-sm leading-7 text-navy-soft">아래 기능은 준비 중이에요. 아직 신청하거나 변경할 수 없어요.</p><ul className="mt-5 grid gap-3 sm:grid-cols-2">{plannedFeatures.map((title) => <li key={title}><button type="button" disabled className="planned-feature"><span className="text-sm font-semibold">{title}</span><span className="planned-feature-status">준비 중</span></button></li>)}</ul></section>
   </div>}</SessionGate></AppShell>;
 }

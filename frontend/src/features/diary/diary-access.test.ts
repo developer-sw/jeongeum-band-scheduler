@@ -139,12 +139,12 @@ describe("diary routes preserve session, membership and role boundaries", () => 
     expect(ordinary).toContain("내가 이끄는 공연조");
     expect(ordinary).toContain('href="/teams/72"');
     expect(ordinary).not.toContain('href="/teams/71"');
-    for (const path of ["/admin/recurring-assignments", "/admin/members", "/admin/invitations"]) expect(ordinary).not.toContain(`href="${path}"`);
+    for (const path of ["/admin/instrument-faults", "/admin/recurring-assignments", "/admin/members", "/admin/invitations"]) expect(ordinary).not.toContain(`href="${path}"`);
     expect(render(ordinaryClient, Home)).toContain("역할: 회원");
     expect(render(ordinaryClient, Home)).not.toContain("역할: 전체 관리자");
     const adminClient = seededClient({ ...member, globalRole: "GLOBAL_ADMIN", teamMemberships: [] });
     const admin = render(adminClient, MorePage, "/more");
-    for (const path of ["/admin/recurring-assignments", "/admin/members", "/admin/invitations"]) expect(admin).toContain(`href="${path}"`);
+    for (const path of ["/admin/instrument-faults", "/admin/recurring-assignments", "/admin/members", "/admin/invitations"]) expect(admin).toContain(`href="${path}"`);
     expect(admin).not.toContain("내가 이끄는 공연조");
     expect(render(adminClient, Home)).toContain("역할: 전체 관리자");
   });
@@ -152,7 +152,7 @@ describe("diary routes preserve session, membership and role boundaries", () => 
   it("keeps unimplemented functions explicitly disabled without fake routes or notification counts", () => {
     const ordinary = render(seededClient(member), MorePage, "/more");
     const admin = render(seededClient({ ...member, globalRole: "GLOBAL_ADMIN" }), MorePage, "/more");
-    for (const [markup, count] of [[ordinary, 5], [admin, 6]] as const) {
+    for (const [markup, count] of [[ordinary, 5], [admin, 5]] as const) {
       const buttons = markup.match(/<button[^>]*class="planned-feature"[^>]*>[\s\S]*?<\/button>/g) ?? [];
       expect(buttons).toHaveLength(count);
       for (const button of buttons) { expect(button).toContain('disabled=""'); expect(button).toContain("준비 중"); }
@@ -160,7 +160,7 @@ describe("diary routes preserve session, membership and role boundaries", () => 
       expect(markup).toContain('href="/exchanges"');
     }
     expect(ordinary).not.toContain("악기 고장 등록·복구");
-    expect(admin).toContain("악기 고장 등록·복구");
+    expect(admin).toContain('href="/admin/instrument-faults"');
     expect(ordinary).toContain("예약 조회·변경·취소·이력");
     expect(ordinary).toContain("예약 교환");
     expect(ordinary).not.toContain("예약 변경·교환");
