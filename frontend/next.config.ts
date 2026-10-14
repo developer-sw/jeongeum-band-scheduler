@@ -22,6 +22,10 @@ function apiOrigin() {
 const nextConfig: NextConfig = {
   agentRules: false,
   poweredByHeader: false,
+  allowedDevOrigins: [
+    "127.0.0.1",
+    ...(process.env.APP_DEV_ORIGINS ?? "").split(",").map((host) => host.trim()).filter(Boolean),
+  ],
   async rewrites() {
     return [{ source: "/api/:path*", destination: `${apiOrigin()}/api/:path*` }];
   },

@@ -4,6 +4,19 @@
 
 Docker Desktop의 WSL 2 Linux 엔진과 개발용 PostgreSQL을 사용한다. 이후 생성한 Spring·Next.js 앱의 실행·검증은 [INITIAL_SETUP.md](INITIAL_SETUP.md)를 따른다. `tools/environment-check`는 Java·Docker·PostgreSQL 실행을 확인하는 독립 도구이며 서비스의 업무 코드나 migration은 포함하지 않는다.
 
+## 같은 네트워크의 스마트폰에서 접속
+
+기본 프론트엔드 실행은 기존처럼 `127.0.0.1:3000`으로 제한한다. 스마트폰 확인 때는 PC와 스마트폰을 같은 공유기 네트워크에 연결하고 기존 프론트엔드만 종료한 뒤 프로젝트 루트에서 실행한다.
+
+```powershell
+# PC의 Wi-Fi IPv4 주소로 바꿔 입력한다.
+./scripts/Start-Frontend.ps1 -Hostname 0.0.0.0 -AllowedDevOrigins '192.168.0.10'
+```
+
+스마트폰 브라우저에서 `http://PC의-Wi-Fi-IP:3000`으로 접속한다. `AllowedDevOrigins`에는 URL이나 포트가 아닌 현재 PC의 IP만 입력하며, Next.js 개발 화면과 자동 갱신 요청을 허용한다. IP가 바뀌면 새 IP로 다시 실행한다. PC의 `http://127.0.0.1:3000`도 함께 사용할 수 있다. 스마트폰은 별도 쿠키를 사용하므로 기존 계정으로 로그인한다.
+
+Windows 방화벽에는 관리자 권한으로 현재 Wi-Fi 인터페이스·PC IPv4 주소·TCP 3000·같은 네트워크 대역만 허용하는 인바운드 규칙을 추가한다. 네트워크의 Public/Private 분류는 변경하지 않는다. 백엔드와 PostgreSQL은 localhost 바인딩을 유지하며 `/api`는 기존 프론트엔드 프록시로 전달한다. 공유기 포트 포워딩은 설정하지 않는다. 기본 PC 전용 실행으로 돌아갈 때는 프론트엔드 종료 후 `./scripts/Start-Frontend.ps1`을 실행한다.
+
 ## 설치 및 확인 상태
 
 | 항목 | 확인 결과 |
