@@ -1,6 +1,6 @@
 # 알림함 및 Web Push 설계
 
-작성 기준: 2026-10-14, Asia/Seoul. 이 문서는 확정된 알림 동작과 구현 제안을 정리한다. V9·전체 공지·사이트 내 알림함과 예약/교환 사건 연동은 main에 반영됐다. service worker, Push 구독/발송, 시작 1시간 전 계획·worker와 CSRF 보완은 로컬 구현·격리 최종 검증 후 사용자 승인으로 새 V9 백업·복원 확인·개발 DB V10 적용·최신 서버 기동을 완료했다. 커밋·Push·초안 PR·CI 확인은 승인 범위이며 정식 전환·main 병합과 실기기 수신은 별도 확인 대상이다. V9 계약은 [NOTICES_NOTIFICATIONS](NOTICES_NOTIFICATIONS.md), 최신 구현 선택·실제 실행 결과와 제한은 [WEB_PUSH_REMINDERS](WEB_PUSH_REMINDERS.md)를 따른다. 아래의 별도 제안 전체가 구현된 것은 아니다. 관련 화면은 [UX.md](UX.md), API 계약은 [API.md](API.md), 검증은 [TEST_PLAN.md](TEST_PLAN.md)를 따른다.
+작성 기준: 2026-10-14, Asia/Seoul. 이 문서는 확정된 알림 동작과 구현 제안을 정리한다. V9·전체 공지·사이트 내 알림함과 예약/교환 사건 연동은 main에 반영됐다. service worker, Push 구독/발송, 시작 1시간 전 계획·worker와 CSRF 보완도 로컬 최종 검증·새 V9 백업의 실제 복원·개발 DB V10 적용·최신 서버 기동·원격 CI 후 사용자 승인으로 PR #17을 main에 병합했다. 실기기 Push 수신·운영 HTTPS/외부 백업 검증은 후속 단계다. V9 계약은 [NOTICES_NOTIFICATIONS](NOTICES_NOTIFICATIONS.md), 최신 구현 선택·실제 실행 결과와 제한은 [WEB_PUSH_REMINDERS](WEB_PUSH_REMINDERS.md)를 따른다. 아래의 별도 제안 전체가 구현된 것은 아니다. 관련 화면은 [UX.md](UX.md), API 계약은 [API.md](API.md), 검증은 [TEST_PLAN.md](TEST_PLAN.md)를 따른다.
 
 ## 1. 확정된 서비스 동작
 

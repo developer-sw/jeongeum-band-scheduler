@@ -1,6 +1,6 @@
 # Web Push·합주 시작 1시간 전 알림
 
-기준일: 2026-10-14 / Asia/Seoul / 브랜치: `codex/web-push-reminders` / 시작 main: `9c05c43`. 구현과 최신 전체 회귀·격리 브라우저 검증을 완료했다. 이후 사용자 승인으로 새 V9 백업·실제 격리 복원 검증·개발 DB V10 한 건 적용·최신 8080/3000 서버 기동을 완료했다. 기존 스마트폰 LAN 설정·다이어리 UI·업무 데이터·관리자·예약·볼륨을 보존했다. 커밋·Push·main 대상 초안 PR·원격 CI 확인은 이번 승인 범위이며 정식 PR 전환·main 병합은 별도 승인 대상이다. 외부 Push 서비스와 실제 휴대폰의 수신은 아직 검증하지 않았다.
+기준일: 2026-10-14 / Asia/Seoul / 구현 브랜치: `codex/web-push-reminders` / 시작 main: `9c05c43`. 구현과 최신 전체 회귀·격리 브라우저 검증 후 사용자 승인으로 새 V9 백업·실제 격리 복원·개발 DB V10 한 건 적용·최신 서버 기동을 완료했다. 커밋·Push·초안 PR·원격 CI를 마친 뒤 추가 승인으로 PR #17을 정식 전환·main 병합했다(`f39969a`). 기존 LAN 설정·다이어리 UI·업무 데이터·관리자·예약·볼륨을 보존했다. 외부 Push 서비스와 실제 휴대폰의 수신은 아직 검증하지 않았다.
 
 ## 확정 정책과 구현 선택
 
@@ -112,4 +112,8 @@ Push와 시작 worker는 기본 비활성이다. 승인된 DB 적용 후 시작 
 
 기존 LAN 실행 옵션·AllowedDevOrigins를 유지했고 방화벽 규칙은 바꾸지 않았다. 방화벽 상세 조회는 Windows 권한 거부로 확인하지 못했다. LAN 주소 응답은 통과했으며 다른 기기의 실제 접속은 별도 확인 대상이다.
 
-기존 LAN 변경은 커밋 `9977da7`로 분리했고 SW 헤더는 Push 기능 커밋에 남긴다. 새 백업·복원·실제 적용·기동·보존 증빙은 Git에서 제외한 `.local/push-v10-backup-latest.json`, `push-v10-startup.json`, `push-v10-smoke.json`, `push-v10-server.json`에 기록했다. 검증한 수정의 커밋·Push·main 대상 초안 PR·원격 CI 확인은 이번 승인 범위이며 원격 결과는 해당 PR 검사와 실행 기록을 따른다. 정식 전환·main 병합·HTTPS 운영 배포·실기기 수신은 후속 단계다.
+기존 LAN 변경은 커밋 `9977da7`, 기능은 `210d504`로 분리했다. 새 백업·복원·실제 적용·기동·보존 증빙은 Git에서 제외한 `.local/push-v10-backup-latest.json`, `push-v10-startup.json`, `push-v10-smoke.json`, `push-v10-server.json`에 기록했다. 기능 HEAD의 [Push CI](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/38528743841)와 [PR CI](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/38528767465)가 모두 성공했다. PR CI에서 Backend 325건·실패/skip 0·JAR, Frontend 214건·타입/lint·기본 Turbopack 빌드·audit 취약점 0을 확인했다. 이후 사용자 승인으로 [PR #17](https://github.com/developer-sw/jeongeum-band-scheduler/pull/17)을 정식 전환·main 병합했다. HTTPS 운영 배포·실기기 수신은 후속 단계다.
+
+병합 커밋 `f39969a45550d522916d07ab2a5d920bd2e0cf4a`의 [main CI](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/38533584617)도 양쪽 검사에 성공했다. main job 로그에서 Backend 325건·실패/skip 0·JAR와 Frontend 214건·타입/lint·기본 Turbopack 빌드·audit 취약점 0을 확인했다. 증빙은 Git 제외 `.local/push-main17-ci-final.json`에 기록한다.
+
+README 갱신 단계의 접속 확인에서 Docker와 앱 프로세스가 중지된 상태를 발견했다. 기존 Docker 환경을 시작하고 실행 스크립트를 숨김 백그라운드 프로세스로 재기동했다. 2026-10-14 17:23 검사에서 backend `UP`·frontend HTTP 200이며 Flyway는 기존 V10을 검증하고 `No migration necessary`로 종료했다. 추가 migration·초기화·복원은 하지 않았고 외부 sender 비활성을 유지했다. 현재 프로세스·로그·주소는 Git 제외 `.local/push-dev-runtime-live.json`, `push-dev-runtime-health.json`에 기록하며 이전 기동 시점의 LAN 주소와 구분한다. 방화벽 규칙을 새로 변경하지 않았다.
