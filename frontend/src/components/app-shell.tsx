@@ -67,7 +67,7 @@ export function AppShell({ children, wide = false }: { children: React.ReactNode
             {mainLinks.map(({ href, label }) => navigationLink(href, label))}
             <details className="app-management" onKeyDown={(event) => { if (event.key === "Escape") { event.currentTarget.open = false; event.currentTarget.querySelector("summary")?.focus(); } }}>
               <summary className="app-nav-link">공지·알림 <span aria-hidden="true" className="ml-2">⌄</span></summary>
-              <div className="app-management-menu">{navigationLink("/notices", "전체 공지")}{navigationLink("/notifications", "내 알림함")}</div>
+              <div className="app-management-menu">{navigationLink("/notices", "전체 공지")}{navigationLink("/notifications", "내 알림함")}{navigationLink("/notifications/settings", "알림 설정")}</div>
             </details>
             {member.globalRole === "GLOBAL_ADMIN" && <details className="app-management" onKeyDown={(event) => { if (event.key === "Escape") { event.currentTarget.open = false; event.currentTarget.querySelector("summary")?.focus(); } }}>
               <summary className="app-nav-link">관리 <span aria-hidden="true" className="ml-2">⌄</span></summary>

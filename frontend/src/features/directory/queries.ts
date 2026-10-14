@@ -26,7 +26,7 @@ export async function refreshDirectory(client: QueryClient) {
 export async function pruneDirectoryCache(client: QueryClient, member: Member | null) {
   const activeMember = member?.status === "ACTIVE" ? member : null;
   const scope = activeMember ? directoryScope(activeMember) : null;
-  const predicate = (query: { queryKey: readonly unknown[] }) => ((["directory", "reservations", "exchanges", "notices", "notifications"].includes(String(query.queryKey[0]))) && query.queryKey[1] !== scope)
+  const predicate = (query: { queryKey: readonly unknown[] }) => ((["directory", "reservations", "exchanges", "notices", "notifications", "push"].includes(String(query.queryKey[0]))) && query.queryKey[1] !== scope)
     || (query.queryKey[0] === "admin" && (activeMember?.globalRole !== "GLOBAL_ADMIN" || (["recurring", "instrument-faults"].includes(String(query.queryKey[1])) && query.queryKey[2] !== scope)));
   await client.cancelQueries({ predicate });
   client.removeQueries({ predicate });

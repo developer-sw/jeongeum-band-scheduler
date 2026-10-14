@@ -22,6 +22,16 @@ function apiOrigin() {
 const nextConfig: NextConfig = {
   agentRules: false,
   poweredByHeader: false,
+  allowedDevOrigins: [
+    "127.0.0.1",
+    ...(process.env.APP_DEV_ORIGINS ?? "").split(",").map((host) => host.trim()).filter(Boolean),
+  ],
+  async headers() {
+    return [{ source: "/push-sw.js", headers: [
+      { key: "Cache-Control", value: "no-store" },
+      { key: "X-Content-Type-Options", value: "nosniff" },
+    ] }];
+  },
   async rewrites() {
     return [{ source: "/api/:path*", destination: `${apiOrigin()}/api/:path*` }];
   },

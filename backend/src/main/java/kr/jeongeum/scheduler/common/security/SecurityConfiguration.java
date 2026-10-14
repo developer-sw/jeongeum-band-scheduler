@@ -2,6 +2,7 @@ package kr.jeongeum.scheduler.common.security;
 
 import kr.jeongeum.scheduler.auth.security.CurrentMemberFilter;
 import kr.jeongeum.scheduler.auth.security.PersistentLoginCookieFilter;
+import kr.jeongeum.scheduler.auth.security.JdbcSessionCsrfTokenRepository;
 import java.time.Duration;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
@@ -24,10 +25,14 @@ import org.springframework.security.web.authentication.session.SessionAuthentica
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CsrfAuthenticationStrategy;
-import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.security.web.csrf.XorCsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.savedrequest.NullRequestCache;
 import org.springframework.session.web.http.CookieSerializer;
+import org.springframework.session.FlushMode;
+import org.springframework.session.config.SessionRepositoryCustomizer;
+import org.springframework.session.jdbc.JdbcIndexedSessionRepository;
+import org.springframework.jdbc.core.JdbcTemplate;
 import java.util.List;
 
 @Configuration(proxyBeanMethods = false)
@@ -37,7 +42,7 @@ public class SecurityConfiguration {
     @Profile("!bootstrap-admin")
     SecurityFilterChain securityFilterChain(HttpSecurity http, SecurityErrorHandler errors,
             CurrentMemberFilter currentMember, SecurityContextRepository contexts,
-            HttpSessionCsrfTokenRepository csrfTokens, CookieSerializer cookies,
+            CsrfTokenRepository csrfTokens, CookieSerializer cookies,
             @Value("${spring.session.timeout}") Duration sessionTimeout) throws Exception {
         http
                 .authorizeHttpRequests(authorize -> authorize
@@ -59,6 +64,8 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.GET, "/api/v1/notices", "/api/v1/notices/**").authenticated()
                         .requestMatchers("/api/v1/notices", "/api/v1/notices/**").hasRole("GLOBAL_ADMIN")
                         .requestMatchers("/api/v1/notifications", "/api/v1/notifications/**").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/push/public-key").authenticated()
+                        .requestMatchers("/api/v1/push-subscriptions", "/api/v1/push-subscriptions/**").authenticated()
                         .anyRequest().denyAll())
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfTokens)
@@ -86,13 +93,18 @@ public class SecurityConfiguration {
     }
 
     @Bean
-    HttpSessionCsrfTokenRepository csrfTokenRepository() { return new HttpSessionCsrfTokenRepository(); }
+    CsrfTokenRepository csrfTokenRepository(JdbcTemplate jdbc) { return new JdbcSessionCsrfTokenRepository(jdbc); }
+
+    @Bean
+    SessionRepositoryCustomizer<JdbcIndexedSessionRepository> persistSessionBeforeCsrfInitialization() {
+        return repository -> repository.setFlushMode(FlushMode.IMMEDIATE);
+    }
 
     @Bean
     SecurityContextRepository securityContextRepository() { return new HttpSessionSecurityContextRepository(); }
 
     @Bean
-    SessionAuthenticationStrategy sessionAuthenticationStrategy(HttpSessionCsrfTokenRepository csrfTokens) {
+    SessionAuthenticationStrategy sessionAuthenticationStrategy(CsrfTokenRepository csrfTokens) {
         CsrfAuthenticationStrategy csrf = new CsrfAuthenticationStrategy(csrfTokens);
         csrf.setRequestHandler(new XorCsrfTokenRequestAttributeHandler());
         return new CompositeSessionAuthenticationStrategy(List.of(

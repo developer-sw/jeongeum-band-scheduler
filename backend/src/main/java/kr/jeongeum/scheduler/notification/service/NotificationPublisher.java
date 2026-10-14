@@ -20,7 +20,8 @@ public class NotificationPublisher {
     private static final DateTimeFormatter WHEN=DateTimeFormatter.ofPattern("M월 d일 HH:mm").withZone(ZoneId.of("Asia/Seoul"));
     private static final Set<String> EXCHANGE_EVENTS=Set.of("EXCHANGE_REQUESTED","EXCHANGE_COMPLETED","EXCHANGE_REJECTED","EXCHANGE_WITHDRAWN","EXCHANGE_EXPIRED","EXCHANGE_INVALIDATED");
     private final NotificationRepository notifications;
-    public NotificationPublisher(NotificationRepository notifications) { this.notifications=notifications; }
+    private final ReminderPlans reminders;
+    public NotificationPublisher(NotificationRepository notifications,ReminderPlans reminders) { this.notifications=notifications; this.reminders=reminders; }
     public void importantNotice(NoticeResponse notice,Instant now) {
         long id=Long.parseLong(notice.id());
         for (long user : notifications.activeUsers()) {
@@ -29,21 +30,29 @@ public class NotificationPublisher {
         }
     }
     public void reservationCreated(Reservation reservation,Long operationId,Instant now) {
+        reminders.schedule(reservation,now);
         reservationEvent(reservation,"reservation:"+reservation.id()+":CREATED","RESERVATION_CREATED",operationId,
                 "합주실 예약이 등록됐어요",describe(reservation),now);
     }
     public void reservationChanged(Reservation old,Reservation next,Long operationId,Instant now) {
         requireOperation(operationId);
+        reminders.cancel(old.id(),now);
+        reminders.schedule(next,now);
         reservationEvent(next,"operation:"+operationId+":reservation:"+old.id()+":CHANGED","RESERVATION_CHANGED",operationId,
                 "합주실 예약이 변경됐어요",describe(old)+" → "+describe(next),now);
     }
     public void reservationCancelled(Reservation reservation,Long operationId,Instant now) {
         requireOperation(operationId);
+        reminders.cancel(reservation.id(),now);
         reservationEvent(reservation,"operation:"+operationId+":reservation:"+reservation.id()+":CANCELED","RESERVATION_CANCELED",operationId,
                 "합주실 예약이 취소됐어요",describe(reservation),now);
     }
     public void exchangeEvent(long requestId,String eventType,List<Reservation> sources,List<Reservation> results,long requestedByUserId,Instant now) {
         if (!EXCHANGE_EVENTS.contains(eventType)) { throw new IllegalArgumentException("Unsupported exchange inbox event"); }
+        if ("EXCHANGE_COMPLETED".equals(eventType)) {
+            for(Reservation source:sources) { reminders.cancel(source.id(),now); }
+            for(Reservation result:results) { reminders.schedule(result,now); }
+        }
         Set<Long> users=new LinkedHashSet<>();
         for (Reservation source : sources) { users.addAll(recipients(source)); }
         users.addAll(notifications.activePersonal(requestedByUserId));

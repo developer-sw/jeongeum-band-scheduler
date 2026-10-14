@@ -15,6 +15,7 @@ import kr.jeongeum.scheduler.invitation.service.InvitationService;
 import kr.jeongeum.scheduler.member.api.MemberResponse;
 import kr.jeongeum.scheduler.member.domain.Member;
 import kr.jeongeum.scheduler.member.service.MemberService;
+import kr.jeongeum.scheduler.push.service.PushSubscriptionService;
 import org.springframework.context.annotation.Profile;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.CacheControl;
@@ -28,7 +29,7 @@ import org.springframework.security.web.authentication.logout.SecurityContextLog
 import org.springframework.security.web.authentication.session.SessionAuthenticationStrategy;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.security.web.csrf.CsrfLogoutHandler;
-import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -42,16 +43,17 @@ public class AuthenticationController {
     private final InvitationService invitations;
     private final SecurityContextRepository contexts;
     private final SessionAuthenticationStrategy sessionAuthentication;
-    private final HttpSessionCsrfTokenRepository csrfTokens;
+    private final CsrfTokenRepository csrfTokens;
+    private final PushSubscriptionService pushSubscriptions;
     private final Clock clock;
     private final MemberService memberService;
     private final int sessionTimeoutSeconds;
 
     public AuthenticationController(LoginService login, RegistrationService registration,
             InvitationService invitations, SecurityContextRepository contexts,
-            SessionAuthenticationStrategy sessionAuthentication, HttpSessionCsrfTokenRepository csrfTokens,
+            SessionAuthenticationStrategy sessionAuthentication, CsrfTokenRepository csrfTokens,
             Clock clock, MemberService memberService,
-            @Value("${spring.session.timeout}") Duration sessionTimeout) {
+            @Value("${spring.session.timeout}") Duration sessionTimeout, PushSubscriptionService pushSubscriptions) {
         this.login = login;
         this.registration = registration;
         this.invitations = invitations;
@@ -60,6 +62,7 @@ public class AuthenticationController {
         this.csrfTokens = csrfTokens;
         this.clock = clock;
         this.memberService = memberService;
+        this.pushSubscriptions = pushSubscriptions;
         this.sessionTimeoutSeconds = Math.toIntExact(sessionTimeout.toSeconds());
     }
 
@@ -97,6 +100,10 @@ public class AuthenticationController {
     @PostMapping("/api/v1/auth/logout")
     public ResponseEntity<Void> logout(HttpServletRequest request, HttpServletResponse response,
             Authentication authentication) {
+        var session=request.getSession(false);
+        if (session!=null && authentication!=null && authentication.getPrincipal() instanceof MemberPrincipal member) {
+            pushSubscriptions.logout(member.memberId(),session.getId());
+        }
         new CsrfLogoutHandler(csrfTokens).logout(request, response, authentication);
         SecurityContextLogoutHandler logout = new SecurityContextLogoutHandler();
         logout.setSecurityContextRepository(contexts);

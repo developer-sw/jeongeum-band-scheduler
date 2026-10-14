@@ -16,7 +16,7 @@ import { useNoticeAction } from "@/features/notices/use-notice-action";
 import { UncertainNotice, noticeTime } from "@/features/notices/view";
 import type { Notice, NoticeIntent } from "@/features/notices/types";
 
-export function NoticeDetail({ id, scope, admin }: { id: string; scope: string; admin: boolean }) {
+function NoticeDetail({ id, scope, admin }: { id: string; scope: string; admin: boolean }) {
   const client = useQueryClient(); const query = useQuery(noticeQuery(scope, id)); const action = useNoticeAction();
   const [editor, setEditor] = useState<Notice | null>(null); const [deleting, setDeleting] = useState<Notice | null>(null); const [status, setStatus] = useState<string | null>(null); const returnFocus = useRef<HTMLElement | null>(null);
   const busy = action.pending || action.uncertain; const stale = Boolean(editor && noticeChanged(editor, query.data)); const deleteStale = Boolean(deleting && noticeChanged(deleting, query.data));

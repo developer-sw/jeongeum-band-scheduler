@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { FormError, SessionGate, primaryButton, secondaryButton } from "@/components/auth-ui";
 import { panelClass } from "@/components/directory-ui";
-import { logout } from "@/features/auth/api";
+import { logoutWithPushCleanup } from "@/features/auth/logout";
 import { useSession } from "@/features/auth/session-provider";
 import { useTransientAction } from "@/features/auth/use-transient-action";
 
@@ -17,8 +17,8 @@ export default function AccountPage() {
   const member = session.member;
 
   async function signOut() {
-    const done = await action.run(async (signal) => { await logout(signal); return true; });
-    if (done) { await session.replace(null); router.replace("/login"); }
+    const done = await action.run((signal) => logoutWithPushCleanup(signal));
+    if (done) { await session.replace(null); router.replace(done.browserCleanupComplete ? "/login" : "/login?pushCleanup=incomplete"); }
   }
 
   return <AppShell><SessionGate>{member && <div className="space-y-6">
@@ -32,7 +32,8 @@ export default function AccountPage() {
         <div><dt className="text-navy-soft">역할</dt><dd className="mt-1 font-semibold">{member.globalRole === "GLOBAL_ADMIN" ? "전체 관리자" : "회원"}</dd></div>
       </dl>
       <div className="flex flex-wrap gap-3"><Link href="/" className={primaryButton}>오늘의 시간표</Link>{member.globalRole === "GLOBAL_ADMIN" && <Link href="/admin/invitations" className={secondaryButton}>개인 초대 관리</Link>}<button type="button" className={secondaryButton} onClick={() => void signOut()} disabled={action.pending}>{action.pending ? "로그아웃하는 중…" : "로그아웃"}</button></div>
-      <p className="mt-4 text-sm leading-7 text-navy-soft">공용 기기를 사용했다면 이용 후 로그아웃해 주세요.</p>
+      <p className="mt-4 text-sm leading-7 text-navy-soft">공용 기기를 사용했다면 이용 후 로그아웃해 주세요. 로그아웃하면 이 기기의 Push 알림만 중단돼요.</p>
+      <Link href="/notifications/settings" className={`${secondaryButton} mt-4`}>기기 알림 설정</Link>
       <div className="mt-4"><FormError message={action.error} /></div>
     </section>
     <section className={panelClass}>

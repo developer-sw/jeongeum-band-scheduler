@@ -46,16 +46,40 @@ interface CsrfToken {
   token: string;
 }
 
+interface CsrfFlight {
+  epoch: number;
+  controller: AbortController;
+  promise: Promise<CsrfToken>;
+  waiters: number;
+}
+
+let sessionEpoch = 0;
+let csrfFlight: CsrfFlight | null = null;
+let sessionTransitionEpoch: number | null = null;
+
+/** Discard pending preparation and responses when the browser's account/session changes. */
+export function resetApiSession(): void {
+  sessionEpoch += 1;
+  const pending = csrfFlight;
+  csrfFlight = null;
+  pending?.controller.abort();
+}
+
+function checkCurrent(epoch: number, signal?: AbortSignal): void {
+  signal?.throwIfAborted();
+  if (epoch !== sessionEpoch) throw new DOMException("The session changed.", "AbortError");
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-async function readResponse<T>(response: Response, signal?: AbortSignal): Promise<ApiResponse<T> | null> {
-  signal?.throwIfAborted();
+async function readResponse<T>(response: Response, signal?: AbortSignal, epoch = sessionEpoch): Promise<ApiResponse<T> | null> {
+  checkCurrent(epoch, signal);
   if (response.status === 204) return null;
 
-  const payload: unknown = await response.json().catch(() => { signal?.throwIfAborted(); return null; });
-  signal?.throwIfAborted();
+  const payload: unknown = await response.json().catch(() => { checkCurrent(epoch, signal); return null; });
+  checkCurrent(epoch, signal);
 
   if (!response.ok) {
     const error = isRecord(payload) && isRecord(payload.error) ? payload.error : null;
@@ -70,7 +94,7 @@ async function readResponse<T>(response: Response, signal?: AbortSignal): Promis
       },
     );
     if (failure.status === 401 || failure.status === 403) {
-      signal?.throwIfAborted();
+      checkCurrent(epoch, signal);
       accessErrorListeners.forEach((listener) => listener(failure));
     }
     throw failure;
@@ -89,7 +113,7 @@ async function readResponse<T>(response: Response, signal?: AbortSignal): Promis
   return payload as unknown as ApiResponse<T>;
 }
 
-async function csrfToken(signal?: AbortSignal): Promise<CsrfToken> {
+async function fetchCsrfToken(signal: AbortSignal, epoch: number): Promise<CsrfToken> {
   const response = await fetch("/api/v1/auth/csrf", {
     credentials: "same-origin",
     cache: "no-store",
@@ -97,7 +121,7 @@ async function csrfToken(signal?: AbortSignal): Promise<CsrfToken> {
     headers: { Accept: "application/json" },
     signal,
   });
-  const result = await readResponse<CsrfToken>(response, signal);
+  const result = await readResponse<CsrfToken>(response, signal, epoch);
 
   if (
     !isRecord(result?.data) ||
@@ -110,6 +134,43 @@ async function csrfToken(signal?: AbortSignal): Promise<CsrfToken> {
   }
 
   return result.data;
+}
+
+function csrfToken(epoch: number, signal?: AbortSignal): Promise<CsrfToken> {
+  checkCurrent(epoch, signal);
+  let flight = csrfFlight;
+  if (!flight || flight.epoch !== epoch) {
+    const controller = new AbortController();
+    flight = { epoch, controller, promise: fetchCsrfToken(controller.signal, epoch), waiters: 0 };
+    csrfFlight = flight;
+    const created = flight;
+    flight.promise = flight.promise.finally(() => { if (csrfFlight === created) csrfFlight = null; });
+  }
+  const shared = flight;
+  shared.waiters += 1;
+  // One canceled screen must not cancel another screen's request using the same preparation.
+  return new Promise<CsrfToken>((resolve, reject) => {
+    let settled = false;
+    const finish = (action: () => void) => {
+      if (settled) return;
+      settled = true;
+      signal?.removeEventListener("abort", abort);
+      shared.waiters -= 1;
+      if (shared.waiters === 0 && csrfFlight === shared) {
+        csrfFlight = null;
+        shared.controller.abort();
+      }
+      action();
+    };
+    const abort = () => finish(() => reject(signal?.reason ?? new DOMException("Request canceled.", "AbortError")));
+    signal?.addEventListener("abort", abort, { once: true });
+    shared.promise.then(
+      (token) => finish(() => {
+        try { checkCurrent(epoch, signal); resolve(token); } catch (error) { reject(error); }
+      }),
+      (error: unknown) => finish(() => reject(error)),
+    );
+  });
 }
 
 /** Browser requests use the same origin; Spring remains the authority for permissions and CSRF. */
@@ -130,27 +191,43 @@ export async function apiRequest<T>(
     throw new ApiError(0, "OFFLINE", "인터넷 연결을 확인한 뒤 다시 요청해 주세요.");
   }
 
+  options.signal?.throwIfAborted();
   const headers = new Headers(options.headers);
   headers.set("Accept", "application/json");
-
-  if (method !== "GET") {
-    // Fetch anew for each mutation so login/logout session rotation cannot retain an old token.
-    const csrf = await csrfToken(options.signal);
-    headers.set(csrf.headerName, csrf.token);
+  const rotatesSession = method === "POST" && (path === "/api/v1/auth/login" || path === "/api/v1/auth/logout");
+  if (method !== "GET" && sessionTransitionEpoch !== null) {
+    throw new DOMException("Authentication is changing. Request again after it completes.", "AbortError");
   }
+  if (rotatesSession) resetApiSession();
+  const epoch = sessionEpoch;
+  checkCurrent(epoch, options.signal);
+  if (rotatesSession) sessionTransitionEpoch = epoch;
 
-  if (options.body !== undefined) headers.set("Content-Type", "application/json");
+  try {
+    if (method !== "GET") {
+      // Only concurrent preparation is shared. Sequential writes always fetch the current token.
+      const csrf = await csrfToken(epoch, options.signal);
+      checkCurrent(epoch, options.signal);
+      headers.set(csrf.headerName, csrf.token);
+    }
 
-  const response = await fetch(path, {
-    method,
-    headers,
-    credentials: "same-origin",
-    cache: "no-store",
-    redirect: "error",
-    body: options.body === undefined ? undefined : JSON.stringify(options.body),
-    signal: options.signal,
-  });
+    if (options.body !== undefined) headers.set("Content-Type", "application/json");
 
-  // Mutations are never replayed automatically, including a CSRF rejection or network failure.
-  return readResponse<T>(response, options.signal);
+    const response = await fetch(path, {
+      method,
+      headers,
+      credentials: "same-origin",
+      cache: "no-store",
+      redirect: "error",
+      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      signal: options.signal,
+    });
+
+    // Mutations are never replayed automatically, including a CSRF rejection or network failure.
+    return await readResponse<T>(response, options.signal, epoch);
+  } finally {
+    // A lost login/logout response may still have rotated or deleted the server session.
+    if (rotatesSession && sessionTransitionEpoch === epoch) sessionTransitionEpoch = null;
+    if (rotatesSession && epoch === sessionEpoch) resetApiSession();
+  }
 }
