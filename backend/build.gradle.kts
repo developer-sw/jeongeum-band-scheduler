@@ -26,6 +26,10 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-session-jdbc")
     implementation("org.flywaydb:flyway-database-postgresql")
     runtimeOnly("org.postgresql:postgresql")
+    // Encrypt/sign using webpush-java; JDK HTTP supplies bounded timeouts and no redirects.
+    implementation("nl.martijndwars:web-push:5.1.2") { isTransitive = false }
+    implementation("org.bouncycastle:bcprov-jdk18on:1.83")
+    implementation("org.bitbucket.b_c:jose4j:0.9.7")
 
     testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
     testImplementation("org.springframework.boot:spring-boot-starter-security-test")

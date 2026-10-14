@@ -1,8 +1,8 @@
 "use client";
 
-import { createContext, useContext, useEffect } from "react";
+import { createContext, useContext, useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { onApiAccessError } from "@/lib/api/client";
+import { onApiAccessError, resetApiSession } from "@/lib/api/client";
 import { getMember } from "./api";
 import { invalidatesSession } from "./access";
 import { memberQueryKey, replaceSessionCache } from "./session-cache";
@@ -21,11 +21,17 @@ const SessionContext = createContext<Session | null>(null);
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const client = useQueryClient();
+  const previousIdentity = useRef<string | null | undefined>(undefined);
+  function recordIdentity(member: Member | null) {
+    const identity = member?.status === "ACTIVE" ? member.id : null;
+    if (previousIdentity.current !== undefined && previousIdentity.current !== identity) resetApiSession();
+    previousIdentity.current = identity;
+  }
   const query = useQuery({
     queryKey: memberQueryKey,
     queryFn: async ({ signal }) => {
-      try { return await getMember(signal); }
-      catch (error) { if (invalidatesSession(error)) return null; throw error; }
+      try { const member = await getMember(signal); recordIdentity(member); return member; }
+      catch (error) { if (invalidatesSession(error)) { recordIdentity(null); return null; } throw error; }
     },
     staleTime: 0,
     retry: false,
@@ -33,7 +39,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   });
 
   useEffect(() => onApiAccessError((error) => {
-    if (invalidatesSession(error)) void replaceSessionCache(client, null);
+    if (invalidatesSession(error)) { resetApiSession(); previousIdentity.current = null; void replaceSessionCache(client, null); }
     else if (error.code === "FORBIDDEN") {
       client.removeQueries({ queryKey: ["admin"] });
       client.removeQueries({ queryKey: ["directory"] });
@@ -41,6 +47,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       client.removeQueries({ queryKey: ["exchanges"] });
       client.removeQueries({ queryKey: ["notices"] });
       client.removeQueries({ queryKey: ["notifications"] });
+      client.removeQueries({ queryKey: ["push"] });
       void client.invalidateQueries({ queryKey: memberQueryKey });
     }
   }), [client]);
@@ -54,7 +61,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       loading: query.isPending,
       error: query.error,
       refresh: query.refetch,
-      replace: (member) => replaceSessionCache(client, member),
+      replace: (member) => { recordIdentity(member); return replaceSessionCache(client, member); },
     }}>
       {children}
     </SessionContext.Provider>

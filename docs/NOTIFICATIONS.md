@@ -1,6 +1,6 @@
 # 알림함 및 Web Push 설계
 
-작성 기준: 2026-10-13, Asia/Seoul. 이 문서는 확정된 알림 동작과 구현 제안을 정리한다. 이번 단계에서 V9·전체 공지·사이트 내 알림함과 예약/교환 사건 연동을 구현·격리 검증한다. service worker, Push 구독/발송, 시작 1시간 전 계획과 worker는 후속 단계이며 아래 설계안을 구현 완료로 간주하지 않는다. 이번 계약과 실제 실행 결과는 [NOTICES_NOTIFICATIONS](NOTICES_NOTIFICATIONS.md)를 따른다. 관련 화면은 [UX.md](UX.md), API 계약은 [API.md](API.md), 검증은 [TEST_PLAN.md](TEST_PLAN.md)를 따른다.
+작성 기준: 2026-10-14, Asia/Seoul. 이 문서는 확정된 알림 동작과 구현 제안을 정리한다. V9·전체 공지·사이트 내 알림함과 예약/교환 사건 연동은 main에 반영됐다. service worker, Push 구독/발송, 시작 1시간 전 계획·worker와 CSRF 보완은 로컬 구현·격리 최종 검증 후 사용자 승인으로 새 V9 백업·복원 확인·개발 DB V10 적용·최신 서버 기동을 완료했다. 커밋·Push·초안 PR·CI 확인은 승인 범위이며 정식 전환·main 병합과 실기기 수신은 별도 확인 대상이다. V9 계약은 [NOTICES_NOTIFICATIONS](NOTICES_NOTIFICATIONS.md), 최신 구현 선택·실제 실행 결과와 제한은 [WEB_PUSH_REMINDERS](WEB_PUSH_REMINDERS.md)를 따른다. 아래의 별도 제안 전체가 구현된 것은 아니다. 관련 화면은 [UX.md](UX.md), API 계약은 [API.md](API.md), 검증은 [TEST_PLAN.md](TEST_PLAN.md)를 따른다.
 
 ## 1. 확정된 서비스 동작
 
@@ -100,6 +100,8 @@ worker 지연, 네트워크, 브라우저·OS 상태 때문에 단말 표시가 
 팀 해체는 정리 대상 예약과 대기 교환을 먼저 식별하고 관련 활성 당사자에게 결과를 기록한다. 해체 이후의 빈 팀 명단만 조회해서 필요한 안내를 모두 놓치지 않는다. 개인 탈퇴는 실제 취소되는 개인 예약과 요청자 권한 상실에 해당하는 교환·계획을 정리한다. 존속 팀 예약은 creator가 탈퇴했더라도 유지하며 다른 활성 조원에게 보낼 예정 알림도 계속한다. 탈퇴자가 상대 승인 후보였을 뿐이고 다른 적법한 승인 경로가 있으면 대기 교환을 종료하지 않는다.
 
 ## 7. 구독 API와 기기 수명주기 제안
+
+2026-10-14 사용자가 Web Push·시작 알림 구현을 요청했고 **로그아웃 시 해당 기기의 Push만 중단, 다른 기기 유지**를 확정했다. V10·API·화면·CSRF 보완과 실제 검증 범위는 [WEB_PUSH_REMINDERS](WEB_PUSH_REMINDERS.md)를 따른다. 아래 기술 제안 중 구현된 선택은 해당 문서와 API/ERD에 구분해 기록한다.
 
 API 경로는 /api/v1 아래를 기준으로 하고 최종 세부 경로는 [API.md](API.md)에 맞춘다.
 

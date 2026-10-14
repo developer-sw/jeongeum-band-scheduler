@@ -222,6 +222,8 @@ PWA는 manifest·아이콘·standalone·service worker·오프라인 안내·Web
 
 ## 10. 갱신·오류·접근성 제안
 
+2026-10-14 Push 설정은 `/notifications/settings`에서 제공한다. 사용자 버튼에서만 권한을 요청하고 미지원·HTTP·서버 미설정·거절·구독 실패와 본인 기기 목록을 구분한다. iPhone 설치 안내·기기별 해제·이전 계정 메시지 보호·캐시 제한은 [WEB_PUSH_REMINDERS](WEB_PUSH_REMINDERS.md)를 따른다. 로그아웃하면 해당 기기의 발송 연결만 정리하며 다른 기기는 유지한다.
+
 - 예약 화면이 보일 때 15~30초 polling, 화면 복귀·네트워크 재연결 시 refetch, 본인의 변경 성공 후 관련 Query invalidate를 제안한다. invalidate만으로 다른 사용자의 화면이 갱신되지는 않는다. [TanStack Query 공식 문서](https://tanstack.com/query/latest/docs/framework/react/guides/important-defaults)
 - Push는 일정 데이터의 최종 상태가 아니다. 알림 클릭과 화면 복귀 시 API를 다시 조회한다.
 - 401은 재로그인, 403은 현재 권한 설명, 예약 충돌은 재조회, 한도 초과는 서버 계산값 표시로 처리한다. 상세 오류 코드·상태는 API 계약에 맞춘다.

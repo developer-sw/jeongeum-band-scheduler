@@ -341,7 +341,9 @@ preview는 자원 확보가 아니다. 실제 적용 시 잠금과 충돌 검사
 
 본인 알림 목록은 `{serverTime, notifications, unreadCount, nextBeforeId}`를 반환하고 항목은 `{id, eventType, title, body, targetPath, createdAt, readAt}`다. 다른 수신자의 ID를 지정한 읽음 처리는 404이며 반복 읽음은 기존 시각을 보존한다. 전체 읽음은 `{through: ISOInstant}`의 서버 시각 이하 기준까지 처리해 `{through, readCount, unreadCount}`를 반환한다. 미래 기준 시각을 거절하며 microsecond보다 세밀한 소수점은 아래 방향으로 절삭해 PostgreSQL 반올림으로 다음 알림까지 읽지 않는다. 프론트는 서버 기준 시각의 소수점 정밀도를 보존한다. 내부 이동 대상에서 기존 예약·교환·공지 API의 현재 권한을 다시 검사하며 알림 수신으로 새 편집/승인 권한을 부여하지 않는다.
 
-위 Push 경로는 후속 구현 계획이며 이번 사이트 내 공지·알림함에서 Push·미래 시작 알림 계획이나 실제 단말 수신 완료를 제공하지 않는다. 상세 실행 기록은 [NOTICES_NOTIFICATIONS](NOTICES_NOTIFICATIONS.md)를 따른다.
+위 Push 경로는 2026-10-14 요청된 V10 구현 범위다. 실제 계약·실행 결과·아직 확인하지 않은 단말 수신은 [WEB_PUSH_REMINDERS](WEB_PUSH_REMINDERS.md)에 기록한다. V9 사이트 내 알림함의 기존 실행 기록은 [NOTICES_NOTIFICATIONS](NOTICES_NOTIFICATIONS.md)를 따른다.
+
+Push 공개 키는 `{enabled:boolean,publicKey:string|null}`, 본인 구독 목록은 `{subscriptions:[...]}`다. 구독 항목은 `{id,deviceName,active,currentDevice,bindingVersion,createdAt,updatedAt}`이며 ID·bindingVersion은 문자열이다. endpoint·p256dh·auth·세션 식별자는 응답에 포함하지 않는다. 등록은 `{endpoint,keys:{p256dh,auth},deviceName}`를 받아 항목을 반환하고 해제는 멱등 204다. 서버가 사용자·현재 세션을 정하며 다른 계정 재연결은 binding version 변경과 이전 발송 작업 종료를 함께 수행한다. 2026-10-14 사용자 확정에 따라 로그아웃은 해당 세션 기기만 중단한다.
 
 구독 본문은 브라우저 PushSubscription의 endpoint와 keys를 받는다. 사용자 ID는 서버가 정하고 HTTPS 발송 대상·길이·키 형태를 검증한다. 임의 내부 URL로 서버가 발송하지 않도록 한다.
 

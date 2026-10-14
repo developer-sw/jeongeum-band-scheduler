@@ -1,10 +1,10 @@
 # 시스템 아키텍처
 
-갱신일: 2026-10-12 (Asia/Seoul)
+갱신일: 2026-10-14 (Asia/Seoul)
 
 ## 1. 문서 범위와 상태
 
-이 문서는 jeongeum-band-scheduler의 구현을 위한 설계 기준이다. 초기 구성·인증·명단·계정 연결과 회원·팀·팀장·곡 관리, 예약 기본, 반복 고정 배정·날짜 개방과 단건 예약 변경을 구현했다. 초기 구성은 [INITIAL_SETUP.md](INITIAL_SETUP.md), 인증 설정·검증은 [AUTHENTICATION.md](AUTHENTICATION.md), 명단·팀 단계는 [MEMBER_TEAM_MANAGEMENT.md](MEMBER_TEAM_MANAGEMENT.md), 예약 기본은 [RESERVATION_FOUNDATION.md](RESERVATION_FOUNDATION.md), 반복 배정은 [RECURRING_ASSIGNMENTS.md](RECURRING_ASSIGNMENTS.md), 이번 단건 변경의 격리 검증·사용자 승인 후 개발 DB V6 적용은 [RESERVATION_CHANGES.md](RESERVATION_CHANGES.md)에 기록한다. 교환·공지·Push와 운영 서버·배포는 후속 단계다.
+이 문서는 jeongeum-band-scheduler의 구현을 위한 설계 기준이다. 초기 구성·인증·명단 연결·회원/팀/곡·예약·반복 배정·날짜 개방·변경·교환·악기 고장·공지/알림함을 구현했다. 초기 구성은 [INITIAL_SETUP](INITIAL_SETUP.md), 인증은 [AUTHENTICATION](AUTHENTICATION.md), 명단·팀은 [MEMBER_TEAM_MANAGEMENT](MEMBER_TEAM_MANAGEMENT.md), 예약은 [RESERVATION_FOUNDATION](RESERVATION_FOUNDATION.md), 반복 배정은 [RECURRING_ASSIGNMENTS](RECURRING_ASSIGNMENTS.md), 변경·교환은 [RESERVATION_CHANGES](RESERVATION_CHANGES.md)·[RESERVATION_EXCHANGES](RESERVATION_EXCHANGES.md), 공지/알림함은 [NOTICES_NOTIFICATIONS](NOTICES_NOTIFICATIONS.md)에 기록한다. Web Push·시작 1시간 전 알림·CSRF 동시성 보완은 로컬 전체 검증과 사용자 승인 후 개발 DB V10 적용·최신 서버 기동을 완료했다. 상세 구현·제한은 [WEB_PUSH_REMINDERS](WEB_PUSH_REMINDERS.md)를 따른다. 운영 서버·HTTPS 배포·실기기 Push 수신은 후속 단계다.
 
 운영 정책의 기준 문서는 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md)와 [RESERVATION_RULES.md](RESERVATION_RULES.md)이다. 이 문서의 **확정 정책**은 사용자 결정의 요약이고, **기술 설계안**은 그 정책을 구현하기 위한 구조다. 세부 버전·성능 한도·설정 수치는 구현과 검증을 거쳐 고정한다.
 
@@ -193,7 +193,7 @@ DB migration은 Flyway로 관리하고, 운영에 적용된 파일은 수정하�
 
 구독은 인증된 사용자와 기기를 연결하고 등록·해제 API도 CSRF와 본인 권한으로 검증한다. 구독 endpoint와 키는 다른 회원에게 노출하거나 로그에 출력하지 않는다. 서버는 발송 목적지 URL을 검증하고 임의 내부 주소를 Push endpoint로 호출하지 않는다. 계정 전환 시 이전 계정의 구독으로 새 계정의 알림이 전달되지 않게 한다. Push는 간단한 안내와 내부 경로를 담고, 상세 조회 시 로그인·현재 자원 권한을 다시 확인한다.
 
-**정책 제안:** 공유 기기 보호를 위해 로그아웃한 해당 기기의 구독을 해제한다. 다른 기기의 구독까지 해제하는 것은 별도 동작이다. 로그아웃 후 수신 여부는 사용자 최종 결정이 아직 없어 이 제안을 확정 운영 정책으로 취급하지 않는다.
+**2026-10-14 사용자 확정:** 로그아웃한 해당 기기의 구독을 중단하고 다른 기기의 구독은 유지한다. 현재 세션 기기 binding과 대기 발송 종료·계정 전환 보호의 구현은 [WEB_PUSH_REMINDERS](WEB_PUSH_REMINDERS.md)를 따른다.
 
 Push 권한 거부나 브라우저 제한에도 사이트를 사용하고 알림함을 확인할 수 있다. PWA 설치나 알림 허용을 예약 기능의 필수 전제로 만들지 않는다.
 

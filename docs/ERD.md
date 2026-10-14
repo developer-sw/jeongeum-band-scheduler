@@ -202,7 +202,7 @@ erDiagram
 
 ## 4. 공지·알림 ERD
 
-2026-10-13 V9 구현 범위는 `announcements`, `notice_idempotency_requests`, `notifications`다. 아래 `notification_jobs`·`push_subscriptions`는 후속 계획이다. V1~V8을 수정하거나 기존 예약에 알림을 소급 생성하지 않는다. 실제 개발 DB는 V8을 유지하며 V9 적용 검증은 별도 합성 PostgreSQL에서 수행한다.
+2026-10-13 V9는 `announcements`, `notice_idempotency_requests`, `notifications`를 추가했고 사용자 승인으로 실제 개발 DB에 적용했다. 2026-10-14 V10 구현은 `notification_jobs`·`push_subscriptions`와 `START_REMINDER` 유형을 추가한다. V1~V9 migration을 수정하거나 과거 예약 생성 알림을 소급 생성하지 않는다. 실제 개발 DB는 V9로 보존하며 V10 검증은 합성 PostgreSQL에서 수행한다. 실행·검증 결과는 [WEB_PUSH_REMINDERS](WEB_PUSH_REMINDERS.md)를 따른다.
 
 ```mermaid
 erDiagram
@@ -259,16 +259,25 @@ erDiagram
         bigint id PK
         string job_kind
         bigint notification_id FK
-        bigint push_subscription_id FK
+        bigint subscription_id FK
+        bigint subscription_binding_version
         bigint reservation_id FK
-        bigint expected_reservation_version
-        string logical_lineage_key
+        bigint expected_version
+        bigint_array logical_root_ids
+        string owner_type
+        bigint owner_user_id FK
+        bigint team_id FK
         timestamptz actual_start_at
         string job_key
         string status
         timestamptz scheduled_at
         int attempts
         timestamptz next_attempt_at
+        uuid lease_token
+        timestamptz lease_expires_at
+        string last_error_code
+        timestamptz canceled_at
+        timestamptz sent_at
     }
     push_subscriptions {
         bigint id PK
@@ -276,7 +285,13 @@ erDiagram
         string endpoint
         string p256dh
         string auth
+        string device_name
+        string session_digest
+        bigint binding_version
         boolean active
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deactivated_at
     }
 ```
 
@@ -425,10 +440,10 @@ V9 구현 계약: `announcements.deleted_at`으로 공개 목록·상세에서 �
 - `notifications`: 사용자별 업무 알림, event_key·유형, 논리 operation/교환/공지 참조, 표시 문구, 내부 이동 대상, read_at. `(event_key, user_id)` 중복을 금지한다.
 - `notification_jobs`: job_kind, job_key, 대상·예상 버전, scheduled_at, 처리 상태, 시도 수, lease/처리 시각, next_attempt_at, 오류 분류. 동일 job_key를 중복 생성하지 않는다.
 - `REMINDER_PLAN`은 미래 시작 알림 계획이다. 계획 단계에는 notification_id와 push_subscription_id가 null이다. due 시 현재 예약·버전·시각·수신 자격을 확인한 뒤 알림함 항목과 기기별 PUSH_DELIVERY를 생성한다. 미래의 "곧 시작" 알림을 알림함에 미리 노출하지 않는다.
-- `PUSH_DELIVERY`는 이미 생성한 알림의 구독 하나에 대한 전송이다. notification_id와 push_subscription_id를 모두 사용하며 `(event_key, push_subscription_id)`로 중복을 억제한다. 한 기기의 성공이 다른 기기의 작업을 SENT로 바꾸지 않는다.
+- `PUSH_DELIVERY`는 이미 생성한 알림의 구독 하나에 대한 전송이다. `notification_id`, `subscription_id`, `subscription_binding_version`을 사용한다. 알림의 `(event_key,user_id)` unique와 `push:{notificationId}:{subscriptionId}:{bindingVersion}` unique job_key를 함께 사용한다. 한 기기의 성공이 다른 기기의 작업을 SENT로 바꾸지 않는다.
 - job 상태는 `PENDING/PROCESSING/RETRY_WAIT/COMPLETED/SENT/FAILED/CANCELED`를 제안한다. COMPLETED는 reminder 계획의 업무 이벤트 생성 완료, SENT는 개별 기기 전송 성공이다. 단말 실제 표시 성공까지 의미하지 않는다.
 - 업무 취소·교체에 따른 무효화는 CANCELED와 canceled_at/사유로 표시한다. 만료 lease는 복구하되 CANCELED 작업을 다시 대기 상태로 되살리지 않는다.
-- `push_subscriptions`: 사용자 소유 endpoint, p256dh/auth 발송 키, 활성 여부, 생성·갱신·만료 시각. endpoint 중복을 막고 계정 전환을 처리한다.
+- `push_subscriptions`: 사용자 소유 endpoint, p256dh/auth 발송 키, device_name·session_digest·binding_version, 활성 여부와 생성·갱신·중단 시각. endpoint unique와 binding 변경으로 계정 전환을 처리한다. 세션 digest는 해당 기기의 로그아웃 연결을 찾는 용도이며 실제 세션 ID·키를 응답이나 로그에 노출하지 않는다.
 - 시작 알림의 due는 블록 시작 한 시간 전이다. 지난 시점은 소급 등록하지 않는다. 예약 ID·버전은 현재 배치 검증과 오래된 계획 무효화에 사용하며 단독 중복 식별키로 쓰지 않는다.
 - 기술안: 동일 주체의 논리 계보와 실제 block_start_at을 reminder identity로 사용한다. 계보는 reservation_lineage를 통해 구한 최초 원본 root IDs의 정렬·중복 제거 집합으로 표현하고 job에 logical_lineage_key/root IDs와 actual_start_at을 보존한다.
 - N:M 병합·분할로 root 집합 표현이 바뀌는 경우에도 같은 원본 계보의 같은 시작 알림을 새 ID라는 이유로 재발송하지 않는다. 같은 주체·시작 시각에서 원본 root 집합이 겹치는 기존 계획·발송 이력을 검사하는 안을 권고한다. 집합 hash unique 하나만으로 이 조건을 보장한다고 주장하지 않는다.

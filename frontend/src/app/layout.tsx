@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
 import { QueryProvider } from "@/providers/query-provider";
 import { SessionProvider } from "@/features/auth/session-provider";
+import { PushSessionBoundary } from "@/features/push/session-boundary";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "정음 · JEONGEUM",
   description: "정음 동아리의 합주와 개인 연습을 함께 준비하는 공간.",
   applicationName: "JEONGEUM",
+  appleWebApp: { capable: true, title: "정음", statusBarStyle: "default" },
+  icons: { apple: "/icons/jeongeum-192.png" },
   robots: { index: false, follow: false },
 };
 
@@ -14,7 +17,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="ko">
       <body>
-        <QueryProvider><SessionProvider>{children}</SessionProvider></QueryProvider>
+        <QueryProvider><SessionProvider><PushSessionBoundary />{children}</SessionProvider></QueryProvider>
       </body>
     </html>
   );

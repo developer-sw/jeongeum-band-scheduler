@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import kr.jeongeum.scheduler.notification.api.NotificationResponse;
+import kr.jeongeum.scheduler.push.service.PushOutbox;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -15,7 +16,8 @@ public class NotificationRepository {
             r.getString("title"),r.getString("body"),r.getString("target_path"),r.getTimestamp("created_at").toInstant(),
             r.getTimestamp("read_at")==null?null:r.getTimestamp("read_at").toInstant());
     private final JdbcTemplate jdbc;
-    public NotificationRepository(JdbcTemplate jdbc) { this.jdbc=jdbc; }
+    private final PushOutbox push;
+    public NotificationRepository(JdbcTemplate jdbc,PushOutbox push) { this.jdbc=jdbc; this.push=push; }
     public List<NotificationResponse> list(long owner,Long before,boolean unreadOnly,int limit) {
         return jdbc.query("SELECT * FROM notifications WHERE user_id=? AND (?::bigint IS NULL OR id<?) AND (NOT ? OR read_at IS NULL) ORDER BY id DESC LIMIT ?",
                 ITEM,owner,before,before,unreadOnly,limit);
@@ -43,7 +45,8 @@ public class NotificationRepository {
     }
     public void insert(long user,String key,String type,Long operation,Long reservation,Long exchange,Long notice,
             String title,String body,String path,Instant now) {
-        jdbc.update("INSERT INTO notifications(user_id,event_key,event_type,operation_id,reservation_id,exchange_request_id,announcement_id,title,body,target_path,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(event_key,user_id) DO NOTHING",
-                user,key,type,operation,reservation,exchange,notice,title,body,path,Timestamp.from(now));
+        List<Long> inserted=jdbc.queryForList("INSERT INTO notifications(user_id,event_key,event_type,operation_id,reservation_id,exchange_request_id,announcement_id,title,body,target_path,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(event_key,user_id) DO NOTHING RETURNING id",
+                Long.class,user,key,type,operation,reservation,exchange,notice,title,body,path,Timestamp.from(now));
+        for(long id:inserted) { push.enqueue(id,now); }
     }
 }

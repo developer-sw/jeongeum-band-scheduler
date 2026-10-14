@@ -173,7 +173,7 @@ V6는 빈 테스트 DB에서 전체 Flyway 적용과, 데이터가 있는 V1~V5 
 - 합성 값을 채운 V8→V9에서 기존 모든 테이블·컬럼·Flyway·세션·예약/교환/고장 상태를 보존하고 migration 재실행 0건·validate를 확인한다. 실제 개발 DB에는 V9를 적용하거나 검증용 공지·알림·예약을 만들지 않는다.
 - PC·모바일 공지/알림함과 중요 최초 안내·확인·권한 차단·계정 전환·오래된 항목 이동·응답 유실 동일 키 재확인을 격리 환경에서 검사한다. 실제 Push·시작 알림 worker·실기기·운영 준비 완료로 확장 보고하지 않는다.
 
-아래 worker·Push 항목은 후속 구현의 검증 기준이다. 이번 실제 수행 결과는 [NOTICES_NOTIFICATIONS](NOTICES_NOTIFICATIONS.md)에 별도로 기록한다.
+아래 worker·Push 항목은 2026-10-14 구현의 검증 기준이다. V9 알림함 기록은 [NOTICES_NOTIFICATIONS](NOTICES_NOTIFICATIONS.md), V10·Push·시작 계획·CSRF 동시 초기화의 실제 결과와 실기기 제한은 [WEB_PUSH_REMINDERS](WEB_PUSH_REMINDERS.md)에 별도로 기록한다.
 
 - 논리 예약 생성만 CREATED, 변경은 CHANGED, 교환은 EXCHANGED로 처리한다. 후속 예약 행 생성으로 중복 CREATED가 생기지 않는다.
 - 팀 활성 조원 전체와 개인 본인 수신자를 검사한다. 같은 사용자의 여러 역할은 한 이벤트로 중복 제거한다. 알림 수신자가 승인 권한을 얻지 않는다.

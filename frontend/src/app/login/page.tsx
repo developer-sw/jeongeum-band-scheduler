@@ -6,6 +6,7 @@ import { Suspense, useState } from "react";
 import { AppShell } from "@/components/app-shell";
 import { Field, FormCard, FormError, inputClass, primaryButton } from "@/components/auth-ui";
 import { login } from "@/features/auth/api";
+import { logoutPushCleanupMessage } from "@/features/auth/logout";
 import { normalizeLoginId } from "@/features/auth/validation";
 import { useSession } from "@/features/auth/session-provider";
 import { useTransientAction } from "@/features/auth/use-transient-action";
@@ -13,7 +14,7 @@ import { useEphemeralState } from "@/features/auth/use-ephemeral-state";
 
 function JoinedNotice() {
   const searchParams = useSearchParams();
-  return searchParams.get("joined") === "1" ? <p id="joined" role="status" className="rounded-xl bg-white px-4 py-3 text-sm">가입을 마쳤어요. 본인 계정으로 로그인해 주세요.</p> : null;
+  return <>{searchParams.get("joined") === "1" && <p id="joined" role="status" className="rounded-xl bg-white px-4 py-3 text-sm">가입을 마쳤어요. 본인 계정으로 로그인해 주세요.</p>}<FormError message={searchParams.get("pushCleanup") === "incomplete" ? logoutPushCleanupMessage : null} /></>;
 }
 
 export default function LoginPage() {

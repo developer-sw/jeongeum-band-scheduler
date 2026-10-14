@@ -14,6 +14,7 @@ const serviceLinks = [
   { href: "/exchanges", title: "예약 교환", description: "시작 전 예약의 교환을 요청하고, 받은 요청의 시간·악기를 확인해 승인·거절해요." },
   { href: "/notices", title: "전체 공지", description: "정음의 중요 소식과 전체 안내를 확인해요. 전체 관리자는 공지를 작성·관리할 수 있어요." },
   { href: "/notifications", title: "내 알림함", description: "내 계정이 받은 공지·예약·교환 알림과 읽음 상태를 확인해요." },
+  { href: "/notifications/settings", title: "기기 알림·홈 화면 설치", description: "이 기기의 Push를 켜고, 기기별 알림 설정과 휴대폰 설치 방법을 확인해요." },
   { href: "/account", title: "내 계정·로그아웃", description: "계정 정보와 소속 공연조를 확인하고 로그아웃해요." },
 ];
 
@@ -24,7 +25,7 @@ const managementLinks = [
   { href: "/admin/invitations", title: "개인 초대 관리", description: "회원 한 명씩 사용할 수 있는 가입 초대를 발급해요." },
 ];
 
-const plannedFeatures = ["예약 시작 1시간 전 알림", "Web Push 알림", "PWA 설치", "탈퇴·팀 해체 예약 정리"];
+const plannedFeatures = ["탈퇴·팀 해체 예약 정리"];
 
 function MenuLink({ href, title, description }: { href: string; title: string; description: string }) {
   return <li><Link href={href} className="more-link"><span><span className="block font-bold break-words">{title}</span><span className="mt-1 block text-sm leading-6 text-navy-soft">{description}</span></span><span aria-hidden="true" className="shrink-0 text-lg">→</span></Link></li>;
