@@ -363,7 +363,8 @@ class PushIntegrationTest {
                 statement.execute("INSERT INTO notifications(user_id,event_key,event_type,title,body,target_path,created_at) VALUES (1,'synthetic:old','IMPORTANT_NOTICE','합성 제목','보존 본문','/notifications',now())");
             }
             Map<String,String> before=snapshots(connection,schema);
-            Flyway.configure().dataSource(POSTGRES.getJdbcUrl(),POSTGRES.getUsername(),POSTGRES.getPassword()).schemas(schema).defaultSchema(schema).load().migrate();
+            // This historical preservation contract is specifically V9 -> V10; later upgrades have separate fixtures.
+            Flyway.configure().dataSource(POSTGRES.getJdbcUrl(),POSTGRES.getUsername(),POSTGRES.getPassword()).schemas(schema).defaultSchema(schema).target("10").load().migrate();
             Map<String,String> after=snapshots(connection,schema); for (String table:before.keySet()) { assertEquals(before.get(table),after.get(table),table); }
             assertEquals("[]",after.get("push_subscriptions")); assertEquals("[]",after.get("notification_jobs")); assertEquals(before.size()+2,after.size());
         }

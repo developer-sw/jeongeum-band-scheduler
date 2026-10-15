@@ -229,9 +229,18 @@ public class ExchangeService {
     public void refreshPending() { writes.executeWithoutResult(status -> { guard.lock();refreshPendingUnderGuard(); }); }
     /** Directory mutations already hold the guard and invoke this inside their transaction. */
     public void refreshPendingUnderGuard() {
-        Instant now=now();for (long id:exchanges.pendingIds()) { refresh(exchanges.lock(id).orElseThrow(DirectoryInputs::notFound),now); }
+        refreshPendingUnderGuard(exchanges.pendingIds(),List.of());
+    }
+    /** Lifecycle closure limits reconciliation to its affected requests, preserving unrelated pending work. */
+    public void refreshPendingUnderGuard(List<Long> ids,List<Long> capturedRecipients) {
+        Instant now=now();for (long id:new TreeSet<>(ids)) {
+            refresh(exchanges.lock(id).orElseThrow(DirectoryInputs::notFound),now,capturedRecipients);
+        }
     }
     private ExchangeRequest refresh(ExchangeRequest request,Instant now) {
+        return refresh(request,now,List.of());
+    }
+    private ExchangeRequest refresh(ExchangeRequest request,Instant now,List<Long> capturedRecipients) {
         if (!request.pending()) { return request; }
         Groups groups=groups(request.id());String reason=null;
         for (ExchangeRepository.Item item:exchanges.items(request.id())) {
@@ -250,7 +259,7 @@ public class ExchangeService {
         }
         if (reason!=null) {
             exchanges.terminal(request.id(),"INVALIDATED",null,now,reason);
-            notifications.publish(exchanges.find(request.id()).orElseThrow(),"EXCHANGE_INVALIDATED",List.of(),now);
+            notifications.publish(exchanges.find(request.id()).orElseThrow(),"EXCHANGE_INVALIDATED",List.of(),now,capturedRecipients);
         } else if (!now.isBefore(request.expiresAt())) {
             exchanges.terminal(request.id(),"EXPIRED",null,now,"EARLIEST_START_REACHED");
             notifications.publish(exchanges.find(request.id()).orElseThrow(),"EXCHANGE_EXPIRED",List.of(),now);

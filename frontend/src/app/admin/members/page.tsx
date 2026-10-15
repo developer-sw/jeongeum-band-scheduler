@@ -12,6 +12,12 @@ import { createRosterEntry, linkAccount, updateGlobalRole, updateRosterEntry } f
 import { membersQuery, refreshDirectory, rosterQuery } from "@/features/directory/queries";
 import type { AdminMember, RosterEntry } from "@/features/directory/types";
 import { nameError } from "@/features/directory/validation";
+import { LifecycleConfirmation, lifecycleResultMessage } from "@/features/lifecycle/confirmation";
+import { lifecycleErrorMessage } from "@/features/lifecycle/errors";
+import { lifecycleIntent, lifecycleTargetChanged, withdrawalBlock } from "@/features/lifecycle/input";
+import { refreshLifecycle } from "@/features/lifecycle/queries";
+import { finishSelfWithdrawal } from "@/features/lifecycle/self-withdrawal";
+import { useLifecycleAction } from "@/features/lifecycle/use-lifecycle-action";
 
 function RosterCard({ entry, accounts, pending, onRename, onLink }: { entry: RosterEntry; accounts: AdminMember[]; pending: boolean; onRename: (name: string) => void; onLink: (account: AdminMember) => void }) {
   const [editing, setEditing] = useState(false);
@@ -27,14 +33,33 @@ function RosterCard({ entry, accounts, pending, onRename, onLink }: { entry: Ros
 }
 
 function MemberManager() {
-  const { member } = useSession();
-  const client = useQueryClient(); const action = useTransientAction();
+  const { member, replace } = useSession();
+  const client = useQueryClient(); const action = useTransientAction(); const lifecycle = useLifecycleAction();
   const roster = useQuery(rosterQuery(member!.id)); const accounts = useQuery(membersQuery(member!.id));
   const [name, setName] = useState(""); const [validation, setValidation] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [linkTarget, setLinkTarget] = useState<{ entry: RosterEntry; account: AdminMember } | null>(null);
   const [roleTarget, setRoleTarget] = useState<AdminMember | null>(null);
+  const [withdrawTarget, setWithdrawTarget] = useState<AdminMember | null>(null);
+  const busy = action.pending || withdrawTarget !== null;
   const unlinkedAccounts = (accounts.data ?? []).filter((account) => !account.rosterEntryId && account.status === "ACTIVE");
+
+  const target = withdrawTarget ? { kind: "WITHDRAW" as const, id: withdrawTarget.id, name: `${withdrawTarget.displayName} · ${withdrawTarget.loginId}`, version: withdrawTarget.version } : null;
+  const currentTarget = accounts.data?.find((account) => account.id === withdrawTarget?.id);
+  const targetAllowed = !accounts.error && Boolean(currentTarget && !withdrawalBlock(currentTarget, accounts.data ?? []));
+  async function withdraw(reason = "", retry = false) {
+    if (!target) return;
+    const result = retry ? await lifecycle.retry() : await lifecycle.run(lifecycleIntent(target, reason));
+    if (result) {
+      setWithdrawTarget(null);
+      if (target.id === member!.id) {
+        void finishSelfWithdrawal(() => replace(null), () => window.location.replace("/login"));
+        return;
+      }
+      setNotice(lifecycleResultMessage(result));
+    }
+    await refreshLifecycle(client);
+  }
 
   async function change(task: (signal: AbortSignal) => Promise<unknown>, message: string) {
     setValidation(null); setNotice(null);
@@ -63,13 +88,26 @@ function MemberManager() {
   }
 
   return <div className="space-y-7">
-    <section><p className="text-sm font-semibold text-navy-soft">전체 관리자</p><h1 className="mt-2 text-3xl font-extrabold">회원·가입 전 명단 관리</h1><p className="mt-3 text-sm leading-7 text-navy-soft">먼저 명단을 등록하고 팀에 배정하세요. 명단 번호에 연결된 개인 초대로 가입하면 같은 사람이 여러 팀에 속해도 하나의 계정을 사용해요.</p><div className="mt-4 flex flex-wrap gap-3"><Link href="/admin/invitations" className={secondaryButton}>명단별 초대 발급</Link><Link href="/teams" className={secondaryButton}>팀 구성 관리</Link><button type="button" className={secondaryButton} disabled={action.pending} onClick={() => void refreshDirectory(client)}>목록 새로 불러오기</button></div></section>
-    <form onSubmit={(event) => void create(event)} method="post" className="space-y-4 rounded-3xl bg-paper p-6 sm:p-8" aria-busy={action.pending}><h2 className="text-xl font-bold">가입 전 명단 등록</h2><Field id="new-roster-name" label="이름" hint="동명이인도 각각 등록할 수 있어요. 연결과 팀 배정은 명단 번호로 구분해요."><input id="new-roster-name" className={inputClass} value={name} onChange={(event) => setName(event.target.value)} required disabled={action.pending} autoComplete="off" aria-describedby="new-roster-name-hint" /></Field><button type="submit" className={primaryButton} disabled={action.pending}>{action.pending ? "처리하는 중…" : "명단 등록"}</button></form>
+    <section><p className="text-sm font-semibold text-navy-soft">전체 관리자</p><h1 className="mt-2 text-3xl font-extrabold">회원·가입 전 명단 관리</h1><p className="mt-3 text-sm leading-7 text-navy-soft">먼저 명단을 등록하고 팀에 배정하세요. 명단 번호에 연결된 개인 초대로 가입하면 같은 사람이 여러 팀에 속해도 하나의 계정을 사용해요.</p><div className="mt-4 flex flex-wrap gap-3"><Link href="/admin/invitations" className={secondaryButton}>명단별 초대 발급</Link><Link href="/teams" className={secondaryButton}>팀 구성 관리</Link><button type="button" className={secondaryButton} disabled={busy} onClick={() => void refreshDirectory(client)}>목록 새로 불러오기</button></div></section>
+    <form onSubmit={(event) => void create(event)} method="post" className="space-y-4 rounded-3xl bg-paper p-6 sm:p-8" aria-busy={busy}><h2 className="text-xl font-bold">가입 전 명단 등록</h2><Field id="new-roster-name" label="이름" hint="동명이인도 각각 등록할 수 있어요. 연결과 팀 배정은 명단 번호로 구분해요."><input id="new-roster-name" className={inputClass} value={name} onChange={(event) => setName(event.target.value)} required disabled={busy} autoComplete="off" aria-describedby="new-roster-name-hint" /></Field><button type="submit" className={primaryButton} disabled={busy}>{busy ? "처리하는 중…" : "명단 등록"}</button></form>
     <FormError message={validation ?? action.error} />{notice && <p role="status" className="rounded-xl bg-paper p-4 text-sm leading-7">{notice}</p>}
-    {linkTarget && <Confirmation title={`${linkTarget.entry.name} 명단 #${linkTarget.entry.id}에 이 계정을 연결할까요?`} description={`${linkTarget.account.displayName} · ${linkTarget.account.loginId} (계정 #${linkTarget.account.id}). 미리 배정한 팀·팀장 역할이 이 계정에 연결되며 해당 명단의 미사용 초대는 해지돼요. 본인 계정인지 확인해 주세요.`} pending={action.pending} onConfirm={() => void confirmLink()} onCancel={() => setLinkTarget(null)} confirmLabel="계정 연결" />}
-    {roleTarget && <Confirmation title={`${roleTarget.displayName}님의 전체 관리자 권한을 ${roleTarget.globalRole === "GLOBAL_ADMIN" ? "해제" : "부여"}할까요?`} description={`${roleTarget.loginId} (계정 #${roleTarget.id}, 현재 버전 ${roleTarget.version}). 전체 관리자는 모든 회원·팀 구성과 초대를 관리할 수 있어요. 마지막 활성 전체 관리자의 권한은 해제할 수 없어요.`} pending={action.pending} onConfirm={() => void confirmRole()} onCancel={() => setRoleTarget(null)} confirmLabel="권한 변경" />}
-    <section aria-labelledby="roster-title" className={panelClass}><h2 id="roster-title" className="text-xl font-bold">명단</h2><QueryState pending={roster.isPending || accounts.isPending} error={roster.error ?? accounts.error} retry={() => void refreshDirectory(client)} />{!roster.isPending && !accounts.isPending && !roster.error && !accounts.error && (roster.data?.length ? <ul className="mt-5 grid gap-4 lg:grid-cols-2">{roster.data.map((entry) => <RosterCard key={`${entry.id}:${entry.version}`} entry={entry} accounts={unlinkedAccounts} pending={action.pending} onRename={(value) => void rename(entry, value)} onLink={(account) => { setRoleTarget(null); setLinkTarget({ entry, account }); }} />)}</ul> : <p className="mt-4 text-sm text-navy-soft">등록된 명단이 없어요.</p>)}</section>
-    <section aria-labelledby="accounts-title" className={panelClass}><h2 id="accounts-title" className="text-xl font-bold">가입 계정·전체 관리자 권한</h2><QueryState pending={accounts.isPending} error={accounts.error} retry={() => void accounts.refetch()} />{!accounts.error && accounts.data && <ul className="mt-5 space-y-3">{accounts.data.map((account) => <li key={account.id} className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-paper p-5"><div className="min-w-0"><h3 className="font-bold break-words">{account.displayName}</h3><p className="mt-1 text-sm break-words">{account.loginId} · 계정 #{account.id}</p><p className="mt-2 text-xs leading-6 text-navy-soft">{account.globalRole === "GLOBAL_ADMIN" ? "전체 관리자" : "일반 회원"} · {account.status === "ACTIVE" ? "활성" : "비활성"} · {account.rosterEntryId ? `명단 #${account.rosterEntryId} 연결` : "명단 연결 전"}</p></div><button type="button" className={secondaryButton} disabled={action.pending || account.status !== "ACTIVE"} onClick={() => { setLinkTarget(null); setRoleTarget(account); }}>{account.globalRole === "GLOBAL_ADMIN" ? "관리자 권한 해제" : "관리자 권한 부여"}</button></li>)}</ul>}</section>
+    {linkTarget && <Confirmation title={`${linkTarget.entry.name} 명단 #${linkTarget.entry.id}에 이 계정을 연결할까요?`} description={`${linkTarget.account.displayName} · ${linkTarget.account.loginId} (계정 #${linkTarget.account.id}). 미리 배정한 팀·팀장 역할이 이 계정에 연결되며 해당 명단의 미사용 초대는 해지돼요. 본인 계정인지 확인해 주세요.`} pending={busy} onConfirm={() => void confirmLink()} onCancel={() => setLinkTarget(null)} confirmLabel="계정 연결" />}
+    {roleTarget && <Confirmation title={`${roleTarget.displayName}님의 전체 관리자 권한을 ${roleTarget.globalRole === "GLOBAL_ADMIN" ? "해제" : "부여"}할까요?`} description={`${roleTarget.loginId} (계정 #${roleTarget.id}, 현재 버전 ${roleTarget.version}). 전체 관리자는 모든 회원·팀 구성과 초대를 관리할 수 있어요. 마지막 활성 전체 관리자의 권한은 해제할 수 없어요.`} pending={busy} onConfirm={() => void confirmRole()} onCancel={() => setRoleTarget(null)} confirmLabel="권한 변경" />}
+    <section aria-labelledby="roster-title" className={panelClass}><h2 id="roster-title" className="text-xl font-bold">명단</h2><QueryState pending={roster.isPending || accounts.isPending} error={roster.error ?? accounts.error} retry={() => void refreshDirectory(client)} />{!roster.isPending && !accounts.isPending && !roster.error && !accounts.error && (roster.data?.length ? <ul className="mt-5 grid gap-4 lg:grid-cols-2">{roster.data.map((entry) => <RosterCard key={`${entry.id}:${entry.version}`} entry={entry} accounts={unlinkedAccounts} pending={busy} onRename={(value) => void rename(entry, value)} onLink={(account) => { setRoleTarget(null); setLinkTarget({ entry, account }); }} />)}</ul> : <p className="mt-4 text-sm text-navy-soft">등록된 명단이 없어요.</p>)}</section>
+    <section aria-labelledby="accounts-title" className={panelClass}>
+      <h2 id="accounts-title" className="text-xl font-bold">가입 계정·전체 관리자 권한</h2>
+      <p className="mt-3 text-sm leading-7 text-navy-soft">탈퇴는 개인 예약과 계정 접근을 정리해요. 존속 팀의 예약과 완료 이력은 유지하며, 팀장 후임은 관리자가 직접 지정해 주세요.</p>
+      <QueryState pending={accounts.isPending} error={accounts.error} retry={() => void accounts.refetch()} />
+      {!accounts.error && accounts.data && <ul className="mt-5 space-y-3">{accounts.data.map((account) => {
+        const block = withdrawalBlock(account, accounts.data);
+        return <li key={account.id} className="flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-paper p-5">
+          <div className="min-w-0"><h3 className="font-bold break-words">{account.displayName}</h3><p className="mt-1 text-sm break-words">{account.loginId} · 계정 #{account.id}</p><p className="mt-2 text-xs leading-6 text-navy-soft">{account.globalRole === "GLOBAL_ADMIN" ? "전체 관리자" : "일반 회원"} · {account.status === "ACTIVE" ? "활성" : account.status === "WITHDRAWN" ? "탈퇴" : "비활성"} · {account.rosterEntryId ? `명단 #${account.rosterEntryId} 연결` : "명단 연결 전"}</p>{block && <p id={`withdraw-block-${account.id}`} className="mt-2 text-xs leading-6 text-navy-soft">{block}</p>}</div>
+          <div className="flex flex-wrap gap-2"><button type="button" className={secondaryButton} disabled={busy || account.status !== "ACTIVE"} onClick={() => { setLinkTarget(null); setRoleTarget(account); }}>{account.globalRole === "GLOBAL_ADMIN" ? "관리자 권한 해제" : "관리자 권한 부여"}</button>
+            <button type="button" className={secondaryButton} disabled={busy || Boolean(block)} aria-describedby={block ? `withdraw-block-${account.id}` : undefined} onClick={() => { setLinkTarget(null); setRoleTarget(null); setNotice(null); lifecycle.clearFailure(); setWithdrawTarget(account); }}>탈퇴 처리</button></div>
+        </li>;
+      })}</ul>}
+    </section>
+    {target && <LifecycleConfirmation target={target} self={target.id === member!.id} stale={lifecycleTargetChanged(target, currentTarget?.version, targetAllowed)} pending={lifecycle.pending} uncertain={lifecycle.uncertain} error={lifecycle.failure ? lifecycleErrorMessage(lifecycle.failure) : null} onConfirm={(reason) => void withdraw(reason)} onRetry={() => void withdraw("", true)} onCancel={() => { setWithdrawTarget(null); lifecycle.clearFailure(); }} />}
   </div>;
 }
 

@@ -26,10 +26,12 @@ public class TeamService {
     private final MemberAccess access;
     private final Clock clock;
     private final kr.jeongeum.scheduler.exchange.service.ExchangeService exchanges;
+    private final kr.jeongeum.scheduler.member.repository.MemberRepository members;
     public TeamService(TeamRepository teams, TeamSongRepository songs, RosterRepository roster,
-            DirectoryMutationGuard guard, MemberAccess access, Clock clock, kr.jeongeum.scheduler.exchange.service.ExchangeService exchanges) {
+            DirectoryMutationGuard guard, MemberAccess access, Clock clock, kr.jeongeum.scheduler.exchange.service.ExchangeService exchanges,
+            kr.jeongeum.scheduler.member.repository.MemberRepository members) {
         this.teams = teams; this.songs = songs; this.roster = roster;
-        this.guard = guard; this.access = access; this.clock = clock; this.exchanges = exchanges;
+        this.guard = guard; this.access = access; this.clock = clock; this.exchanges = exchanges; this.members = members;
     }
     @Transactional(readOnly = true)
     public List<TeamResponse> list(long actorId) {
@@ -39,7 +41,9 @@ public class TeamService {
     @Transactional(readOnly = true)
     public TeamDetailResponse detail(long actorId, long id) {
         Member actor = access.active(actorId);
-        return response(actor, activeTeam(teams.findById(id).orElseThrow(DirectoryInputs::notFound)));
+        Team team=teams.findById(id).orElseThrow(DirectoryInputs::notFound);
+        if (!actor.globalAdmin()) { activeTeam(team); }
+        return response(actor,team);
     }
     @Transactional
     public TeamResponse create(long actorId, String name, String kind) {
@@ -61,7 +65,10 @@ public class TeamService {
     public TeamDetailResponse addMember(long actorId, long id, long rosterId) {
         guard.lock(); Member actor = access.administratorForMutation(actorId);
         lockActiveTeam(id);
-        roster.lockById(rosterId).orElseThrow(DirectoryInputs::notFound);
+        var entry=roster.lockById(rosterId).orElseThrow(DirectoryInputs::notFound);
+        if (entry.userId()!=null && !members.findById(entry.userId()).orElseThrow(DirectoryInputs::notFound).active()) {
+            throw new ApiException(409,"INACTIVE_USER","현재 이용할 수 없는 계정은 팀에 추가할 수 없습니다.");
+        }
         if (teams.membershipExists(id, rosterId)) {
             throw new ApiException(409, "MEMBERSHIP_ALREADY_EXISTS", "이미 이 팀에 등록된 사람입니다.");
         }
@@ -97,6 +104,6 @@ public class TeamService {
         boolean canViewMembers = actor.globalAdmin() || role != null;
         return new TeamDetailResponse(TeamResponse.from(team), canViewMembers ? teams.members(team.id()) : List.of(),
                 songs.list(team.id()).stream().map(TeamSongResponse::from).toList(), canViewMembers,
-                actor.globalAdmin(), actor.globalAdmin() || "LEADER".equals(role));
+                team.active() && actor.globalAdmin(), team.active() && (actor.globalAdmin() || "LEADER".equals(role)));
     }
 }

@@ -9,6 +9,7 @@ import java.util.List;
 import kr.jeongeum.scheduler.auth.api.AuthRequests;
 import kr.jeongeum.scheduler.auth.security.MemberPrincipal;
 import kr.jeongeum.scheduler.auth.service.LoginService;
+import kr.jeongeum.scheduler.auth.service.LoginSessionService;
 import kr.jeongeum.scheduler.auth.service.RegistrationService;
 import kr.jeongeum.scheduler.common.api.ApiResponse;
 import kr.jeongeum.scheduler.invitation.service.InvitationService;
@@ -39,6 +40,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Profile("!bootstrap-admin")
 public class AuthenticationController {
     private final LoginService login;
+    private final LoginSessionService loginSessions;
     private final RegistrationService registration;
     private final InvitationService invitations;
     private final SecurityContextRepository contexts;
@@ -53,8 +55,10 @@ public class AuthenticationController {
             InvitationService invitations, SecurityContextRepository contexts,
             SessionAuthenticationStrategy sessionAuthentication, CsrfTokenRepository csrfTokens,
             Clock clock, MemberService memberService,
-            @Value("${spring.session.timeout}") Duration sessionTimeout, PushSubscriptionService pushSubscriptions) {
+            @Value("${spring.session.timeout}") Duration sessionTimeout, PushSubscriptionService pushSubscriptions,
+            LoginSessionService loginSessions) {
         this.login = login;
+        this.loginSessions = loginSessions;
         this.registration = registration;
         this.invitations = invitations;
         this.contexts = contexts;
@@ -70,18 +74,21 @@ public class AuthenticationController {
     public ResponseEntity<ApiResponse<MemberResponse>> login(@RequestBody AuthRequests.Login input,
             HttpServletRequest request, HttpServletResponse response) {
         Member member = login.login(input.loginId(), input.password());
-        var authentication = UsernamePasswordAuthenticationToken.authenticated(
-                new MemberPrincipal(member.id()), null, List.of());
-        // The controller performs the strategies and explicit save that form-login normally owns.
-        sessionAuthentication.onAuthentication(authentication, request, response);
-        var context = SecurityContextHolder.createEmptyContext();
-        context.setAuthentication(authentication);
-        SecurityContextHolder.setContext(context);
-        contexts.saveContext(context, request, response);
-        // A pre-login CSRF session may still have the old inactivity limit.
-        request.getSession().setMaxInactiveInterval(sessionTimeoutSeconds);
+        MemberResponse authenticatedMember=loginSessions.complete(member.id(),() -> {
+            var authentication = UsernamePasswordAuthenticationToken.authenticated(
+                    new MemberPrincipal(member.id()), null, List.of());
+            // The controller performs the strategies and explicit save that form-login normally owns.
+            sessionAuthentication.onAuthentication(authentication, request, response);
+            var context = SecurityContextHolder.createEmptyContext();
+            context.setAuthentication(authentication);
+            SecurityContextHolder.setContext(context);
+            contexts.saveContext(context, request, response);
+            // A pre-login CSRF session may still have the old inactivity limit.
+            request.getSession().setMaxInactiveInterval(sessionTimeoutSeconds);
+            return memberService.current(member.id());
+        });
         return ResponseEntity.ok().cacheControl(CacheControl.noStore())
-                .body(ApiResponse.of(memberService.current(member.id()), clock));
+                .body(ApiResponse.of(authenticatedMember, clock));
     }
 
     @PostMapping("/api/v1/auth/register")

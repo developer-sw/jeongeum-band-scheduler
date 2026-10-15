@@ -30,15 +30,24 @@ public class ExchangeNotificationTransitions {
 
     /** Only IDs captured while PENDING may be passed; unchanged and completing requests are ignored. */
     public void invalidated(List<Long> previouslyPendingIds, Instant now) {
+        invalidated(previouslyPendingIds,now,List.of());
+    }
+    public void invalidated(List<Long> previouslyPendingIds, Instant now, List<Long> capturedRecipients) {
         for (long id : previouslyPendingIds) {
             ExchangeRequest request = exchanges.find(id).orElseThrow();
-            if ("INVALIDATED".equals(request.status())) { publish(request, "EXCHANGE_INVALIDATED", List.of(), now); }
+            if ("INVALIDATED".equals(request.status())) {
+                publish(request,"EXCHANGE_INVALIDATED",List.of(),now,capturedRecipients);
+            }
         }
     }
 
     public void publish(ExchangeRequest request, String eventType, List<Reservation> results, Instant now) {
+        publish(request,eventType,results,now,List.of());
+    }
+    public void publish(ExchangeRequest request, String eventType, List<Reservation> results, Instant now,
+            List<Long> capturedRecipients) {
         List<Reservation> sources = exchanges.items(request.id()).stream()
                 .map(item -> reservations.find(item.reservationId()).orElseThrow()).toList();
-        notifications.exchangeEvent(request.id(), eventType, sources, results, request.requesterUserId(), now);
+        notifications.exchangeEvent(request.id(),eventType,sources,results,request.requesterUserId(),now,capturedRecipients);
     }
 }

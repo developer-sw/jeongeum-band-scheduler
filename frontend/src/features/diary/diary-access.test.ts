@@ -149,17 +149,23 @@ describe("diary routes preserve session, membership and role boundaries", () => 
     expect(render(adminClient, Home)).toContain("역할: 전체 관리자");
   });
 
-  it("keeps unimplemented functions explicitly disabled without fake routes or notification counts", () => {
+  it("links implemented lifecycle management for admins while keeping service navigation available to members", () => {
     const ordinary = render(seededClient(member), MorePage, "/more");
     const admin = render(seededClient({ ...member, globalRole: "GLOBAL_ADMIN" }), MorePage, "/more");
-    for (const [markup, count] of [[ordinary, 1], [admin, 1]] as const) {
-      const buttons = markup.match(/<button[^>]*class="planned-feature"[^>]*>[\s\S]*?<\/button>/g) ?? [];
-      expect(buttons).toHaveLength(count);
-      for (const button of buttons) { expect(button).toContain('disabled=""'); expect(button).toContain("준비 중"); }
+    for (const markup of [ordinary, admin]) {
+      expect(markup).not.toContain('class="planned-feature"');
+      expect(markup).not.toContain('id="planned-menu-title"');
+      expect(markup).not.toContain("탈퇴·팀 해체 예약 정리");
       for (const route of ["/announcements", "/pwa"]) expect(markup).not.toContain(`href="${route}"`);
       for (const route of ["/notices", "/notifications", "/notifications/settings"]) expect(markup).toContain(`href="${route}"`);
       expect(markup).toContain('href="/exchanges"');
     }
+    expect(admin).toContain('href="/admin/members"');
+    expect(admin).toContain("전체 관리자 역할과 회원 탈퇴를 관리해요");
+    expect(admin).toContain("팀 해체는 공연조 상세 화면에서 처리할 수 있어요");
+    expect(ordinary).not.toContain('href="/admin/members"');
+    expect(ordinary).not.toContain("회원 탈퇴를 관리해요");
+    expect(ordinary).not.toContain("팀 해체는 공연조 상세 화면");
     expect(ordinary).not.toContain("악기 고장 등록·복구");
     expect(admin).toContain('href="/admin/instrument-faults"');
     expect(ordinary).toContain("예약 조회·변경·취소·이력");

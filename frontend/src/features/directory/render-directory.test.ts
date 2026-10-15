@@ -49,6 +49,27 @@ describe("directory views enforce current permissions and privacy", () => {
     expect(markup).not.toContain('id="new-song-title"');
   });
 
+  it("offers only active linked accounts and unlinked roster entries when adding team members", () => {
+    const admin = { ...member, globalRole: "GLOBAL_ADMIN" } as Member;
+    const markup = render(createElement(TeamDetailView, { detail: { ...detail, canManageTeam: true } }), admin, (client) => {
+      client.setQueryData(rosterQuery(admin.id).queryKey, [
+        { id: "31", name: "현재 팀원", userId: "21", loginId: "fixture.existing", displayName: "현재 팀원", accountStatus: "ACTIVE", version: 0 },
+        { id: "32", name: "활성 가입 회원", userId: "22", loginId: "fixture.active", displayName: "활성 가입 회원", accountStatus: "ACTIVE", version: 0 },
+        { id: "33", name: "가입 전 명단", userId: null, loginId: null, displayName: null, accountStatus: null, version: 0 },
+        { id: "34", name: "탈퇴한 회원", userId: "24", loginId: "fixture.withdrawn", displayName: "탈퇴한 회원", accountStatus: "WITHDRAWN", version: 1 },
+        { id: "35", name: "비활성 회원", userId: "25", loginId: "fixture.inactive", displayName: "비활성 회원", accountStatus: "INACTIVE", version: 1 },
+      ]);
+    });
+    const select = markup.match(/<select id="add-team-roster"[\s\S]*?<\/select>/)?.[0];
+    expect(select).toBeDefined();
+    expect(select).toContain('<option value="32">활성 가입 회원');
+    expect(select).toContain('<option value="33">가입 전 명단');
+    expect(select).not.toContain('<option value="31">');
+    expect(select).not.toContain("탈퇴한 회원");
+    expect(select).not.toContain("비활성 회원");
+    expect(markup).toContain("가상 팀원 정보");
+  });
+
   it("does not transfer a leader's song-edit authority to a different team", () => {
     const own = render(createElement(TeamDetailView, { detail: { ...detail, canManageSongs: true } }), member);
     const other = render(createElement(TeamDetailView, { detail: { ...detail, team: { ...detail.team, id: "11", name: "가상 B조" } } }), member);
@@ -56,6 +77,17 @@ describe("directory views enforce current permissions and privacy", () => {
     expect(other).not.toContain('id="new-song-title"'); expect(other).not.toContain("곡 수정</button>");
     expect(own).toContain("&lt;script&gt;unsafe title&lt;/script&gt;"); expect(own).not.toContain("<script>unsafe title");
     expect(own).toContain("&lt;img onerror=unsafe&gt;");
+  });
+
+  it("explains that a disbanded team's preserved songs are read-only, including to administrators", () => {
+    const admin = { ...member, globalRole: "GLOBAL_ADMIN" } as Member;
+    const markup = render(createElement(TeamDetailView, { detail: { ...detail, team: { ...detail.team, status: "DISBANDED" }, canManageSongs: true } }), admin);
+    expect(markup).toContain("해체된 팀의 곡 목록은 조회만 할 수 있어요.");
+    expect(markup).not.toContain("곡 등록·수정·삭제는 전체 관리자와");
+    expect(markup).not.toContain('id="new-song-title"');
+    expect(markup).not.toContain("곡 수정</button>");
+    expect(markup).not.toContain("곡 삭제</button>");
+    expect(markup).toContain("&lt;script&gt;unsafe title&lt;/script&gt;");
   });
 
   it("renders multiple regular memberships separately without administrator creation controls", () => {
