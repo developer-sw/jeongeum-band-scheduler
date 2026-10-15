@@ -21,7 +21,8 @@ function TeamAdministration({ detail, blocked }: { detail: TeamDetail; blocked: 
   const [validation, setValidation] = useState<string | null>(null); const [notice, setNotice] = useState<string | null>(null);
   const [removal, setRemoval] = useState<TeamMember | null>(null);
   const [leader, setLeader] = useState<{ rosterEntryId: string | null; name: string } | null>(null);
-  const available = (roster.data ?? []).filter((entry) => !detail.members.some((membership) => membership.rosterEntryId === entry.id));
+  const available = (roster.data ?? []).filter((entry) => (!entry.userId || entry.accountStatus === "ACTIVE")
+    && !detail.members.some((membership) => membership.rosterEntryId === entry.id));
   async function change(task: (signal: AbortSignal) => Promise<unknown>, message: string) {
     setValidation(null); setNotice(null);
     const done = await action.run(async (signal) => { await task(signal); return true; });
@@ -104,7 +105,7 @@ export function TeamDetailView({ detail, readError = false, lifecycle }: {
   return <div className="space-y-7"><section><p className="text-sm font-semibold text-navy-soft">{teamKindLabel(detail.team.kind)}</p><h1 className="mt-2 text-3xl font-extrabold break-words">{detail.team.name}</h1></section>
     <section className={panelClass} aria-labelledby="team-members-title"><h2 id="team-members-title" className="text-xl font-bold">팀원</h2>{detail.canViewMembers ? (detail.members.length ? <ul className="mt-5 grid gap-3 sm:grid-cols-2">{detail.members.map((item) => <li key={item.rosterEntryId} className="rounded-2xl bg-paper p-4"><span className="font-semibold break-words">{item.name}</span><p className="mt-2 text-xs text-navy-soft">{item.role === "LEADER" ? "팀장" : "팀원"} · {item.userId ? "계정 연결됨" : "가입 전"}</p></li>)}</ul> : <p className="mt-4 text-sm text-navy-soft">아직 등록된 팀원이 없어요.</p>) : <p className="mt-4 text-sm leading-7 text-navy-soft">팀원 정보는 해당 팀 소속 회원과 전체 관리자만 볼 수 있어요.</p>}</section>
     {detail.canManageTeam && detail.team.status === "ACTIVE" && <TeamAdministration key={`${detail.team.id}:${detail.team.version}`} detail={detail} blocked={blocked} />}
-    <section className={panelClass} aria-labelledby="team-songs-title"><h2 id="team-songs-title" className="text-xl font-bold">팀별 곡 목록</h2>{detail.canManageSongs && detail.team.status === "ACTIVE" ? <SongManager detail={detail} blocked={blocked} /> : <><p className="mt-3 text-sm leading-7 text-navy-soft">곡 등록·수정·삭제는 전체 관리자와 이 팀의 팀장이 처리해요.</p><SongList songs={detail.songs} /></>}</section>
+    <section className={panelClass} aria-labelledby="team-songs-title"><h2 id="team-songs-title" className="text-xl font-bold">팀별 곡 목록</h2>{detail.canManageSongs && detail.team.status === "ACTIVE" ? <SongManager detail={detail} blocked={blocked} /> : <><p className="mt-3 text-sm leading-7 text-navy-soft">{detail.team.status === "DISBANDED" ? "해체된 팀의 곡 목록은 조회만 할 수 있어요." : "곡 등록·수정·삭제는 전체 관리자와 이 팀의 팀장이 처리해요."}</p><SongList songs={detail.songs} /></>}</section>
     {admin && <section className={panelClass} aria-labelledby="team-disband-title"><h2 id="team-disband-title" className="text-xl font-bold">팀 해체</h2><p className="mt-3 text-sm leading-7 text-navy-soft">팀의 미래·진행 중 예약과 관련 교환·예정 알림을 정리하고 반복 배정을 종료해요. 완료된 이용 이력과 다른 팀·개인 예약은 유지해요.</p>{block && <p id="team-disband-block" className="mt-3 text-sm text-navy-soft">{block}</p>}<button type="button" className={`${secondaryButton} mt-4`} disabled={!lifecycle || blocked || Boolean(block)} aria-describedby={block ? "team-disband-block" : undefined} onClick={() => lifecycle?.onStart(detail.team)}>팀 해체 확인</button>{lifecycle?.notice && <p role="status" className="mt-4 text-sm leading-7">{lifecycle.notice}</p>}</section>}
   </div>;
 }
