@@ -28,10 +28,11 @@ export async function pushWorker(register = false): Promise<ServiceWorkerRegistr
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return undefined;
   const existing = register ? await navigator.serviceWorker.register("/push-sw.js", { scope: "/", updateViaCache: "none" }) : await navigator.serviceWorker.getRegistration("/");
   if (!existing) return undefined;
-  if (register && !existing.active) {
-    const worker = existing.installing ?? existing.waiting;
+  if (register) {
+    await existing.update();
+    const worker = existing.installing ?? existing.waiting ?? existing.active;
     if (!worker) throw new Error("Push worker unavailable");
-    await new Promise<void>((resolve, reject) => {
+    if (worker.state !== "activated") await new Promise<void>((resolve, reject) => {
       const timer = setTimeout(() => { worker.removeEventListener("statechange", changed); reject(new Error("Push worker timeout")); }, 10000);
       const changed = () => { if (worker.state === "activated") { clearTimeout(timer); worker.removeEventListener("statechange", changed); resolve(); } else if (worker.state === "redundant") { clearTimeout(timer); worker.removeEventListener("statechange", changed); reject(new Error("Push worker unavailable")); } };
       worker.addEventListener("statechange", changed); changed();
@@ -41,18 +42,52 @@ export async function pushWorker(register = false): Promise<ServiceWorkerRegistr
   if (!active || new URL(active.scriptURL).pathname !== "/push-sw.js" || new URL(active.scriptURL).origin !== window.location.origin) return undefined;
   return existing;
 }
-export async function workerBinding(registration: ServiceWorkerRegistration, binding: PushBinding | null | "READ") {
+async function workerMessage(registration: ServiceWorkerRegistration, message: Record<string, unknown>) {
   const worker = registration.active;
   if (!worker) throw new Error("Push worker unavailable");
-  return await new Promise<PushBinding | null>((resolve, reject) => {
+  return await new Promise<Record<string, unknown>>((resolve, reject) => {
     const channel = new MessageChannel();
     const timer = setTimeout(() => { channel.port1.close(); reject(new Error("Push binding timeout")); }, 5000);
-    channel.port1.onmessage = (event: MessageEvent<{ ok: boolean; binding: PushBinding | null }>) => {
+    channel.port1.onmessage = (event: MessageEvent<Record<string, unknown>>) => {
       clearTimeout(timer); channel.port1.close();
-      if (!event.data?.ok) reject(new Error("Push binding unavailable")); else resolve(event.data.binding);
+      if (event.data?.ok !== true) reject(new Error("Push worker response unavailable")); else resolve(event.data);
     };
-    worker.postMessage({ type: binding === "READ" ? "READ_PUSH_BINDING" : "SET_PUSH_BINDING", binding: binding === "READ" ? undefined : binding }, [channel.port2]);
+    worker.postMessage(message, [channel.port2]);
   });
+}
+export async function workerBinding(registration: ServiceWorkerRegistration, binding: PushBinding | null | "READ", preservePendingClick = false) {
+  const reply = await workerMessage(registration, { type: binding === "READ" ? "READ_PUSH_BINDING" : "SET_PUSH_BINDING", binding: binding === "READ" ? undefined : binding, ...(preservePendingClick ? { preservePendingClick: true } : {}) });
+  return reply.binding as PushBinding | null;
+}
+export function allowedPushClickPath(value: unknown): string | null {
+  return typeof value === "string" && value.trim() === value && !/[\\\r\n#]/.test(value) && (value === "/notifications" || /^\/notices\/[1-9]\d*$/.test(value) || /^\/reservations\?reservationId=[1-9]\d*$/.test(value) || /^\/exchanges\?exchangeId=[1-9]\d*$/.test(value)) ? value : null;
+}
+export async function takePendingPushClick(registration: ServiceWorkerRegistration) {
+  const reply = await workerMessage(registration, { type: "TAKE_PUSH_CLICK" });
+  if (reply.path === null) return null;
+  const path = allowedPushClickPath(reply.path);
+  if (!path) throw new Error("Invalid Push click destination");
+  return path;
+}
+export interface PushClickDiagnostics {
+  workerVersion: string;
+  clickReceivedAt: string | null;
+  lastNativeResult: string | null;
+  lastRecovery: string | null;
+  windowCount: number | null;
+  targetMatched: boolean | null;
+}
+export async function readPushClickDiagnostics(): Promise<PushClickDiagnostics | null> {
+  const registration = await pushWorker();
+  if (!registration) return null;
+  const reply = await workerMessage(registration, { type: "READ_PUSH_DIAGNOSTICS" });
+  const data = reply.diagnostics as Partial<PushClickDiagnostics> | undefined;
+  if (!data || typeof data.workerVersion !== "string" || data.workerVersion.trim() !== data.workerVersion || !/^[a-z0-9-]{1,80}$/.test(data.workerVersion)
+    || !(data.clickReceivedAt === null || typeof data.clickReceivedAt === "string" && Number.isFinite(Date.parse(data.clickReceivedAt)))
+    || ![data.lastNativeResult, data.lastRecovery].every((value) => value === null || typeof value === "string" && value.trim() === value && /^[A-Z0-9_]{1,80}$/.test(value))
+    || !(data.windowCount === null || typeof data.windowCount === "number" && Number.isSafeInteger(data.windowCount) && data.windowCount >= 0)
+    || !(data.targetMatched === null || typeof data.targetMatched === "boolean")) throw new Error("Invalid Push diagnostics");
+  return { workerVersion: data.workerVersion, clickReceivedAt: data.clickReceivedAt, lastNativeResult: data.lastNativeResult, lastRecovery: data.lastRecovery, windowCount: data.windowCount, targetMatched: data.targetMatched } as PushClickDiagnostics;
 }
 export async function clearCurrentPushBinding() {
   const registration = await pushWorker();

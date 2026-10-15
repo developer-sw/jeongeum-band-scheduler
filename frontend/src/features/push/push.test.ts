@@ -11,7 +11,7 @@ import { logoutWithPushCleanup } from "@/features/auth/logout";
 import { directoryScope, pruneDirectoryCache } from "@/features/directory/queries";
 import { ApiError, resetApiSession } from "@/lib/api/client";
 import { deletePushDevice, getPushDevices, getPushPublicKey, registerPushDevice } from "./api";
-import { applicationServerKey, clearCurrentPushBinding, disablePushDevice, enableCurrentDevice, pushCapability } from "./browser";
+import { applicationServerKey, clearCurrentPushBinding, disablePushDevice, enableCurrentDevice, pushCapability, pushWorker, readPushClickDiagnostics, takePendingPushClick, workerBinding } from "./browser";
 import { pushErrorMessage } from "./errors";
 import { pushDevicesQuery, pushPublicKeyQuery, refreshPush } from "./queries";
 import { CapabilityNotice, PushDeviceCard } from "./settings-view";
@@ -27,9 +27,9 @@ function response(data: unknown) { return Response.json({ data, meta }); }
 function fakeFetch(data: unknown) { return vi.fn().mockImplementation(async (path: string) => path.endsWith("/csrf") ? response({ headerName: "X-CSRF-TOKEN", token: "fixture-csrf" }) : response(data)); }
 function browser({ secure = true, permission = "default", ios = false, installed = false, supported = true }: { secure?: boolean; permission?: NotificationPermission; ios?: boolean; installed?: boolean; supported?: boolean } = {}) {
   let binding: PushBinding | null = { subscriptionId: "69", bindingVersion: "1" };
-  const active = { scriptURL: "https://jeongeum.example/push-sw.js", postMessage: vi.fn((message: { type: string; binding: PushBinding | null }, ports: MessagePort[]) => { if (message.type === "SET_PUSH_BINDING") binding = message.binding; ports[0].postMessage({ ok: true, binding }); ports[0].close(); }) };
+  const active = { state: "activated", scriptURL: "https://jeongeum.example/push-sw.js", postMessage: vi.fn((message: { type: string; binding: PushBinding | null }, ports: MessagePort[]) => { if (message.type === "SET_PUSH_BINDING") binding = message.binding; ports[0].postMessage({ ok: true, binding }); ports[0].close(); }) };
   const subscription = { toJSON: () => ({ endpoint: "https://push.example.invalid/fixture", keys: { p256dh: "fixture-public-key", auth: "fixture-auth" } }), unsubscribe: vi.fn().mockResolvedValue(true) };
-  const registration = { active, pushManager: { getSubscription: vi.fn().mockResolvedValue(null), subscribe: vi.fn().mockResolvedValue(subscription) } };
+  const registration = { active, update: vi.fn().mockResolvedValue(undefined), pushManager: { getSubscription: vi.fn().mockResolvedValue(null), subscribe: vi.fn().mockResolvedValue(subscription) } };
   const worker = { getRegistration: vi.fn().mockResolvedValue(registration), register: vi.fn().mockResolvedValue(registration) };
   const notification = { permission, requestPermission: vi.fn().mockResolvedValue("granted") };
   vi.stubGlobal("Notification", notification);
@@ -38,6 +38,55 @@ function browser({ secure = true, permission = "default", ios = false, installed
   return { worker, registration, subscription, notification, binding: () => binding };
 }
 describe("Push device API and permission lifecycle", () => {
+  it("waits for the newly installing worker when an older active worker already exists", async () => {
+    const fixture = browser({ permission: "granted" });
+    const installing = Object.assign(new EventTarget(), { state: "installing", scriptURL: fixture.registration.active.scriptURL });
+    const listen = vi.spyOn(installing, "addEventListener");
+    Object.assign(fixture.registration, { installing });
+    let finished = false;
+    const task = pushWorker(true).then((result) => { finished = true; return result; });
+    await vi.waitFor(() => expect(listen).toHaveBeenCalledWith("statechange", expect.any(Function)));
+    expect(fixture.registration.update).toHaveBeenCalledOnce();
+    expect(finished).toBe(false);
+    installing.state = "activated";
+    Object.assign(fixture.registration, { active: installing, installing: null });
+    installing.dispatchEvent(new Event("statechange"));
+    expect(await task).toBe(fixture.registration);
+  });
+  it("does not register a server binding when the worker update check fails", async () => {
+    const fixture = browser({ permission: "granted" });
+    fixture.registration.update.mockRejectedValue(new TypeError("Synthetic offline update"));
+    const fetchMock = fakeFetch(device); vi.stubGlobal("fetch", fetchMock);
+    await expect(enableCurrentDevice(publicKey, "fixture")).rejects.toThrow("Synthetic offline update");
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fixture.registration.pushManager.subscribe).not.toHaveBeenCalled();
+  });
+  it("preserves a click only for temporary account reconciliation, with default cleanup unchanged", async () => {
+    const fixture = browser();
+    const registration = fixture.registration as unknown as ServiceWorkerRegistration;
+    await workerBinding(registration, null, true);
+    expect(fixture.registration.active.postMessage).toHaveBeenLastCalledWith({ type: "SET_PUSH_BINDING", binding: null, preservePendingClick: true }, expect.any(Array));
+    await clearCurrentPushBinding();
+    expect(fixture.registration.active.postMessage).toHaveBeenLastCalledWith({ type: "SET_PUSH_BINDING", binding: null }, expect.any(Array));
+  });
+  it("accepts only a verified worker's internal click destination", async () => {
+    const fixture = browser();
+    let path: string | null = "/notices/91";
+    fixture.registration.active.postMessage.mockImplementation((_message, ports) => { ports[0].postMessage({ ok: true, path }); ports[0].close(); });
+    const registration = fixture.registration as unknown as ServiceWorkerRegistration;
+    expect(await takePendingPushClick(registration)).toBe("/notices/91");
+    for (path of ["https://outside.example/notices/1", "//outside.example", "/notices/1#extra", "/notices/1\n", "/api/v1/users", "/reservations?reservationId=1&extra=2"]) await expect(takePendingPushClick(registration)).rejects.toThrow("Invalid Push click destination");
+    path = null;
+    expect(await takePendingPushClick(registration)).toBeNull();
+  });
+  it("reads bounded non-personal click diagnostics and rejects untrusted diagnostic content", async () => {
+    const fixture = browser();
+    const diagnostics = { workerVersion: "push-click-recovery-v2", clickReceivedAt: meta.serverTime, lastNativeResult: "NAVIGATED", lastRecovery: "CONSUMED", windowCount: 1, targetMatched: false };
+    let result: unknown = { ...diagnostics, unrelated: "not returned" };
+    fixture.registration.active.postMessage.mockImplementation((_message, ports) => { ports[0].postMessage({ ok: true, diagnostics: result }); ports[0].close(); });
+    expect(await readPushClickDiagnostics()).toEqual(diagnostics);
+    for (result of [{ ...diagnostics, workerVersion: "invalid\nversion" }, { ...diagnostics, clickReceivedAt: "not a date" }, { ...diagnostics, lastRecovery: "untrusted text" }, { ...diagnostics, windowCount: -1 }]) await expect(readPushClickDiagnostics()).rejects.toThrow("Invalid Push diagnostics");
+  });
   it("reads enabled/public key and own minimal device list without an owner parameter", async () => {
     const fetchMock = vi.fn().mockImplementation(async (path: string) => response(path.endsWith("public-key") ? { enabled: true, publicKey } : { subscriptions: [device] })); vi.stubGlobal("fetch", fetchMock);
     expect(await getPushPublicKey()).toEqual({ enabled: true, publicKey }); expect(await getPushDevices()).toEqual({ subscriptions: [device] });
