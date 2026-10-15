@@ -8,6 +8,9 @@ import kr.jeongeum.scheduler.common.api.DirectoryInputs;
 import kr.jeongeum.scheduler.team.api.TeamDetailResponse;
 import kr.jeongeum.scheduler.team.api.TeamResponse;
 import kr.jeongeum.scheduler.team.service.TeamService;
+import kr.jeongeum.scheduler.lifecycle.api.LifecycleRequests;
+import kr.jeongeum.scheduler.lifecycle.api.LifecycleResponse;
+import kr.jeongeum.scheduler.lifecycle.service.LifecycleService;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
@@ -20,7 +23,10 @@ import org.springframework.web.bind.annotation.*;
 public class TeamController {
     private final TeamService teams;
     private final Clock clock;
-    public TeamController(TeamService teams, Clock clock) { this.teams = teams; this.clock = clock; }
+    private final LifecycleService lifecycle;
+    public TeamController(TeamService teams, Clock clock, LifecycleService lifecycle) {
+        this.teams = teams; this.clock = clock; this.lifecycle = lifecycle;
+    }
     @GetMapping
     public ResponseEntity<ApiResponse<List<TeamResponse>>> list(@AuthenticationPrincipal MemberPrincipal actor) {
         return response(teams.list(actor.memberId()), 200);
@@ -58,4 +64,10 @@ public class TeamController {
     public record Create(String name, String kind) {}
     public record Rename(String name, Long version) {}
     public record Membership(String rosterEntryId) {}
+    @PostMapping("/{id}/disband")
+    public ResponseEntity<ApiResponse<LifecycleResponse>> disband(@AuthenticationPrincipal MemberPrincipal actor,
+            @PathVariable String id,@RequestHeader(name="Idempotency-Key",required=false) String key,
+            @RequestBody LifecycleRequests.Close input) {
+        return response(lifecycle.disband(actor.memberId(),DirectoryInputs.id(id),key,input),200);
+    }
 }

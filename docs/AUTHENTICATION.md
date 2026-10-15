@@ -6,6 +6,8 @@
 
 ## 구현 계약과 기술 설정
 
+2026-10-14 회원 탈퇴 단계의 세션 해제·로그인 경합 보완은 [MEMBER_TEAM_LIFECYCLE](MEMBER_TEAM_LIFECYCLE.md)을 따른다. 비밀번호 검증 후 인증 세션을 저장하는 마지막 단계는 directory guard 안에서 현재 활성 회원을 다시 검사하고 CSRF/세션 ID 회전과 90일 설정을 유지한다. 탈퇴는 해당 회원의 모든 JDBC 세션을 업무 정리와 함께 삭제하며, 늦은 로그인·Push 재등록이 접근을 복구하지 못하도록 격리 검증한다. 다른 회원의 세션과 일반 로그아웃의 기기별 정책은 유지한다.
+
 회원 ID는 bigint를 JSON 문자열로 전달한다. 인증 PR #3에서는 팀 관리 전이므로 `teamMemberships`를 빈 목록으로 반환했다. 이후 [회원·팀 관리 단계](MEMBER_TEAM_MANAGEMENT.md)에서는 연결된 명단의 현재 활성 소속을 `teamId/teamName/kind/role` 목록으로 반환하고 초대에 명단 ID를 연결한다. 팀장 권한을 전역 역할로 저장하지 않는다.
 
 | 요청 | 결과 |

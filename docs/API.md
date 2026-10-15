@@ -102,7 +102,7 @@ Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 �
 | POST /roster/{id}/link-account | 전체 관리자 | 기존 활성 계정 명시적 연결, 양쪽 일대일 제약, 남은 초대 해지 |
 | GET /users | 전체 관리자 | 운영 회원 목록 |
 | PATCH /users/{id}/role | 전체 관리자 | 전역 역할 변경·version·감사 기록, 마지막 활성 관리자 강등 거절 |
-| POST /users/{id}/withdraw | 전체 관리자 | 탈퇴 처리, 미래·진행 중 개인 예약만 취소, 팀 예약 유지 |
+| POST /users/{id}/withdraw | 전체 관리자 + CSRF | `Idempotency-Key`·`expectedVersion`·선택 사유, 미래·진행 중 개인 예약만 취소, 존속 팀 예약 유지·모든 기기/세션 종료 |
 | GET /teams | 활성 회원 | 팀 목록, 공개 필드는 최소화하는 제안 |
 | POST /teams | 전체 관리자 | REGULAR/ADDITIONAL 팀 생성 |
 | GET /teams/{id} | 활성 회원 | 팀 정보·곡 목록·권한별 명단 필드 |
@@ -110,7 +110,7 @@ Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 �
 | POST /teams/{id}/members | 전체 관리자 | `rosterEntryId`로 가입 전·가입 후 명단 추가, 복수 소속 허용, 같은 팀의 활성 소속 중복 거절 |
 | DELETE /teams/{id}/members/{rosterEntryId} | 전체 관리자 | 명단의 소속 제거, 팀장 제거 시 후임 자동 지정 없음 |
 | PUT /teams/{id}/leader | 전체 관리자 | 활성 소속 명단 중 팀장 지정, null로 지정 해제, 자동 전역 권한 부여 금지 |
-| POST /teams/{id}/disband | 전체 관리자 | 팀 해체, 남은 팀 예약·반복 배정·관련 교환과 예정 알림 종료 |
+| POST /teams/{id}/disband | 전체 관리자 + CSRF | `Idempotency-Key`·`expectedVersion`·선택 사유, 남은 팀 예약·반복 배정·관련 교환과 예정 알림 종료·과거 이력 보존 |
 | GET /teams/{id}/songs | 활성 회원 | 팀별 곡 목록; 비소속 회원 조회 범위는 기술 제안 |
 | POST /teams/{id}/songs | 전체 관리자 또는 해당 팀장 | 곡명 필수, 아티스트 선택, 표시 순서 |
 | PATCH /teams/{id}/songs/{songId} | 전체 관리자 또는 해당 팀장 | 곡 내용·표시 순서 변경 |
@@ -118,7 +118,9 @@ Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 �
 
 명단·소속·곡·역할·초대·가입 변경은 `directory_mutation_guard`를 먼저 잠그고 현재 실행자 권한·대상 명단·팀을 다시 검사한다. 팀장 지정은 연결된 활성 계정에 자기 팀 권한만 부여한다. 삭제 대상 곡이 요청 경로의 팀에 속하는지도 검증한다. 팀 상세 명단은 전체 관리자 또는 해당 팀의 활성 계정만 조회하며 다른 회원에게는 `members=[]`, `canViewMembers=false`를 반환하는 읽기 기술안을 적용한다.
 
-이번 단계의 명단·회원·팀·곡 GET 목록은 약 45명 규모에 맞춰 `ApiResponse`의 `data` 배열로 반환하고 임의 개수로 잘라 누락하지 않는다. 기존 초대 목록만 cursor 계약을 유지한다. 탈퇴·팀 해체 API는 예약·교환·알림 정리까지 필요한 후속 구현이며 이번 단계에 제공하지 않는다.
+명단·회원·팀·곡 GET 목록은 약 45명 규모에 맞춰 `ApiResponse`의 `data` 배열로 반환하고 임의 개수로 잘라 누락하지 않는다. 기존 초대 목록만 cursor 계약을 유지한다. 2026-10-14 탈퇴·팀 해체 정리 구현 단계의 두 POST 계약은 [MEMBER_TEAM_LIFECYCLE](MEMBER_TEAM_LIFECYCLE.md)을 따른다. V11·격리 검증과 실제 개발 DB 적용 상태는 구분한다.
+
+탈퇴/해체 본문은 `{ expectedVersion, reason? }`이며 사유는 선택·최대 500자다. 성공 `200`의 `data`는 문자열 `operationId`·`targetId`, 종료 `status`, 증가한 `version`과 `canceledReservations`·`invalidatedExchanges`·`endedAssignments`·`deactivatedSubscriptions`·`revokedSessions` 건수를 반환한다. 동일 실행자/키/요청은 원래 결과를 재확인하며 다른 요청으로 키를 재사용하면 `IDEMPOTENCY_KEY_REUSED`다. 현재 관리자 권한은 재확인에도 필요하다. 마지막 활성 전체 관리자 탈퇴는 기존 운영 보호와 같은 `LAST_GLOBAL_ADMIN`으로 거절한다. 예약 취소부터 최종 처리 기록까지 한 트랜잭션이며 후반 실패·timeout은 전체 rollback한다.
 
 탈퇴 후에도 과거 예약의 주체·최초 예약자 이력을 보존한다. 탈퇴자가 만들었던 존속 팀 예약을 함께 취소하거나 새 예약자로 덮어쓰지 않는다. 본인 서비스 탈퇴 버튼은 확정된 관리 범위에 임의로 추가하지 않는다.
 

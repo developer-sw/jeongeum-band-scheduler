@@ -322,6 +322,8 @@ erDiagram
 
 ### 5.3 time_blocks / assets / asset_incidents
 
+2026-10-14 회원/팀 종료 단계는 V11 `lifecycle_operations`에 실행자·대상 사용자/팀·종료 시각·선택 사유·재시도 key digest/fingerprint와 최초 처리 응답 요약을 보존한다. 기존 사용자/팀·예약/계보·소속·곡·알림 이력을 물리 삭제하지 않는다. 회원/팀 상태 변경·예약/회차/quota·교환·시작 계획/Push·세션 정리와 처리 기록은 하나의 트랜잭션이다. 상세 계약과 실제 검증 상태는 [MEMBER_TEAM_LIFECYCLE](MEMBER_TEAM_LIFECYCLE.md)을 따른다. 기존 V1~V10을 수정하거나 실제 개발 DB 적용을 문서만으로 완료 표시하지 않는다.
+
 V8의 관리자 고장·복구·재시도 모델은 [INSTRUMENT_FAULTS](INSTRUMENT_FAULTS.md)에서 구현·격리 검증했다. 이후 사용자 승인으로 실제 개발 DB 백업·V8 한 건 적용·기존 업무 데이터 보존을 확인했다. 실제 고장 등록·복구 검증은 임시 DB의 합성 데이터에서 수행한 결과와 구분한다.
 
 - `time_blocks`: B01~B10, start_minute, end_minute, duration_minutes. [고정 열 블록](RESERVATION_RULES.md#2-운영-시간과-고정-블록)의 매핑을 그대로 저장한다.

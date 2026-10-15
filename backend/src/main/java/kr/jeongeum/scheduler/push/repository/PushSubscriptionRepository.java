@@ -50,6 +50,13 @@ public class PushSubscriptionRepository {
         List<Long> ids=jdbc.queryForList("SELECT id FROM push_subscriptions WHERE user_id=? AND session_digest=? AND active FOR UPDATE",Long.class,owner,digest);
         for (long id:ids) { deactivate(id,now); cancelJobs(id,now); }
     }
+    /** Withdrawal ends every device binding without deleting the subscription audit rows. */
+    public int deactivateUser(long owner,Instant now) {
+        List<Long> ids=jdbc.queryForList("SELECT id FROM push_subscriptions WHERE user_id=? AND active ORDER BY id FOR UPDATE",
+                Long.class,owner);
+        for (long id:ids) { deactivate(id,now); cancelJobs(id,now); }
+        return ids.size();
+    }
     public void expireBinding(long id,long version,Instant now) {
         int changed=jdbc.update("UPDATE push_subscriptions SET active=false,deactivated_at=?,binding_version=binding_version+1,updated_at=? WHERE id=? AND binding_version=? AND active",
                 Timestamp.from(now),Timestamp.from(now),id,version);

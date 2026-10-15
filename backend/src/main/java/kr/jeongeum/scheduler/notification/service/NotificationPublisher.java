@@ -42,12 +42,24 @@ public class NotificationPublisher {
                 "합주실 예약이 변경됐어요",describe(old)+" → "+describe(next),now);
     }
     public void reservationCancelled(Reservation reservation,Long operationId,Instant now) {
+        reservationCancelledTo(reservation,operationId,now,recipients(reservation));
+    }
+    /** Closure uses the recipients captured before memberships ended; inactive users remain excluded. */
+    public void reservationCancelledTo(Reservation reservation,Long operationId,Instant now,List<Long> capturedRecipients) {
         requireOperation(operationId);
         reminders.cancel(reservation.id(),now);
-        reservationEvent(reservation,"operation:"+operationId+":reservation:"+reservation.id()+":CANCELED","RESERVATION_CANCELED",operationId,
-                "합주실 예약이 취소됐어요",describe(reservation),now);
+        for (long user : new LinkedHashSet<>(capturedRecipients)) {
+            if (notifications.activePersonal(user).isEmpty()) { continue; }
+            notifications.insert(user,"operation:"+operationId+":reservation:"+reservation.id()+":CANCELED",
+                    "RESERVATION_CANCELED",operationId,reservation.id(),null,null,
+                    "합주실 예약이 취소됐어요",describe(reservation),"/reservations?reservationId="+reservation.id(),now);
+        }
     }
     public void exchangeEvent(long requestId,String eventType,List<Reservation> sources,List<Reservation> results,long requestedByUserId,Instant now) {
+        exchangeEvent(requestId,eventType,sources,results,requestedByUserId,now,List.of());
+    }
+    public void exchangeEvent(long requestId,String eventType,List<Reservation> sources,List<Reservation> results,long requestedByUserId,
+            Instant now,List<Long> capturedRecipients) {
         if (!EXCHANGE_EVENTS.contains(eventType)) { throw new IllegalArgumentException("Unsupported exchange inbox event"); }
         if ("EXCHANGE_COMPLETED".equals(eventType)) {
             for(Reservation source:sources) { reminders.cancel(source.id(),now); }
@@ -56,6 +68,7 @@ public class NotificationPublisher {
         Set<Long> users=new LinkedHashSet<>();
         for (Reservation source : sources) { users.addAll(recipients(source)); }
         users.addAll(notifications.activePersonal(requestedByUserId));
+        for (long user : capturedRecipients) { users.addAll(notifications.activePersonal(user)); }
         String title=switch (eventType) {
             case "EXCHANGE_REQUESTED" -> "예약 교환 요청이 도착했어요";
             case "EXCHANGE_COMPLETED" -> "예약 교환이 완료됐어요";
