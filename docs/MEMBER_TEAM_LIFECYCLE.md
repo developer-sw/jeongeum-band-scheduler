@@ -1,5 +1,7 @@
 # 회원 탈퇴·팀 해체 정리
 
+최신 반영: 2026-10-16 사용자 승인으로 [PR #19](https://github.com/developer-sw/jeongeum-band-scheduler/pull/19)를 정식 전환·main에 병합했다(`0d660ae`). 기능 HEAD `27cde27`의 [Push CI](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/38732916135)·[PR CI](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/38732923247) 총 4개 검사에서 Backend 352건·Frontend 289건과 양쪽 빌드·타입·lint를 확인했다. 아래 초안·별도 승인 대상 표시는 당시 기록이며, 실기기 검증 범위와 제한은 후속 결과를 따른다.
+
 기준일: 2026-10-15 / Asia/Seoul / 구현 브랜치: `codex/member-team-lifecycle` / 시작 main: `1b64eaa`. 설계·구현·격리 PostgreSQL/HTTP·회귀·재시작 검증과 승인된 개발 DB V11 적용·데이터 보존을 완료했다. 최초 커밋 `6b89102`의 초안 PR #19·Push/PR CI 성공 뒤 실제 브라우저 28항목·320~1440px와 후속 UI·Push 클릭 복구를 검증했다. 최종 Frontend는 **21파일·289건**이며 타입·lint·격리 production 빌드와 최종 worker 추가 회귀를 확인했다. PC·iPhone 중요 공지 수신·열기, iPhone 시작 1시간 전 알림·예약 열기, iPhone 단독 로그아웃 후 PC 알림 유지, 회원 탈퇴 후 두 기기 로그인 종료·재로그인 거부·새 알림 차단까지 확인했다. 2026-10-15 사용자가 이 후속 수정의 커밋·Push·기존 PR 업데이트·CI 확인을 승인했다. 최신 원격 검사는 기존 커밋의 CI와 구분하여 PR의 커밋별 결과로 확인한다. 정식 PR 전환·main 병합은 별도 승인 대상이다. 아래 개발 당시 기록과 후속 결과를 구분한다.
 
 ## 1. 확정 정책
