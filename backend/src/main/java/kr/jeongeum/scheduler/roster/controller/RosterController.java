@@ -33,6 +33,12 @@ public class RosterController {
         return response(roster.rename(actor.memberId(), DirectoryInputs.id(id), input.name(),
                 DirectoryInputs.version(input.version())), 200);
     }
+    @PatchMapping("/{id}/signup-role")
+    public ResponseEntity<ApiResponse<RosterEntryResponse>> signupRole(@AuthenticationPrincipal MemberPrincipal actor,
+            @PathVariable String id, @RequestBody SignupRole input) {
+        return response(roster.changeSignupRole(actor.memberId(), DirectoryInputs.id(id), input.globalRole(),
+                DirectoryInputs.version(input.version())), 200);
+    }
     @PostMapping("/{id}/link-account")
     public ResponseEntity<ApiResponse<RosterEntryResponse>> link(@AuthenticationPrincipal MemberPrincipal actor,
             @PathVariable String id, @RequestBody Link input) {
@@ -44,5 +50,6 @@ public class RosterController {
     }
     public record Create(String name) {}
     public record Rename(String name, Long version) {}
+    public record SignupRole(String globalRole, Long version) {}
     public record Link(String userId, Long version) {}
 }

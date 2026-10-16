@@ -143,7 +143,7 @@ describe("cleanup confirmation, state and administrator boundaries", () => {
       client.setQueryData(membersQuery(admin.id).queryKey, [{ ...account, id: admin.id, globalRole: "GLOBAL_ADMIN" }, account]);
       client.setQueryData(rosterQuery(admin.id).queryKey, []);
     });
-    expect(html).toContain("탈퇴 처리</button>"); expect(html).toContain("마지막 활성 전체 관리자"); expect(html).toContain("존속 팀의 예약과 완료 이력"); expect(html).toContain("JEONGEUM · SENTIMENTAL MUSIC");
+    expect(html).toContain("탈퇴 처리</button>"); expect(html).toContain("마지막 활성 전체 관리자"); expect(html).toContain("존속 팀 예약과 완료 이력"); expect(html).toContain("JEONGEUM · SENTIMENTAL MUSIC");
     for (const member of [null, { ...admin, globalRole: "MEMBER" as const }]) expect(renderPage(createElement(MembersPage), member)).not.toContain("탈퇴 처리</button>");
   });
   it("never grants disband permission to a leader or an accidental management payload", () => {

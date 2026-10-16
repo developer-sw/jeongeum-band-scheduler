@@ -11,6 +11,7 @@ const teamPath = (id: string): `/api/v1/${string}` => `/api/v1/teams/${encodeURI
 export const getRoster = (signal?: AbortSignal) => data(apiRequest<RosterEntry[]>("/api/v1/roster", { signal }));
 export const createRosterEntry = (name: string, signal?: AbortSignal) => data(apiRequest<RosterEntry>("/api/v1/roster", { method: "POST", body: { name }, signal }));
 export const updateRosterEntry = (entry: RosterEntry, name: string, signal?: AbortSignal) => data(apiRequest<RosterEntry>(`/api/v1/roster/${encodeURIComponent(entry.id)}`, { method: "PATCH", body: { name, version: entry.version }, signal }));
+export const updateSignupRole = (entry: RosterEntry, globalRole: RosterEntry["signupGlobalRole"], signal?: AbortSignal) => data(apiRequest<RosterEntry>(`/api/v1/roster/${encodeURIComponent(entry.id)}/signup-role`, { method: "PATCH", body: { globalRole, version: entry.version }, signal }));
 export const linkAccount = (entry: RosterEntry, userId: string, signal?: AbortSignal) => data(apiRequest<RosterEntry>(`/api/v1/roster/${encodeURIComponent(entry.id)}/link-account`, { method: "POST", body: { userId, version: entry.version }, signal }));
 export const getMembers = (signal?: AbortSignal) => data(apiRequest<AdminMember[]>("/api/v1/users", { signal }));
 export const updateGlobalRole = (member: AdminMember, globalRole: AdminMember["globalRole"], signal?: AbortSignal) => data(apiRequest<AdminMember>(`/api/v1/users/${encodeURIComponent(member.id)}/role`, { method: "PATCH", body: { globalRole, version: member.version }, signal }));

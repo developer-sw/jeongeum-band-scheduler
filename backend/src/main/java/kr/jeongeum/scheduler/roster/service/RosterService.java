@@ -46,6 +46,16 @@ public class RosterService {
         return roster.response(id);
     }
     @Transactional
+    public RosterEntryResponse changeSignupRole(long actorId, long id, String role, long version) {
+        if (!"MEMBER".equals(role) && !"GLOBAL_ADMIN".equals(role)) { throw ApiException.invalidInput(); }
+        guard.lock(); access.administratorForMutation(actorId);
+        RosterEntry entry = roster.lockById(id).orElseThrow(DirectoryInputs::notFound);
+        if (entry.userId() != null) { throw alreadyLinked(); }
+        DirectoryInputs.sameVersion(entry.version(), version);
+        if (!entry.signupGlobalRole().equals(role)) { roster.changeSignupRole(id, role, clock.instant()); }
+        return roster.response(id);
+    }
+    @Transactional
     public RosterEntryResponse linkAccount(long actorId, long id, long userId, long version) {
         guard.lock(); access.administratorForMutation(actorId);
         RosterEntry entry = roster.lockById(id).orElseThrow(DirectoryInputs::notFound);

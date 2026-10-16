@@ -73,6 +73,7 @@ class DirectoryIntegrationTest {
 
     @BeforeEach
     void setup() throws Exception {
+        assertEquals("directory_test", jdbc.queryForObject("SELECT current_database()", String.class));
         jdbc.execute("TRUNCATE teams, roster_entries, invitation_codes, users, spring_session RESTART IDENTITY CASCADE");
         password = UUID.randomUUID().toString();
         admin = account("GLOBAL_ADMIN");
@@ -484,6 +485,83 @@ class DirectoryIntegrationTest {
     }
 
     @Test
+    void rosterLeaderTeamsIncludesUnregisteredAndLinkedLeadersWithKindsAndCurrentNames() throws Exception {
+        JsonNode person = roster("합성 팀장 명단");
+        assertLeaderTeams(person);
+        JsonNode regular = team("합성 정규 팀장조", "REGULAR");
+        JsonNode additional = team("합성 추가 팀장조", "ADDITIONAL");
+        add(regular, person); add(additional, person);
+        assertEquals(200, leader(regular, person).statusCode());
+        assertEquals(200, leader(additional, person).statusCode());
+        JsonNode beforeSignup = find(administrator.get("/api/v1/roster"), person.get("id").asString());
+        assertTrue(beforeSignup.get("userId").isNull());
+        assertLeaderTeams(beforeSignup, regular, additional);
+
+        Member existing = account("MEMBER");
+        JsonNode linked = success(administrator.mutate("POST", rosterPath(person) + "/link-account",
+                Map.of("userId", Long.toString(existing.id()), "version", version(person))), 200);
+        assertEquals(person.get("id").asString(), linked.get("id").asString());
+        assertEquals(Long.toString(existing.id()), linked.get("userId").asString());
+        assertLeaderTeams(linked, regular, additional);
+        assertEquals("MEMBER", members.findById(existing.id()).orElseThrow().globalRole());
+
+        JsonNode currentTeam = data(administrator.get(teamPath(regular))).get("team");
+        JsonNode renamed = success(administrator.mutate("PATCH", teamPath(regular),
+                Map.of("name", "합성 바뀐 팀장조", "version", version(currentTeam))), 200);
+        assertLeaderTeams(find(administrator.get("/api/v1/roster"), person.get("id").asString()), renamed, additional);
+    }
+
+    @Test
+    void rosterLeaderTeamsExcludesDisbandedRemovedAndInactiveLinkedLeadership() throws Exception {
+        JsonNode pending = roster("합성 가입 전 팀장");
+        JsonNode active = team("합성 활성 조", "REGULAR");
+        JsonNode disbanded = team("합성 해체 이력 조", "ADDITIONAL");
+        JsonNode removed = team("합성 제거 이력 조", "REGULAR");
+        for (JsonNode assigned : List.of(active, disbanded, removed)) {
+            add(assigned, pending); assertEquals(200, leader(assigned, pending).statusCode());
+        }
+        // Keep historical LEADER values so each active-state predicate is verified independently.
+        jdbc.update("UPDATE teams SET status='DISBANDED' WHERE id=?", id(disbanded));
+        jdbc.update("UPDATE team_memberships SET status='REMOVED' WHERE team_id=?", id(removed));
+        assertLeaderTeams(find(administrator.get("/api/v1/roster"), pending.get("id").asString()), active);
+
+        JsonNode ordinary = roster("합성 일반 소속");
+        add(active, ordinary);
+        assertLeaderTeams(find(administrator.get("/api/v1/roster"), ordinary.get("id").asString()));
+        for (String status : List.of("INACTIVE", "WITHDRAWN")) {
+            JsonNode person = roster("합성 비활성 팀장 " + status);
+            Member existing = account("MEMBER");
+            assertEquals(200, administrator.mutate("POST", rosterPath(person) + "/link-account",
+                    Map.of("userId", Long.toString(existing.id()), "version", version(person))).statusCode());
+            JsonNode assigned = team("합성 비활성 조 " + status, "ADDITIONAL");
+            add(assigned, person); assertEquals(200, leader(assigned, person).statusCode());
+            jdbc.update("UPDATE users SET status=? WHERE id=?", status, existing.id());
+            JsonNode entry = find(administrator.get("/api/v1/roster"), person.get("id").asString());
+            assertEquals(status, entry.get("accountStatus").asString());
+            assertLeaderTeams(entry);
+        }
+    }
+
+    @Test
+    void rosterLeaderTeamsTracksReplacementAndRemainsAdministratorOnly() throws Exception {
+        JsonNode first = roster("합성 이전 팀장");
+        JsonNode next = roster("합성 후임 팀장");
+        JsonNode assigned = team("합성 교체 조", "REGULAR");
+        add(assigned, first); add(assigned, next);
+        assertEquals(200, leader(assigned, first).statusCode());
+        Client teamLeader = registerAndLogin(first);
+        assertError(teamLeader.get("/api/v1/roster"), 403, "FORBIDDEN");
+        assertError(new Client().get("/api/v1/roster"), 401, "AUTHENTICATION_REQUIRED");
+        assertLeaderTeams(find(administrator.get("/api/v1/roster"), first.get("id").asString()), assigned);
+        assertEquals(200, leader(assigned, next).statusCode());
+        assertLeaderTeams(find(administrator.get("/api/v1/roster"), first.get("id").asString()));
+        assertLeaderTeams(find(administrator.get("/api/v1/roster"), next.get("id").asString()), assigned);
+        Map<String, Object> clear = new HashMap<>(); clear.put("rosterEntryId", null);
+        assertEquals(200, administrator.mutate("PUT", teamPath(assigned) + "/leader", clear).statusCode());
+        assertLeaderTeams(find(administrator.get("/api/v1/roster"), next.get("id").asString()));
+    }
+
+    @Test
     void teamScopedLeaderCanManageOnlyOwnSongsAndGlobalAdminStillCannotMisrouteSongId() throws Exception {
         JsonNode person = roster("여러 조 합성 팀장");
         JsonNode first = team("권한 합성 조 A", "REGULAR");
@@ -850,6 +928,18 @@ class DirectoryIntegrationTest {
 
     private long countKind(JsonNode profile, String kind) {
         return profile.get("teamMemberships").valueStream().filter(value -> kind.equals(value.get("kind").asString())).count();
+    }
+
+    private void assertLeaderTeams(JsonNode entry, JsonNode... expected) {
+        JsonNode teams = entry.get("leaderTeams");
+        assertNotNull(teams); assertTrue(teams.isArray()); assertEquals(expected.length, teams.size());
+        for (int index = 0; index < expected.length; index++) {
+            JsonNode actual = teams.get(index);
+            assertEquals(3, actual.size());
+            for (String field : List.of("id", "name", "kind")) {
+                assertEquals(expected[index].get(field).asString(), actual.get(field).asString());
+            }
+        }
     }
 
     private JsonNode membership(JsonNode profile, JsonNode team) {

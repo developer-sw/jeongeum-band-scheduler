@@ -4,7 +4,8 @@ import { ApiError } from "@/lib/api/client";
 import { authErrorMessage } from "@/features/auth/errors";
 import { invitationInput } from "@/features/auth/invitation-input";
 import type { Invitation, Member } from "@/features/auth/types";
-import { linkAccount, updateGlobalRole, updateSong } from "./api";
+import { getRoster, linkAccount, updateGlobalRole, updateSignupRole, updateSong } from "./api";
+import type { RosterEntry } from "./types";
 import { directoryScope, pruneDirectoryCache } from "./queries";
 import { nameError, songError } from "./validation";
 
@@ -41,11 +42,47 @@ describe("directory authority and current-state cache", () => {
   it("uses explicit string IDs and current versions for manual account linkage and authority changes", async () => {
     const fetchMock = vi.fn().mockImplementation(async (path: string) => path.endsWith("/csrf") ? Response.json({ data: { headerName: "X-CSRF-TOKEN", token: "fixture-csrf" }, meta }) : Response.json({ data: {}, meta }));
     vi.stubGlobal("fetch", fetchMock);
-    await linkAccount({ id: "9007199254740995", name: "동명이인", userId: null, loginId: null, displayName: null, accountStatus: null, version: 7 }, member.id);
+    await linkAccount({ id: "9007199254740995", name: "동명이인", userId: null, loginId: null, displayName: null, accountStatus: null, signupGlobalRole: "MEMBER", leaderTeams: [], version: 7 }, member.id);
     await updateGlobalRole({ ...member, rosterEntryId: null, version: 3 }, "GLOBAL_ADMIN");
     expect(fetchMock.mock.calls[1][0]).toBe("/api/v1/roster/9007199254740995/link-account");
     expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ userId: "9007199254740993", version: 7 });
     expect(JSON.parse(fetchMock.mock.calls[3][1].body)).toEqual({ globalRole: "GLOBAL_ADMIN", version: 3 });
+  });
+
+  it("preserves signup authority and all leader team IDs from the administrator roster response", async () => {
+    const rows: RosterEntry[] = [{ id: "31", name: "합성 예정 관리자", userId: null, loginId: null, displayName: null, accountStatus: null,
+      signupGlobalRole: "GLOBAL_ADMIN", leaderTeams: [{ id: "10", name: "합성 정규조", kind: "REGULAR" }, { id: "11", name: "합성 추가조", kind: "ADDITIONAL" }], version: 3 }];
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ data: rows, meta })); vi.stubGlobal("fetch", fetchMock);
+    const controller = new AbortController(); expect(await getRoster(controller.signal)).toEqual(rows);
+    expect(fetchMock).toHaveBeenCalledOnce(); expect(fetchMock.mock.calls[0][0]).toBe("/api/v1/roster");
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: "GET", cache: "no-store", credentials: "same-origin", signal: controller.signal });
+  });
+
+  it("changes only the selected roster signup role through the versioned CSRF-protected API", async () => {
+    const roster: RosterEntry = { id: "9007199254740995", name: "합성 미가입 명단", userId: null, loginId: null, displayName: null, accountStatus: null, signupGlobalRole: "MEMBER", leaderTeams: [], version: 7 };
+    const updated = { ...roster, signupGlobalRole: "GLOBAL_ADMIN", version: 8 };
+    const fetchMock = vi.fn().mockImplementation(async (path: string) => path.endsWith("/csrf") ? Response.json({ data: { headerName: "X-CSRF-TOKEN", token: "fixture-csrf" }, meta }) : Response.json({ data: updated, meta }));
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await updateSignupRole(roster, "GLOBAL_ADMIN")).toEqual(updated);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const request = fetchMock.mock.calls[1];
+    expect(request[0]).toBe("/api/v1/roster/9007199254740995/signup-role");
+    expect(request[1].method).toBe("PATCH");
+    expect(JSON.parse(request[1].body)).toEqual({ globalRole: "GLOBAL_ADMIN", version: 7 });
+    expect(new Headers(request[1].headers).get("X-CSRF-TOKEN")).toBe("fixture-csrf");
+    expect(JSON.parse(request[1].body)).not.toHaveProperty("userId");
+  });
+
+  it("does not replay a signup-role version conflict or send an offline role change", async () => {
+    const roster: RosterEntry = { id: "31", name: "합성 미가입 명단", userId: null, loginId: null, displayName: null, accountStatus: null, signupGlobalRole: "GLOBAL_ADMIN", leaderTeams: [], version: 3 };
+    const fetchMock = vi.fn().mockResolvedValueOnce(Response.json({ data: { headerName: "X-CSRF-TOKEN", token: "fixture-csrf" }, meta }))
+      .mockResolvedValueOnce(Response.json({ error: { code: "VERSION_CONFLICT", message: "synthetic private diagnostic" } }, { status: 409 }));
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(updateSignupRole(roster, "MEMBER")).rejects.toMatchObject({ status: 409, code: "VERSION_CONFLICT" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    vi.stubGlobal("navigator", { onLine: false });
+    await expect(updateSignupRole(roster, "MEMBER")).rejects.toMatchObject({ status: 0, code: "OFFLINE" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("preserves a song's own team path and version, and does not replay a conflicting edit", async () => {
