@@ -23,11 +23,11 @@
 - **사용 대상:** 정음 동아리의 전체 관리자, 팀장, 일반 회원
 - **개발 형태:** Spring Boot 백엔드와 Next.js 프론트엔드를 분리한 단일 Git 저장소
 - **UI 방향:** 동일한 코드베이스에서 모바일·데스크톱에 적합한 반응형 화면 제공
-- **현재 단계(2026-10-16):** 인증·회원·팀·곡·예약·반복 배정·날짜 개방·변경·교환·악기 고장·공지·알림함·Web Push·시작 1시간 전 알림과 **회원 탈퇴·팀 해체 정리**를 구현하고 `main`에 반영. 개발 DB **Flyway V1~V11** 적용·데이터 보존, PC·iPhone 공지 수신/열기·iPhone 시작 알림·기기별 로그아웃·탈퇴 후 전체 기기 차단을 합성 시험 환경에서 확인
-- **현재 UI:** 다이어리 홈·달력·주간 시간표·모바일 예약 바텀시트·계정 인사말·예약 변경/교환·관리자 악기 고장·공지·개인 알림함·기기별 알림 설정/클릭 진단·회원 탈퇴/팀 해체 확인 화면. PC·모바일에서 같은 API와 예약 정책 사용
+- **현재 단계(2026-10-17):** 인증·회원·팀·곡·예약·반복 배정·날짜 개방·변경·교환·악기 고장·공지·알림함·Web Push·시작 1시간 전 알림·회원 탈퇴·팀 해체에 이어 **가입 전 관리자 지정·역할별 명단·카드 내 권한 변경과 다이어리 UI 보완**을 `main`에 반영. 개발 DB **Flyway V1~V12** 적용·기존 데이터 보존 확인. 앞선 합성 시험 환경에서 PC·iPhone 공지 수신/열기·iPhone 시작 알림·기기별 로그아웃·탈퇴 후 전체 기기 차단 확인
+- **현재 UI:** 다이어리 홈·달력·주간 시간표·모바일 예약 바텀시트·계정 인사말·예약 변경/교환·관리자 악기 고장·공지·개인 알림함·기기별 알림 설정/클릭 진단·회원 탈퇴/팀 해체 확인 화면. 회원 관리는 전체 관리자·팀장·일반 회원의 세 영역과 카드 내 지정·해제, 다이어리는 PC 소개 정렬·모바일 로고/더보기 크기·제목 아이콘·응원 문구 보완. PC·모바일에서 같은 API와 예약 정책 사용
 - **배포 상태:** 로컬 개발·테스트 단계. 운영 도메인과 서버는 아직 연결하지 않음
 
-> **구현 상태 안내:** 기본 예약·취소는 [PR #6](https://github.com/developer-sw/jeongeum-band-scheduler/pull/6), 반복 고정 배정·날짜 개방·내 공연조 일정은 [PR #7](https://github.com/developer-sw/jeongeum-band-scheduler/pull/7), 다이어리 UI는 [PR #9](https://github.com/developer-sw/jeongeum-band-scheduler/pull/9), 단건 예약 변경은 [PR #10](https://github.com/developer-sw/jeongeum-band-scheduler/pull/10), 예약 교환은 [PR #12](https://github.com/developer-sw/jeongeum-band-scheduler/pull/12), 악기 고장 관리는 [PR #13](https://github.com/developer-sw/jeongeum-band-scheduler/pull/13), 전체 공지·개인 알림함은 [PR #15](https://github.com/developer-sw/jeongeum-band-scheduler/pull/15), Web Push·시작 1시간 전 알림·CSRF 보완은 [PR #17](https://github.com/developer-sw/jeongeum-band-scheduler/pull/17)로 `main`에 반영했습니다. [PR #18](https://github.com/developer-sw/jeongeum-band-scheduler/pull/18)은 당시 README 갱신이며, **회원 탈퇴·팀 해체·후속 관리자 UI·Push 클릭 복원 및 실기기 검증은 [PR #19](https://github.com/developer-sw/jeongeum-band-scheduler/pull/19), 병합 커밋 `0d660ae`로 반영했습니다.** 최신 기능 검증은 Backend **352건**·Frontend **289건**입니다. 운영 HTTPS 배포·Android 실기기·운영 외부 백업 복원은 후속 검증 범위입니다.
+> **구현 상태 안내:** 기본 예약·취소는 [PR #6](https://github.com/developer-sw/jeongeum-band-scheduler/pull/6), 반복 고정 배정·날짜 개방·내 공연조 일정은 [PR #7](https://github.com/developer-sw/jeongeum-band-scheduler/pull/7), 다이어리 UI는 [PR #9](https://github.com/developer-sw/jeongeum-band-scheduler/pull/9), 단건 예약 변경은 [PR #10](https://github.com/developer-sw/jeongeum-band-scheduler/pull/10), 예약 교환은 [PR #12](https://github.com/developer-sw/jeongeum-band-scheduler/pull/12), 악기 고장 관리는 [PR #13](https://github.com/developer-sw/jeongeum-band-scheduler/pull/13), 전체 공지·개인 알림함은 [PR #15](https://github.com/developer-sw/jeongeum-band-scheduler/pull/15), Web Push·시작 1시간 전 알림·CSRF 보완은 [PR #17](https://github.com/developer-sw/jeongeum-band-scheduler/pull/17)로 `main`에 반영했습니다. [PR #18](https://github.com/developer-sw/jeongeum-band-scheduler/pull/18)은 당시 README 갱신이며, **회원 탈퇴·팀 해체·후속 관리자 UI·Push 클릭 복원 및 실기기 검증은 [PR #19](https://github.com/developer-sw/jeongeum-band-scheduler/pull/19), 병합 커밋 `0d660ae`로 반영했습니다.** **가입 전 관리자 지정·역할별 명단·카드 내 확인과 다이어리 UI 보완은 [PR #21](https://github.com/developer-sw/jeongeum-band-scheduler/pull/21)로 `main`에 반영했습니다.** 최신 기능 검증은 Backend **368건**·Frontend **334건**, 총 **702건**입니다. 운영 HTTPS 배포·Android 실기기·운영 외부 백업 복원은 후속 검증 범위입니다.
 
 ## ✅ 구현 현황
 
@@ -36,14 +36,15 @@
 | 개발 기반 | ✅ 구현 완료 | Docker Compose 개발용 PostgreSQL, Flyway, 프로젝트 실행 스크립트, GitHub Actions CI |
 | 초대·인증 | ✅ 구현 완료 | 관리자 발급 개인별 일회용 초대, 초대 가입, 로그인·로그아웃, 세션·CSRF 보호 |
 | 로그인 유지 | ✅ 구현 완료 | 마지막 인증 요청 후 **90일** 유지, 유효한 인증 요청 때 세션·쿠키 만료 연장 |
-| 회원·명단 | ✅ 구현 완료 | 가입 전 명단, 초대를 통한 계정 연결, 기존 계정 수동 연결, 회원·관리자 역할 관리 |
+| 회원·명단 | ✅ 구현·main 반영 | 가입 전 명단·개인 초대 계정 연결·기존 계정 수동 연결, 전체 관리자→팀장→일반 회원의 중복 없는 분류 |
+| 관리자 지정 | ✅ 구현·main 반영 | 가입 전 명단의 관리자 사전 지정·개인 초대 가입 시 자동 적용, 가입 계정 사후 지정·해제, 카드 내 확인/오류/완료·마지막 활성 관리자 보호 |
 | 합주팀·곡 | ✅ 구현 완료 | 정규조·추가조, 복수 팀 소속, 팀장 지정, 팀별 연습곡 등록·조회·수정·삭제 |
 | 권한·무결성 | ✅ 구현 완료 | 전역 관리자와 팀별 팀장 권한 분리, 트랜잭션·잠금, DB 제약 및 버전 충돌 처리 |
 | 웹 화면 | ✅ 현재 기능 구현 | 로그인·가입·다이어리 홈·관리자 명단/초대·팀 목록/상세·합주실 시간표·고정 배정·내 공연조 일정·예약 변경/이력·교환·악기 고장 관리·공지·개인 알림함·기기별 알림 설정, 반응형 레이아웃 |
 | 합주실 예약 | ✅ 구현 완료 | 고정 시간 블록, 팀 독점·악기별 개인 예약, 충돌·일일 한도·취소·이력 |
 | 반복 고정 배정 | ✅ 구현·main 반영 | 관리자 정규조·추가조 배정, 적용일별 패턴 수정·종료, 회차 취소 예외, 고정 반영 후 날짜 개방·실패 재시도·재시작 복구 |
 | 내 공연조 일정 | ✅ 구현·main 반영 | 현재 소속 정규조·추가조의 여러 날짜 일반/고정 확정 예약 통합 조회, 팀 필터, 날짜·시간순 목록·해당 날짜 시간표 연결 |
-| 다이어리 UI | ✅ 구현·main 반영 | 따뜻한 달력·월~일 시간표·내 공연조 요약·공유 빠른 예약, 모바일 하루 카드·바텀시트·4탭, 계정 인사말·더보기 |
+| 다이어리 UI | ✅ 구현·main 반영 | 따뜻한 달력·월~일 시간표·내 공연조 요약·공유 빠른 예약, 모바일 하루 카드·바텀시트·4탭, PC 소개 정렬·모바일 로고/더보기 조정·달력/합주/예약 아이콘·기타 옆 응원 문구 |
 | 단건 예약 변경 | ✅ 구현·main 반영 | 시작 전 날짜·시간 블록·개인 악기 변경, 원본/후속 이력, 권한·충돌·한도 재검사, 실패 시 원본 보존, 고정 회차 단건 예외 |
 | 예약 교환 | ✅ 구현·main 반영 | 1↔1·연속 60분 두 건↔90분 한 건의 요청·승인·거절·철회·만료·무효화, 개인 악기 배분, 실패 시 양쪽 원본 보존 |
 | 악기 고장 관리 | ✅ 구현·main 반영 | 관리자 고장 등록·복구·사유/처리 이력, 현재 상태 표시, 개인 신규/실질 변경/교환의 고장 검사, 팀 합주 경고·기존 예약 보존 |
@@ -60,7 +61,9 @@
 - **팀장(`LEADER`)**: 자신이 담당하는 팀의 연습곡 관리와 다른 팀원이 만든 해당 팀 예약 변경·취소·관련 교환 처리. 다른 팀이나 전체 관리자 권한은 부여하지 않음
 - **일반 회원(`MEMBER`)**: 본인 개인·소속 팀 예약 생성, 본인 개인 예약과 본인이 생성한 소속 팀 예약 변경·취소·관련 교환 처리, 현재 소속 공연조 일정과 팀·곡 목록 조회
 
-한 회원은 여러 정규조와 추가조에 동시에 속할 수 있습니다. **가입 전 명단과 로그인 계정은 별도 데이터**로 관리하며, 이름이 같다는 이유만으로 계정을 자동 연결하지 않습니다.
+한 회원은 여러 정규조와 추가조에 동시에 속할 수 있습니다. **가입 전 명단과 로그인 계정은 별도 데이터**로 관리하며, 이름이 같다는 이유만으로 계정을 자동 연결하지 않습니다. 회원 관리에서는 **전체 관리자 → 팀장 → 일반 회원** 순서로 한 번만 표시합니다. 관리자가 팀장을 겸하면 전체 관리자 영역에만 표시하고 담당 팀 정보는 유지합니다.
+
+**관리자 지정은 가입 전·후 모두 가능합니다.** 가입 전에는 명단에서 미리 지정하면 **해당 명단의 개인 초대로 가입할 때** 관리자 권한을 적용합니다. 이미 가입한 계정은 카드의 **전체 관리자 지정**으로 승격할 수 있습니다. 기존 계정을 명단에 수동 연결하는 동작 자체는 그 계정의 현재 권한을 바꾸지 않으므로, 필요하면 연결 후 별도로 지정합니다. 지정·해제의 확인·오류·상태 재조회·완료는 같은 카드 안에서 처리하고 마지막 활성 관리자의 해제는 차단합니다.
 
 교환 요청에는 본인 측 전체 예약의 현재 변경 권한이 필요하며, 승인·거절에는 상대 측 예약의 현재 권한이 필요합니다. 팀원이 교환 목록을 조회할 수 있다는 이유만으로 다른 팀원이 작성한 예약의 승인 권한을 갖지는 않습니다. 교환 후 예약 주체·최초 예약자는 승인자로 바뀌지 않으며, 두 악기 개인 90분 예약을 두 60분으로 나눌 때 악기 순서는 해당 개인 예약자가 직접 선택합니다.
 
@@ -76,7 +79,7 @@ Push 구독은 인증된 본인과 해당 브라우저의 로그인 세션에 �
 | --- | --- |
 | Backend | Java 21, Spring Boot 4.1.1, Gradle 9.8.1 |
 | Backend 주요 구성 | Spring MVC, Spring Security, Spring Session JDBC, Spring Data JPA, Bean Validation |
-| Database | PostgreSQL 17.11, Flyway V1~V11 |
+| Database | PostgreSQL 17.11, Flyway V1~V12 |
 | Push | Web Push·VAPID·AES128GCM, PostgreSQL 대기열·계획 worker |
 | Frontend | Next.js 16.4.0 (App Router), React 19.3.0, TypeScript 6.0.3 |
 | UI·데이터 | Tailwind CSS 4.3.3, TanStack Query 5.104.1 |
@@ -119,7 +122,8 @@ jeongeum-band-scheduler/
 │   │   ├── V8__instrument_faults.sql
 │   │   ├── V9__notices_notifications.sql
 │   │   ├── V10__web_push_and_reminders.sql
-│   │   └── V11__member_team_lifecycle.sql
+│   │   ├── V11__member_team_lifecycle.sql
+│   │   └── V12__roster_signup_global_role.sql
 │   ├── src/test/                        # 통합 테스트
 │   └── build.gradle.kts
 ├── frontend/
@@ -173,7 +177,7 @@ cd ..
 .\scripts\Start-Backend.ps1
 ```
 
-기본 백엔드 주소는 `http://127.0.0.1:8080`입니다. 이 스크립트는 개발 DB 접속 정보를 프로세스 환경변수로 전달하고 `local` 프로필로 `bootRun`을 실행합니다. **기동 시 Flyway가 V1~V11 중 아직 적용되지 않은 마이그레이션을 개발 DB에 적용합니다.** 기존 DB를 업데이트할 때는 먼저 백업과 격리 복원 검증을 확보하고 기존 비밀번호 파일·계정·데이터 볼륨을 유지하세요. 이미 적용된 마이그레이션을 강제로 재적용하거나 데이터를 초기화하지 않습니다.
+기본 백엔드 주소는 `http://127.0.0.1:8080`입니다. 이 스크립트는 개발 DB 접속 정보를 프로세스 환경변수로 전달하고 `local` 프로필로 `bootRun`을 실행합니다. **기동 시 Flyway가 V1~V12 중 아직 적용되지 않은 마이그레이션을 개발 DB에 적용합니다.** 기존 DB를 업데이트할 때는 먼저 백업과 격리 복원 검증을 확보하고 기존 비밀번호 파일·계정·데이터 볼륨을 유지하세요. 이미 적용된 마이그레이션을 강제로 재적용하거나 데이터를 초기화하지 않습니다.
 
 Push·시작 알림 worker와 외부 발송은 기본 비활성입니다. **외부 Push 발송을 끈 채** 로컬 worker를 검증하려면 해당 터미널에서 아래 설정으로 실행합니다. 기존 프로세스가 있는지 확인하고 중복 기동하지 마세요.
 
@@ -209,6 +213,8 @@ LAN HTTP는 화면 확인용이며 Push·service worker의 보안 컨텍스트 �
 예약 교환은 [예약 교환](http://127.0.0.1:3000/exchanges), **더보기 → 예약 교환** 또는 예약 상세의 **이 예약으로 교환 요청**에서 진입합니다. 양측 후보를 선택해 요청하고 상대 측 권한자가 승인합니다. 대기 중 원래 예약을 유지하며, 개인 악기 배분이 필요한 경우 해당 예약자가 순서를 저장한 뒤 승인할 수 있습니다. 거절·철회·만료·무효화 상태와 완료 후속 예약도 확인합니다.
 
 전체 관리자는 [악기 고장 관리](http://127.0.0.1:3000/admin/instrument-faults)에서 여섯 악기의 현재 상태, 고장 등록·복구와 처리 이력을 관리합니다. 데스크톱 **관리 → 악기 고장 관리**, 모바일 **더보기 → 악기 고장 관리**로 진입합니다. 고장 등록은 기존 예약을 자동 취소하지 않으며, 고장 악기를 새로 배치하는 개인 예약·변경·교환을 제한하고 팀 합주는 경고와 함께 허용합니다.
+
+전체 관리자는 [회원·가입 전 명단 관리](http://127.0.0.1:3000/admin/members)에서 세 역할 영역별 명단과 계정을 확인하고 각 카드에서 관리자 지정·해제를 완료합니다. 가입 전 지정 후에는 [명단별 초대 발급](http://127.0.0.1:3000/admin/invitations)에서 해당 명단의 개인 초대를 발급합니다. 사전 지정과 가입한 계정의 사후 지정 모두 지원하며, 다른 관리자가 상태를 바꾸면 해당 카드에서 최신 정보를 다시 확인합니다.
 
 회원 탈퇴는 전체 관리자의 [회원 관리](http://127.0.0.1:3000/admin/members), 팀 해체는 [팀 목록](http://127.0.0.1:3000/teams)에서 해당 팀 상세의 관리자 영역으로 진입합니다. 대상·사유와 정리/보존 범위를 확인한 뒤 확정합니다. 회원 탈퇴는 개인 예약과 전체 세션/기기를 종료하고 존속 팀 예약을 유지하며, 팀 해체는 해당 팀 예약·반복 배정을 종료합니다. 마지막 활성 전체 관리자는 탈퇴할 수 없습니다. 성공 응답을 잃었을 때는 같은 요청으로 결과를 재확인합니다.
 
@@ -296,17 +302,23 @@ Spring Session JDBC를 사용하며 `HttpOnly`·`SameSite=Lax` 세션 쿠키와 
 
 회원 탈퇴·팀 해체와 남은 예약 취소·점유/한도·교환·반복 배정·예정 알림·탈퇴에 따른 기기/세션 정리·관리 이력을 한 트랜잭션으로 처리합니다. 탈퇴자의 존속 팀 예약과 완료/작성자/계보 이력은 보존합니다. 현재 관리자·마지막 관리자·version을 잠금 후 검사하고 실패 시 전체를 롤백합니다. 같은 키·본문의 재확인은 같은 결과를 반환하며 탈퇴와 경합한 늦은 로그인이 세션을 다시 만들지 못하게 합니다.
 
+**14. 가입 전 역할 지정과 기존 계정 권한의 구분**
+
+가입 시 역할은 잠근 개인 초대의 명단 ID와 DB에 저장된 예정 권한으로 정하며, 공개 가입 입력으로 관리자 권한을 지정할 수 없습니다. 예정 권한 변경은 현재 관리자·미연결 상태·version을 검사하며, 가입·수동 연결과 공통 잠금 순서를 따릅니다. 기존 계정의 수동 연결은 현재 권한을 보존하고 사후 역할 변경은 별도 관리 작업으로 처리합니다. 미가입 예정 관리자는 마지막 활성 관리자 수에 포함하지 않습니다.
+
 ## 🧪 테스트 및 CI
 
-2026-10-16 기준 최신 기능 검증은 **Backend 352건·Frontend 289건, 총 641건**입니다. 로컬 자동 회귀·CI·합성 환경의 브라우저 조작·사용자 실기기 관찰을 구분해 기록합니다. 아래 수치는 해당 소스의 실행 기록이며 README 변경 자체를 새로운 기능 검증으로 집계하지 않습니다.
+2026-10-17 게시 기준, 최신 기능 검증은 **2026-10-16에 확인한 Backend 368건·Frontend 334건, 총 702건**입니다. 로컬 자동 회귀·CI·합성 환경의 브라우저 조작·사용자 실기기 관찰을 구분해 기록합니다. 아래 수치는 해당 소스의 실행 기록이며 README 변경 자체를 새로운 기능 검증으로 집계하지 않습니다.
 
-- **Backend:** JUnit/PostgreSQL Testcontainers **19개 suite·352건 통과**, 실패·오류·skip 0, `compileJava`·`bootJar` 통과. 탈퇴/해체 PostgreSQL 통합 27건과 Bootstrap 5건, 기존 인증·90일 세션·CSRF·예약·변경·교환·반복·고장·공지·알림·Push/worker 회귀 포함
-- **Frontend:** **21개 파일·289건 통과**, worker 35건·앱 클릭 복원 21건 포함. TypeScript·ESLint(경고 0)·Next.js production build 20개 route 확인. 로컬 격리 webpack 빌드와 원격 CI의 기본 Turbopack 빌드를 구분
-- **GitHub Actions:** 최신 PR #19 기능 커밋의 [Push 실행](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/38732916135)과 [PR 실행](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/38732923247)에서 Backend·Frontend **총 4개 job 성공**. 테스트·양쪽 빌드·타입·lint·프론트엔드 생산 의존성 감사를 CI로 확인
+- **Backend:** JUnit/PostgreSQL Testcontainers **20개 suite·368건 통과**, 실패·오류·skip 0, `compileJava`·`bootJar` 통과. 명단 통합 25건·가입 예정 권한 13건과 탈퇴/해체·인증·90일 세션·CSRF·예약·변경·교환·반복·고장·공지·알림·Push/worker 회귀 포함
+- **Frontend:** **23개 파일·334건 통과**, worker 35건·앱 클릭 복원 21건 포함. TypeScript·ESLint(경고 0)·Next.js production build 20개 route 확인. 로컬 격리 webpack 빌드와 원격 CI의 기본 Turbopack 빌드를 구분
+- **GitHub Actions:** 최신 PR #21 기능 커밋 `44c9fab`의 [Push 실행](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/38900217557)과 [PR 실행](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/38900246980)에서 Backend·Frontend **총 4개 job 성공**. 테스트·양쪽 빌드·타입·lint·프론트엔드 생산 의존성 감사를 CI로 확인
+- **관리자 지정·분류:** 가입 전 지정/해제·개인 초대 권한 적용·공개 역할/명단 ID 위조 차단·수동 연결의 기존 권한 보존·가입/연결/지정 경합·후반 실패 rollback·마지막 활성 관리자 보호 확인. 관리자 우선 단일 표시·동명이인 분리·카드 내 오류/재조회/완료·그룹 이동 후 포커스·중복 실행 차단도 검증
 - **예약·교환·고장·공지 경합:** 실제 PostgreSQL 잠금 timeout·후반 저장 실패의 전체 rollback, 동일 키 재확인·중복 방지, 현재 권한·점유·한도·계보 보존 확인. 최초 중요 작성만 알림·수신자 격리·읽음 시각 경계 포함
 - **실제 스케줄러·재시작:** Spring Boot 종료·새 JVM 재시작과 데이터 보존, 자정 cron 등록·누락 날짜 복구·자동 재시도, 독립 JVM의 시작 계획·발송 lease 복구·중복 방지 확인
 - **V11·개발 DB 보존:** populated V10→V11 업그레이드와 기존 컬럼/행 보존·재적용 0건·Flyway validate 확인. 사용자 승인으로 실제 개발 DB에 V11 한 건만 적용하고 기존 계정·예약·세션·Flyway·Docker 볼륨 보존. 최근 실기기 시험 전후에도 기존 **39개 테이블 전체 행 지문·세션·시퀀스·볼륨 일치** 확인
-- **로컬 백업 복원:** V10 적용 직전 V9 백업 **139,986bytes**, V11 적용 직전 V10 백업 **153,172bytes**의 checksum·archive를 확인하고 각각 네트워크/호스트 포트가 없는 임시 PostgreSQL에 실제 복원. 당시 36개/38개 테이블의 행·세션·시퀀스 일치 확인. 운영 외부 백업 복원과 구분
+- **V12·개발 DB 보존:** 새 비공개 V11 백업을 네트워크 없는 임시 PostgreSQL에 복원해 원래 행·세션·시퀀스 일치 확인. 앱·worker 중지 상태에서 표준 Flyway로 V12 한 건만 적용하고 새 컬럼/이력 행을 제외한 원래 모든 행 필드·세션·시퀀스·V1~V11 이력·Docker 볼륨 보존 확인. 관리자 지정/해제의 쓰기 시험은 합성 계정에서 수행
+- **로컬 백업 복원:** V10 적용 직전 V9 백업 **139,986bytes**, V11 적용 직전 V10 백업 **153,172bytes**의 checksum·archive를 확인하고 각각 네트워크/호스트 포트가 없는 임시 PostgreSQL에 실제 복원. 당시 36개/38개 테이블의 행·세션·시퀀스 일치 확인. V12 적용 전 새 V11 백업의 격리 복원까지 확인했으며 운영 외부 백업 복원과 구분
 - **탈퇴·해체 원자성:** 마지막 관리자·동시 탈퇴·로그인/예약/Push 재등록 경합, 실제 10초 잠금 timeout과 후반 INSERT 실패의 전체 rollback, 개인/팀 예약·교환·반복·시작 계획 정리와 존속 팀·곡·작성자/완료 이력 보존 확인. 같은 DB의 새 JVM 재시작 후 39개 테이블·세션·시퀀스 일치
 - **실제 브라우저:** 격리 DB·합성 계정으로 기존 다이어리·예약/변경/교환·고장·공지/알림을 검증하고, 이어 **탈퇴·해체 후속 28항목**을 별도로 확인. 관리자/회원 권한, 마지막 관리자 보호, 확인 체크·사유 제한, Tab/Shift+Tab·Escape·초점 복원, 성공 응답 유실·동일 요청 재확인과 자동 제출 차단 확인
 - **Push·시작 worker·CSRF:** VAPID 서명·AES128GCM 복호화, 재시도/만료/재등록·수신자/계보·트랜잭션 rollback, scheduler 응답성·독립 JVM·동시 CSRF 초기화/ID 회전·이전 토큰 거절 검증. CSRF 보호와 90일 로그인 유지 보존
@@ -316,11 +328,11 @@ Spring Session JDBC를 사용하며 `HttpOnly`·`SameSite=Lax` 세션 쿠키와 
 - **기기별 로그아웃:** iPhone만 로그아웃한 뒤 해당 구독/세션 종료·추가 Push 작업 0건, **PC 로그인·구독·실수신/클릭 유지**를 확인. 기기 이름/등록 순서 대신 같은 구독의 전후 상태로 식별
 - **회원 탈퇴 실기기:** 관리자 탈퇴 API가 구독 **2개**·인증 세션 **3개**(두 실기기+별도 API 검증용 1개)를 종료. 이전 쿠키의 보호 API 401·재로그인 거부·동일 요청의 단일 작업과 관리자/존속 팀 보존 확인. 새 중요 공지의 해당 회원 알림함·Push 작업 **0건**, 사용자도 두 기기 로그인 종료·재로그인 거부·새 알림 없음을 확인. 이 실기기 환경의 예약은 0건이며 예약 정리는 별도 PostgreSQL·브라우저 검증 결과를 따름
 
-다이어리 UI는 375~1920px의 8개 viewport에서 레이아웃·모바일 바텀시트를 확인했고 인사말은 320/375/390/768/1440px에서 확인했습니다. 예약 변경·교환·고장·공지·알림함·기기 설정·탈퇴/해체 화면은 **320/390/768/1440px**에서 가로 넘침이 없음을 확인했으며 320×568px 확인창 내부 스크롤도 유지했습니다. 로고·기타 마스코트·작은 `JEONGEUM · SENTIMENTAL MUSIC`·닉네임 인사말·연한 로그인 ID/역할을 보존했습니다.
+다이어리 UI는 375~1920px의 8개 viewport에서 레이아웃·모바일 바텀시트를 확인했고 인사말은 320/375/390/768/1440px에서 확인했습니다. 예약 변경·교환·고장·공지·알림함·기기 설정·탈퇴/해체 화면은 **320/390/768/1440px**에서 가로 넘침이 없음을 확인했으며 320×568px 확인창 내부 스크롤도 유지했습니다. 역할별 명단은 320/390/768/1440px, 카드 내 확인과 최신 메인·헤더 보완은 320/390/1440px에서 확인했습니다. 모바일 제목·소개 시작점과 로고 중앙 정렬, 작아진 더보기 표시 영역과 44px 터치 영역, PC 인사말·공연조 선택 상단 정렬을 확인했습니다. 추가 달력 아이콘은 DB 없는 현재 컴포넌트 SSR·1360px 브라우저에서 월 이동 버튼과 겹치지 않음을 확인했습니다. 로고·기타 마스코트·작은 `JEONGEUM · SENTIMENTAL MUSIC`·닉네임 인사말·연한 로그인 ID/역할을 보존했으며 이번 화면 크기 확인을 새 스마트폰 실기기 검증으로 간주하지 않습니다.
 
-검증 범위와 재현 절차는 [다이어리](docs/DIARY_UI_REDESIGN.md), [예약 변경](docs/RESERVATION_CHANGES.md), [예약 교환](docs/RESERVATION_EXCHANGES.md), [악기 고장](docs/INSTRUMENT_FAULTS.md), [공지·알림함](docs/NOTICES_NOTIFICATIONS.md), [Web Push·시작 알림](docs/WEB_PUSH_REMINDERS.md), [회원 탈퇴·팀 해체](docs/MEMBER_TEAM_LIFECYCLE.md)에 기록했습니다.
+검증 범위와 재현 절차는 [명단·관리자 지정](docs/MEMBER_TEAM_MANAGEMENT.md), [다이어리](docs/DIARY_UI_REDESIGN.md), [예약 변경](docs/RESERVATION_CHANGES.md), [예약 교환](docs/RESERVATION_EXCHANGES.md), [악기 고장](docs/INSTRUMENT_FAULTS.md), [공지·알림함](docs/NOTICES_NOTIFICATIONS.md), [Web Push·시작 알림](docs/WEB_PUSH_REMINDERS.md), [회원 탈퇴·팀 해체](docs/MEMBER_TEAM_LIFECYCLE.md)에 기록했습니다.
 
-**미완료 범위:** 운영 HTTPS 배포·도메인/서버 연결·운영 외부 백업 복원·실서비스 트래픽, Android 실기기 설치/수신/클릭, 실제 OS의 오프라인·가상 키보드·스크린리더·200% 확대 검증입니다. 기기별 로그아웃은 iPhone 중단→PC 유지 방향을 확인했으며 반대 방향과 모든 OS/실행 상태까지 확인한 것은 아닙니다. 이전 V7~V9 적용 전 백업 파일 자체의 복원은 미검증이며 V10/V11 적용 전 새 백업의 로컬 격리 복원과 구분합니다.
+**미완료 범위:** 운영 HTTPS 배포·도메인/서버 연결·운영 외부 백업 복원·실서비스 트래픽, Android 실기기 설치/수신/클릭, 실제 OS의 오프라인·가상 키보드·스크린리더·200% 확대 검증입니다. 기기별 로그아웃은 iPhone 중단→PC 유지 방향을 확인했으며 반대 방향과 모든 OS/실행 상태까지 확인한 것은 아닙니다. 이전 V7~V9 적용 전 백업 파일 자체의 복원은 미검증이며 V10/V11/V12 적용 전 새 백업의 로컬 격리 복원과 구분합니다.
 
 시험 계정·임시 HTTPS·합성 DB는 검증 후 종료했습니다. 실제 개발 계정·예약·Docker 영속 볼륨은 보존했으며 공개 시험 계정이나 운영 접속 주소는 제공하지 않습니다. iPhone 클릭 문제의 재발과 후속 복원을 확인했지만 단말의 상세 native 이벤트 기록은 수집하지 않아 모든 iOS 상태의 해결을 보장하지 않습니다. 탈퇴 후 미수신은 사용자 관찰이며 이미 제공자가 수락한 이전 알림을 철회할 수 없습니다. 네트워크·OS 지연·발송 후 기록 전 중단의 외부 중복 가능성도 남습니다.
 
@@ -369,7 +381,7 @@ npm.cmd run build
 | [API](docs/API.md) | API 계약과 권한·오류 응답 |
 | [ERD](docs/ERD.md) | 현재·계획 데이터 관계와 제약 |
 | [AUTHENTICATION](docs/AUTHENTICATION.md) | 초대·가입·로그인, 90일 세션, 최초 관리자 절차 |
-| [MEMBER_TEAM_MANAGEMENT](docs/MEMBER_TEAM_MANAGEMENT.md) | 명단·계정 연결, 복수 팀·팀장·곡 관리 및 테스트 |
+| [MEMBER_TEAM_MANAGEMENT](docs/MEMBER_TEAM_MANAGEMENT.md) | 가입 전/후 관리자 지정·V12·역할별 명단·카드 내 확인, 계정 연결·복수 팀·팀장·곡 관리 및 검증 |
 | [RESERVATION_RULES](docs/RESERVATION_RULES.md) | 예약 블록, 한도, 반복·변경·교환 정책 |
 | [RESERVATION_FOUNDATION](docs/RESERVATION_FOUNDATION.md) | 기본 예약·취소·점유·한도 구현 및 검증 |
 | [RECURRING_ASSIGNMENTS](docs/RECURRING_ASSIGNMENTS.md) | 반복 배정·회차 예외·날짜 개방·내 공연조 일정·V5 적용 및 검증 |
@@ -410,6 +422,8 @@ npm.cmd run build
 | [#17](https://github.com/developer-sw/jeongeum-band-scheduler/pull/17) | 기기별 Web Push·시작 1시간 전 알림·CSRF 동시성 보완·V10·325/214건·다중 JVM·개발 백업 복원, 기존 LAN 변경 별도 커밋 |
 | [#18](https://github.com/developer-sw/jeongeum-band-scheduler/pull/18) | Web Push·V10·검증 범위를 반영한 README 갱신 |
 | [#19](https://github.com/developer-sw/jeongeum-band-scheduler/pull/19) | 관리자 회원 탈퇴·팀 해체·V11·예약/알림/기기/세션 정리·Push 클릭 120초 일회 복원·352/289건·브라우저 28항목·PC/iPhone 실기기 확인 |
+| [#20](https://github.com/developer-sw/jeongeum-band-scheduler/pull/20) | 탈퇴·팀 해체·실기기 Push 확인·V11·검증 상태를 반영한 README 갱신 |
+| [#21](https://github.com/developer-sw/jeongeum-band-scheduler/pull/21) | 가입 전 관리자 지정·개인 초대 권한 적용·역할별 명단·카드 내 권한 확인·V12·다이어리/모바일 헤더 보완·368/334건 |
 
 현재는 **핵심 기능 구현 후 운영 준비 검증 단계**이며, 동아리 대상 운영 배포·실사용 지표는 아직 없습니다. 운영 HTTPS·외부 백업 복원과 남은 실기기/접근성 검증을 거쳐 실제 사용자에게 제공할 예정입니다.
 
