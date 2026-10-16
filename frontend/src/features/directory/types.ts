@@ -1,5 +1,6 @@
 export type TeamKind = "REGULAR" | "ADDITIONAL";
 export type MembershipRole = "MEMBER" | "LEADER";
+export interface LeaderTeam { id: string; name: string; kind: TeamKind }
 
 export interface RosterEntry {
   id: string;
@@ -8,6 +9,8 @@ export interface RosterEntry {
   loginId: string | null;
   displayName: string | null;
   accountStatus: string | null;
+  signupGlobalRole: "MEMBER" | "GLOBAL_ADMIN";
+  leaderTeams: LeaderTeam[];
   version: number;
 }
 

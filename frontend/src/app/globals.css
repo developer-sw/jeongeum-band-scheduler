@@ -60,7 +60,6 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 .app-brand-badge { display: inline-flex; align-items: center; flex-shrink: 0; padding: 4px 7px; border: 1px solid #d6b879; border-radius: 6px; background: #fff8eb; color: #79551f; font-size: 11px; font-weight: 600; line-height: 1.2; letter-spacing: 0.02em; white-space: nowrap; }
 .app-brand-mobile { display: none; }
 .app-brand-subtitle { display: block; margin-top: 3px; font-size: 12px; font-weight: 600; color: var(--diary-muted); }
-.app-brand-subtitle-mobile { display: none; }
 .desktop-navigation { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 5px; min-width: 0; max-width: 100%; margin-left: auto; font-size: 14px; font-weight: 700; }
 .app-nav-link { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 12px; border-radius: 12px; white-space: nowrap; }
 .app-nav-link:hover { background: #fff8eb; }
@@ -98,18 +97,23 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
 @media (max-width: 767px) {
   .app-container { padding-inline: 16px; }
   .app-header { padding-block: 16px; }
-  .app-header-card { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 8px; padding: 10px 12px; }
-  .app-brand { grid-column: 1 / -1; gap: 8px; min-width: 0; min-height: 44px; }
-  .app-brand img { width: 44px; height: 44px; }
+  .app-header-card { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; padding: 10px 12px; }
+  .app-brand { grid-column: 1; grid-row: 1; width: 100%; gap: 8px; min-width: 0; min-height: 0; }
+  .app-brand > span { flex: 1; }
+  .app-brand img { width: 52px; height: 52px; }
   .app-brand-title { font-size: 18px; }
   .app-brand-desktop { display: none; }
   .app-brand-mobile { display: block; }
-  .app-brand-subtitle { font-size: 10px; letter-spacing: 0.05em; }
-  .app-brand-subtitle-desktop { display: none; }
-  .app-brand-subtitle-mobile { display: block; grid-column: 1; grid-row: 2; align-self: center; margin-top: 0; white-space: nowrap; }
+  .app-brand-subtitle { display: flex; min-height: 44px; align-items: center; margin-top: 0; padding-inline-end: 112px; font-size: 10px; letter-spacing: 0.05em; word-break: keep-all; }
   .desktop-navigation { display: none; }
-  .app-compact-actions { display: flex; grid-column: 2; grid-row: 2; align-items: center; gap: 2px; margin-left: auto; font-size: 14px; font-weight: 700; }
+  /* Reserve the subtitle's right edge for actions while keeping the logo centered on both lines. */
+  .app-compact-actions { display: flex; grid-column: 1; grid-row: 1; align-self: end; justify-self: end; align-items: center; gap: 2px; margin-left: 0; font-size: 14px; font-weight: 700; }
   .app-compact-actions .app-nav-link { padding-inline: 9px; }
+  /* Keep the tap area while making the visible button shorter. */
+  .app-compact-actions .app-account-link { position: relative; isolation: isolate; border-color: transparent; background: transparent; }
+  .app-compact-actions .app-account-link::before { content: ""; position: absolute; z-index: -1; inset: 3px -1px; border: 1px solid var(--diary-border); border-radius: inherit; background: #fffdf9; pointer-events: none; }
+  .app-compact-actions .app-account-link:hover::before { background: #fff8eb; }
+  .app-compact-actions .app-account-link[aria-current="page"]::before { background: #f1e5cd; }
   .app-main { padding-top: 0; padding-bottom: 32px; }
   .app-frame-member .app-footer { margin-bottom: calc(78px + env(safe-area-inset-bottom)); }
   .mobile-navigation { position: fixed; z-index: 40; inset: auto 0 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 3px; padding: 8px 8px calc(8px + env(safe-area-inset-bottom)); border-top: 1px solid var(--diary-border); background: #fffdf9; box-shadow: 0 -3px 20px #3e342b08; }
@@ -118,6 +122,17 @@ select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible {
   .mobile-nav-link[aria-current="page"] { background: #f1e5cd; color: var(--diary-ink); }
   body:has(dialog[open]) .mobile-navigation { visibility: hidden; }
   .app-footer p { font-size: 11px; letter-spacing: 0.12em; }
+}
+
+@media (max-width: 374px) {
+  .app-brand { gap: 6px; }
+  .app-brand img { width: 46px; height: 46px; }
+  .app-brand-title-row { gap: 4px; }
+  .app-brand-title { font-size: 16px; letter-spacing: -0.045em; }
+  .app-brand-badge { padding: 3px; font-size: 8.5px; letter-spacing: 0; }
+  .app-brand-subtitle { padding-inline-end: 96px; letter-spacing: 0; }
+  .app-compact-actions { font-size: 12px; }
+  .app-compact-actions .app-nav-link { min-width: 44px; padding-inline: 4px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

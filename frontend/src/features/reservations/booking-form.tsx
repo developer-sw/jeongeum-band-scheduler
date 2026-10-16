@@ -48,7 +48,7 @@ export function BookingForm({ member, schedule, day, block, now, disabled, onCre
   }
 
   return <section id="booking-confirmation" className={compact ? "min-w-0 space-y-4 [&_ul]:text-sm" : "rounded-3xl border-2 border-yellow p-6 sm:p-8"} aria-labelledby="booking-title">
-    <h2 ref={title} id="booking-title" tabIndex={-1} className={compact ? "text-lg font-bold" : "text-xl font-bold"}>{compact ? "빠른 예약" : "선택한 시간 예약"}</h2>
+    <h2 ref={title} id="booking-title" tabIndex={-1} className={compact ? "text-lg font-bold" : "text-xl font-bold"}>{compact ? <><span aria-hidden="true">✏️</span> 빠른 예약</> : "선택한 시간 예약"}</h2>
     <p className={`${compact ? "" : "mt-3"} text-sm font-semibold leading-7`}>{dateLabel(day.date)} · {blockLabel(block)} · {block.durationMinutes}분</p>
     <p className="mt-1 text-sm leading-7 text-navy-soft">{phase === "IN_PROGRESS"
       ? `이미 시작한 블록이에요. 지금부터 종료까지 약 ${remainingMinutes(block, now)}분 이용할 수 있어요.`

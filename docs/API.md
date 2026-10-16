@@ -96,9 +96,10 @@ Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 �
 
 | Method / 경로 | 권한 | 계약 |
 |---|---|---|
-| GET /roster | 전체 관리자 | 가입 전·연결된 명단 목록, 연결 계정 정보 |
+| GET /roster | 전체 관리자 | 명단·연결 계정 정보, `signupGlobalRole`·`leaderTeams: [{id,name,kind}]` |
 | POST /roster | 전체 관리자 | 이름으로 새 명단 생성; 이름 중복으로 기존 사람을 자동 판정하지 않음 |
 | PATCH /roster/{id} | 전체 관리자 | 명단 이름 변경, version 검사 |
+| PATCH /roster/{id}/signup-role | 전체 관리자 + CSRF | 미가입 명단의 `{globalRole,version}` 지정·해제, `MEMBER/GLOBAL_ADMIN`; 연결된 명단 거절 |
 | POST /roster/{id}/link-account | 전체 관리자 | 기존 활성 계정 명시적 연결, 양쪽 일대일 제약, 남은 초대 해지 |
 | GET /users | 전체 관리자 | 운영 회원 목록 |
 | PATCH /users/{id}/role | 전체 관리자 | 전역 역할 변경·version·감사 기록, 마지막 활성 관리자 강등 거절 |
@@ -119,6 +120,8 @@ Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 �
 명단·소속·곡·역할·초대·가입 변경은 `directory_mutation_guard`를 먼저 잠그고 현재 실행자 권한·대상 명단·팀을 다시 검사한다. 팀장 지정은 연결된 활성 계정에 자기 팀 권한만 부여한다. 삭제 대상 곡이 요청 경로의 팀에 속하는지도 검증한다. 팀 상세 명단은 전체 관리자 또는 해당 팀의 활성 계정만 조회하며 다른 회원에게는 `members=[]`, `canViewMembers=false`를 반환하는 읽기 기술안을 적용한다.
 
 명단·회원·팀·곡 GET 목록은 약 45명 규모에 맞춰 `ApiResponse`의 `data` 배열로 반환하고 임의 개수로 잘라 누락하지 않는다. 기존 초대 목록만 cursor 계약을 유지한다. 2026-10-14 탈퇴·팀 해체 정리 구현 단계의 두 POST 계약은 [MEMBER_TEAM_LIFECYCLE](MEMBER_TEAM_LIFECYCLE.md)을 따른다. V11·격리 검증과 실제 개발 DB 적용 상태는 구분한다.
+
+2026-10-16 확정: 초대 가입은 그 명단 ID의 최신 `signupGlobalRole`만 초기 권한으로 적용한다. 공개 가입의 역할·다른 명단 ID로 권한을 바꿀 수 없다. 기본값은 `MEMBER`이며 계정 생성·명단 연결·초대 소비는 원자적이다. 수동 계정 연결은 기존 전역 권한을 보존한다. `leaderTeams`는 활성 팀/소속의 팀장이고 미가입자는 포함하되 비활성·탈퇴 계정은 제외한다. 명단 변경 응답에도 두 필드를 제공한다.
 
 탈퇴/해체 본문은 `{ expectedVersion, reason? }`이며 사유는 선택·최대 500자다. 성공 `200`의 `data`는 문자열 `operationId`·`targetId`, 종료 `status`, 증가한 `version`과 `canceledReservations`·`invalidatedExchanges`·`endedAssignments`·`deactivatedSubscriptions`·`revokedSessions` 건수를 반환한다. 동일 실행자/키/요청은 원래 결과를 재확인하며 다른 요청으로 키를 재사용하면 `IDEMPOTENCY_KEY_REUSED`다. 현재 관리자 권한은 재확인에도 필요하다. 마지막 활성 전체 관리자 탈퇴는 기존 운영 보호와 같은 `LAST_GLOBAL_ADMIN`으로 거절한다. 예약 취소부터 최종 처리 기록까지 한 트랜잭션이며 후반 실패·timeout은 전체 rollback한다.
 

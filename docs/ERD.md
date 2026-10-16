@@ -55,6 +55,7 @@ erDiagram
         bigint id PK
         string name
         bigint user_id FK,UK
+        string signup_global_role
         bigint version
     }
     team_memberships {
@@ -311,7 +312,7 @@ erDiagram
 ### 5.2 roster_entries / teams / team_memberships / team_songs
 
 - `teams`: 이름, `REGULAR/ADDITIONAL`, `ACTIVE/DISBANDED`, 생성·해체 시각, version.
-- `roster_entries`: 이름, nullable unique `user_id`, 생성·수정 시각, version. 미가입 명단에 로그인 ID·임시 비밀번호를 만들지 않는다. 기존 계정은 관리자가 명시적으로 한 명단에 연결하며 이미 연결된 계정·명단의 재연결은 거절한다.
+- `roster_entries`: 이름, nullable unique `user_id`, 생성·수정 시각, version. V12의 `signup_global_role`은 `MEMBER` 기본값과 `MEMBER/GLOBAL_ADMIN` CHECK를 가지며 미가입자의 초대 가입 초기 권한만 지정한다. 연결 계정은 `users.global_role`이 기준이고 수동 연결로 덮어쓰지 않는다. 미가입 명단에 로그인 ID·임시 비밀번호를 만들지 않는다. 기존 계정은 관리자가 명시적으로 한 명단에 연결하며 이미 연결된 계정·명단의 재연결은 거절한다.
 - `team_memberships`: 팀, `roster_entry_id`, `MEMBER/LEADER`, `ACTIVE/REMOVED`, 가입·제거 시각. 활성 `(team_id, roster_entry_id)` 중복을 금지한다. 가입 후 같은 명단 ID를 통해 계정의 소속을 조회하므로 소속·팀장 배정을 다시 복사하지 않는다. 로그인 권한은 연결된 활성 계정에만 적용한다.
 - 팀별 활성 팀장은 최대 한 명이라는 DB 제약을 권고한다. 팀장이 탈퇴하고 후임 지정 전인 상태는 허용하므로 항상 한 명이 있어야 한다는 제약을 만들지 않는다.
 - 같은 회원이 여러 활성 정규조·추가조에 소속될 수 있다. 회원별 활성 정규조 수를 한 개로 제한하는 제약·서비스 검증은 두지 않는다. 동일 팀의 활성 `(team_id, roster_entry_id)` 중복 금지와 팀별 역할 검증은 유지한다.

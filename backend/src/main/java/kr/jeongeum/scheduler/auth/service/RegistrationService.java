@@ -63,7 +63,8 @@ public class RegistrationService {
             entry = roster.lockById(invitation.rosterEntryId()).orElseThrow(DirectoryInputs::notFound);
         }
         if (entry.userId() != null) { throw RosterService.alreadyLinked(); }
-        Member member = members.insert(normalizedLoginId, hash, name, "MEMBER", now)
+        // Only the invitation's locked roster identity can grant a preassigned role; public input cannot.
+        Member member = members.insert(normalizedLoginId, hash, name, entry.signupGlobalRole(), now)
                 .orElseThrow(() -> new ApiException(409, "LOGIN_ID_TAKEN", "이미 사용 중인 로그인 ID입니다."));
         invitations.use(invitation.id(), member.id(), now);
         roster.link(entry.id(), member.id(), now);

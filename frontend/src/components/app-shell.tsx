@@ -58,10 +58,9 @@ export function AppShell({ children, wide = false }: { children: React.ReactNode
               <span className="app-brand-title app-brand-mobile">정음 합주실 다이어리</span>
               <span className="app-brand-badge">STUDIO NOTE</span>
             </span>
-            <span className="app-brand-subtitle app-brand-subtitle-desktop">따뜻한 합주실 예약 공간</span>
+            <span className="app-brand-subtitle">따뜻한 합주실 예약 공간</span>
           </span>
         </Link>
-        <span className="app-brand-subtitle app-brand-subtitle-mobile">따뜻한 합주실 예약 공간</span>
         <nav aria-label="주요 메뉴" className="desktop-navigation">
           {member ? <>
             {mainLinks.map(({ href, label }) => navigationLink(href, label))}

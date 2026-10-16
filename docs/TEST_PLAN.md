@@ -1,5 +1,14 @@
 # 테스트 및 운영 검증 계획
 
+## 2026-10-16 역할별 명단·가입 전 관리자 지정
+
+- 관리자/팀장/일반 회원의 배타 분류, 관리자 겸 팀장·복수 팀장의 단일 표시, 동명이인·미가입 명단·미연결 계정·조회 시점 차이를 ID로 처리한다.
+- 미가입 지정·해제·기본값, 올바른 초대 명단의 역할 적용, 공개 가입의 역할/다른 명단 ID 위조 차단, 수동 연결의 기존 계정 권한 보존을 검사한다.
+- 관리자·CSRF·version·연결 상태, 지정/가입/연결의 directory guard 경합·실패 rollback·마지막 관리자 보호를 실제 PostgreSQL에서 확인한다.
+- 데이터가 있는 V11→V12의 원래 컬럼/행·소속/팀장/예약/세션 보존과 새 기본값·제약을 확인한다. 실제 명단은 비공개 백업·격리 복원으로 보존하고 쓰기 시험은 합성 데이터만 사용한다.
+- 별도 시험 환경에서 PC/모바일의 세 영역·관리자 버튼·중복 없음과 미가입 지정→개인 초대 가입의 실제 흐름을 확인한다. 실행 결과·제한은 [MEMBER_TEAM_MANAGEMENT](MEMBER_TEAM_MANAGEMENT.md)에 기록한다.
+- 관리자 지정/해제의 확인·취소·오류·완료가 해당 카드에 귀속되고 상단 확인 영역을 사용하지 않는지 검사한다. 가입 전/후 네 경로, 그룹 이동 뒤 완료 포커스, 처리부터 재조회까지 중복 차단, version 충돌의 카드 내 재조회·stale 차단·재선택을 합성 환경에서 확인한다.
+
 작성 기준: 2026-10-12, Asia/Seoul. 이 문서는 업무 테스트의 기준이다. 로컬 DB·초기 앱 검증은 [DEV_ENVIRONMENT.md](DEV_ENVIRONMENT.md), [INITIAL_SETUP.md](INITIAL_SETUP.md), 초대·가입·세션·권한 회수·경합은 [AUTHENTICATION.md](AUTHENTICATION.md), 명단·팀·곡 단계는 [MEMBER_TEAM_MANAGEMENT.md](MEMBER_TEAM_MANAGEMENT.md), 예약 기본 단계는 [RESERVATION_FOUNDATION.md](RESERVATION_FOUNDATION.md), 반복 배정·개방은 [RECURRING_ASSIGNMENTS.md](RECURRING_ASSIGNMENTS.md), 단건 변경·V6의 실제 결과는 [RESERVATION_CHANGES.md](RESERVATION_CHANGES.md)에 기록한다. 기본 예약이나 단건 변경 검증을 교환·Push 등 후속 항목의 통과로 간주하지 않는다. [RESERVATION_RULES.md](RESERVATION_RULES.md), [API.md](API.md), [ERD.md](ERD.md), [UX.md](UX.md), [NOTIFICATIONS.md](NOTIFICATIONS.md)와 함께 검토한다.
 
 ## 1. 목표와 우선순위

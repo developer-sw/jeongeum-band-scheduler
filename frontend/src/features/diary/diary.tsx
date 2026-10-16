@@ -111,7 +111,7 @@ export function Diary({ member, scope }: { member: Member; scope: string }) {
         </section>
         <aside className="diary-side"><TeamSummary member={member} scope={scope} schedule={schedule} today={today} now={now} highlight={highlight} onDate={selectDate} disabled={busy} />
           <div className="diary-booking-host">
-            {!selectedBlock && <section className="diary-booking-placeholder diary-card"><p className="diary-eyebrow">SAVE YOUR PRACTICE</p><h2>빠른 예약</h2><div className="diary-booking-empty"><span aria-hidden="true">＋</span><p>시간표에서 날짜와<br />연습할 시간을 골라주세요.</p></div><button type="button" className="diary-disabled-booking" disabled>시간을 먼저 선택해 주세요</button><p className="diary-small">개인은 악기 한 종류, 소속 공연조는 합주실 전체를 예약해요.</p></section>}
+            {!selectedBlock && <section className="diary-booking-placeholder diary-card"><p className="diary-eyebrow">SAVE YOUR PRACTICE</p><h2><span aria-hidden="true">✏️</span> 빠른 예약</h2><div className="diary-booking-empty"><span aria-hidden="true">＋</span><p>시간표에서 날짜와<br />연습할 시간을 골라주세요.</p></div><button type="button" className="diary-disabled-booking" disabled>시간을 먼저 선택해 주세요</button><p className="diary-small">개인은 악기 한 종류, 소속 공연조는 합주실 전체를 예약해요.</p></section>}
             <dialog ref={dialog} className="diary-booking-dialog" aria-labelledby="booking-title" onCancel={(event) => { event.preventDefault(); clearSelection(); }} onKeyDown={(event) => {
               if (!compact || event.key !== "Tab") return;
               const focusable = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), select:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex="0"]')).filter((element) => element.getClientRects().length);
