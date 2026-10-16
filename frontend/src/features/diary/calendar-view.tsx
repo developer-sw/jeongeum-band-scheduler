@@ -15,7 +15,7 @@ function MonthCalendar({ selected, today, through, days, disabled, onSelect, onU
   const week = new Set(weekDates(selected));
   const available = new Set(days.map((day) => day.date));
   return <div className="diary-calendar">
-    <div className="diary-calendar-heading"><h2>{monthLabel(month)}</h2><div className="diary-month-buttons">
+    <div className="diary-calendar-heading"><h2><span aria-hidden="true">📅</span>{monthLabel(month)}</h2><div className="diary-month-buttons">
       <button type="button" aria-label="이전 달" onClick={() => setMonth(moveMonth(month, -1))}>‹</button>
       <button type="button" aria-label="다음 달" onClick={() => setMonth(moveMonth(month, 1))}>›</button>
     </div></div>
