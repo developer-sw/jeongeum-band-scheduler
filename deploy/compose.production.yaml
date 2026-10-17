@@ -1,0 +1,156 @@
+name: ${COMPOSE_PROJECT_NAME:?Set a dedicated production project name}
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: 10m
+    max-file: "3"
+
+services:
+  postgres:
+    image: postgres:17.11-bookworm@sha256:3645570cccdfa447589da9f57dd740faa29b30938e861289a5574b6ca6b03826
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Set the dedicated database name}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_admin_password
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+      APP_DB_USERNAME: ${APP_DB_USERNAME:?Set a non-superuser application role}
+      APP_DB_PASSWORD_FILE: /run/secrets/app_db_password
+      TZ: UTC
+    command: [postgres, -c, timezone=UTC, -c, log_timezone=UTC]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init-app.sh:/docker-entrypoint-initdb.d/10-init-app.sh:ro
+    secrets: [postgres_admin_password, app_db_password]
+    networks: [database]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -h 127.0.0.1 -U postgres -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 5s
+      retries: 24
+      start_period: 10s
+    mem_limit: 768m
+    stop_grace_period: 30s
+    logging: *logging
+
+  backend:
+    image: ${BACKEND_IMAGE:?Set the tested backend image tag or digest}
+    build:
+      context: ../backend
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: production
+      APP_DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:?Set database name}
+      APP_DB_USERNAME: ${APP_DB_USERNAME:?Set application role}
+      APP_DB_PASSWORD_FILE: /run/secrets/app_db_password
+      APP_BIND_ADDRESS: 0.0.0.0
+      APP_SERVER_PORT: "8080"
+      APP_TRUSTED_PROXY_REGEX: ${APP_TRUSTED_PROXY_REGEX:?Set the exact Caddy internal IP regex}
+      APP_VAPID_PUBLIC_KEY_FILE: /run/secrets/vapid_public_key
+      APP_VAPID_PRIVATE_KEY_FILE: /run/secrets/vapid_private_key
+      APP_VAPID_SUBJECT_FILE: /run/secrets/vapid_subject
+      JEONGEUM_RECURRING_WORKER_ENABLED: ${JEONGEUM_RECURRING_WORKER_ENABLED:-false}
+      JEONGEUM_EXCHANGE_WORKER_ENABLED: ${JEONGEUM_EXCHANGE_WORKER_ENABLED:-false}
+      JEONGEUM_REMINDER_WORKER_ENABLED: ${JEONGEUM_REMINDER_WORKER_ENABLED:-false}
+      JEONGEUM_PUSH_WORKER_ENABLED: ${JEONGEUM_PUSH_WORKER_ENABLED:-false}
+      JEONGEUM_PUSH_ENABLED: ${JEONGEUM_PUSH_ENABLED:-false}
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=50.0 -XX:+ExitOnOutOfMemoryError
+      TZ: UTC
+    secrets: [app_db_password, vapid_public_key, vapid_private_key, vapid_subject]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [application, database]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 1280m
+    stop_grace_period: 35s
+    logging: *logging
+
+  frontend:
+    image: ${FRONTEND_IMAGE:?Set the tested frontend image tag or digest}
+    build:
+      context: ../frontend
+      args:
+        APP_API_ORIGIN: http://backend:8080
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+      NODE_OPTIONS: --max-old-space-size=384
+      NEXT_TELEMETRY_DISABLED: "1"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks: [application]
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/.next/cache:uid=1000,gid=1000,mode=0700
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 640m
+    stop_grace_period: 30s
+    logging: *logging
+
+  caddy:
+    image: ${CADDY_IMAGE:-jeongeum-caddy:production-local}
+    build:
+      context: ./caddy
+    restart: unless-stopped
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?Set the public hostname without scheme or path}
+      ACME_EMAIL: ${ACME_EMAIL:?Set the certificate contact address}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/common.caddy:/etc/caddy/common.caddy:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    networks:
+      application:
+        ipv4_address: ${CADDY_INTERNAL_IP:?Set the Caddy internal IPv4 address}
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+    stop_grace_period: 15s
+    logging: *logging
+
+networks:
+  application:
+    ipam:
+      config:
+        - subnet: ${APP_NETWORK_SUBNET:?Set a free private IPv4 subnet}
+  database:
+    internal: true
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:
+
+secrets:
+  postgres_admin_password:
+    file: ${POSTGRES_ADMIN_PASSWORD_FILE:?Set the admin secret file path}
+  app_db_password:
+    file: ${APP_DB_PASSWORD_FILE:?Set the app secret file path}
+  vapid_public_key:
+    file: ${VAPID_PUBLIC_KEY_FILE:?Set the VAPID public key file path, empty while disabled}
+  vapid_private_key:
+    file: ${VAPID_PRIVATE_KEY_FILE:?Set the VAPID private key file path, empty while disabled}
+  vapid_subject:
+    file: ${VAPID_SUBJECT_FILE:?Set the VAPID contact file path, empty while disabled}

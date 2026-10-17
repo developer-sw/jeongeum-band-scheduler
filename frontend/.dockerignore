@@ -1,0 +1,29 @@
+# Only build inputs may enter the context. Local output and private files stay out.
+*
+!package.json
+!package-lock.json
+!.npmrc
+!next.config.ts
+!tsconfig.json
+!postcss.config.mjs
+!src/
+!src/**
+!public/
+!public/**
+
+# Keep private/generated files excluded even if placed beneath an allowed directory.
+**/.env
+**/.env.*
+**/.git
+**/node_modules
+**/.next
+**/.local
+**/secrets
+**/private
+**/*.log
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/*.dump
+**/*.sql

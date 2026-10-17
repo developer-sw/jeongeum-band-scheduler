@@ -1,0 +1,41 @@
+spring:
+  config:
+    activate:
+      on-profile: production
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+
+server:
+  address: ${APP_BIND_ADDRESS:0.0.0.0}
+  shutdown: graceful
+  forward-headers-strategy: native
+  tomcat:
+    remoteip:
+      # A missing value trusts no proxy; the image entrypoint requires an explicit Caddy IP regex.
+      internal-proxies: ${APP_TRUSTED_PROXY_REGEX:(?!)}
+      remote-ip-header: X-Forwarded-For
+      protocol-header: X-Forwarded-Proto
+      protocol-header-https-value: https
+      host-header: X-Forwarded-Host
+      port-header: X-Forwarded-Port
+  servlet:
+    session:
+      cookie:
+        secure: true
+
+# Restored data must be compared before any startup recovery or external delivery runs.
+# Compose explicitly supplies these flags; standalone production starts safely with them off too.
+jeongeum:
+  recurring:
+    worker:
+      enabled: ${JEONGEUM_RECURRING_WORKER_ENABLED:false}
+  exchange:
+    worker:
+      enabled: ${JEONGEUM_EXCHANGE_WORKER_ENABLED:false}
+  reminder:
+    worker:
+      enabled: ${JEONGEUM_REMINDER_WORKER_ENABLED:false}
+  push:
+    enabled: ${JEONGEUM_PUSH_ENABLED:false}
+    worker:
+      enabled: ${JEONGEUM_PUSH_WORKER_ENABLED:false}

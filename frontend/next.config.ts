@@ -20,6 +20,7 @@ function apiOrigin() {
 }
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   agentRules: false,
   poweredByHeader: false,
   allowedDevOrigins: [

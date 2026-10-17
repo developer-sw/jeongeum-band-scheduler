@@ -1,0 +1,38 @@
+# Synthetic local integration only. Never apply this override to a real deployment.
+services:
+  postgres:
+    restart: "no"
+  backend:
+    restart: "no"
+    environment:
+      JEONGEUM_RECURRING_WORKER_ENABLED: "false"
+      JEONGEUM_EXCHANGE_WORKER_ENABLED: "false"
+      JEONGEUM_REMINDER_WORKER_ENABLED: "false"
+      JEONGEUM_PUSH_WORKER_ENABLED: "false"
+      JEONGEUM_PUSH_ENABLED: "false"
+      APP_BOOTSTRAP_LOGIN_ID_FILE: /run/secrets/bootstrap_login_id
+      APP_BOOTSTRAP_PASSWORD_FILE: /run/secrets/bootstrap_password
+      APP_BOOTSTRAP_DISPLAY_NAME_FILE: /run/secrets/bootstrap_display_name
+    secrets:
+      - bootstrap_login_id
+      - bootstrap_password
+      - bootstrap_display_name
+  frontend:
+    restart: "no"
+  caddy:
+    restart: "no"
+    environment:
+      QA_HTTPS_PORT: ${QA_HTTPS_PORT:-18443}
+    ports: !override
+      - "127.0.0.1:${QA_HTTP_PORT:-18080}:80"
+      - "127.0.0.1:${QA_HTTPS_PORT:-18443}:443"
+    volumes:
+      - ./caddy/Caddyfile.qa:/etc/caddy/Caddyfile:ro
+
+secrets:
+  bootstrap_login_id:
+    file: ${BOOTSTRAP_LOGIN_ID_FILE:?Set the synthetic bootstrap login file}
+  bootstrap_password:
+    file: ${BOOTSTRAP_PASSWORD_FILE:?Set the synthetic bootstrap password file}
+  bootstrap_display_name:
+    file: ${BOOTSTRAP_DISPLAY_NAME_FILE:?Set the synthetic bootstrap display name file}
