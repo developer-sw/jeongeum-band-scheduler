@@ -1,0 +1,12 @@
+{
+	admin 127.0.0.1:2019
+	email {$ACME_EMAIL}
+	servers {
+		protocols h1 h2
+	}
+}
+
+{$APP_DOMAIN} {
+	header Strict-Transport-Security "max-age=31536000"
+	import /etc/caddy/common.caddy
+}

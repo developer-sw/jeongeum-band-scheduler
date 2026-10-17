@@ -1,14 +1,18 @@
 # 시스템 아키텍처
 
-갱신일: 2026-10-14 (Asia/Seoul)
+갱신일: 2026-10-17 (Asia/Seoul)
+
+최신 후속: 운영 Docker·Compose·Caddy 자산과 `production` 프로필, secret 파일 주입·정확한 내부 프록시 신뢰·기본 worker OFF를 구현했다. 별도 합성 DB/HTTPS의 권한·예약·앱 종료/재시작·별도 DB 복원 등 57개 검사를 통과했다. 파일별 책임과 실제 결과는 [PRODUCTION_CONTAINERS](PRODUCTION_CONTAINERS.md)를 따른다. 이 로컬 격리 구현은 운영 VPS·공개 CA·외부 백업과 실서비스 성능 검증 완료를 뜻하지 않는다.
 
 ## 1. 문서 범위와 상태
 
-이 문서는 jeongeum-band-scheduler의 구현을 위한 설계 기준이다. 초기 구성·인증·명단 연결·회원/팀/곡·예약·반복 배정·날짜 개방·변경·교환·악기 고장·공지/알림함을 구현했다. 초기 구성은 [INITIAL_SETUP](INITIAL_SETUP.md), 인증은 [AUTHENTICATION](AUTHENTICATION.md), 명단·팀은 [MEMBER_TEAM_MANAGEMENT](MEMBER_TEAM_MANAGEMENT.md), 예약은 [RESERVATION_FOUNDATION](RESERVATION_FOUNDATION.md), 반복 배정은 [RECURRING_ASSIGNMENTS](RECURRING_ASSIGNMENTS.md), 변경·교환은 [RESERVATION_CHANGES](RESERVATION_CHANGES.md)·[RESERVATION_EXCHANGES](RESERVATION_EXCHANGES.md), 공지/알림함은 [NOTICES_NOTIFICATIONS](NOTICES_NOTIFICATIONS.md)에 기록한다. Web Push·시작 1시간 전 알림·CSRF 동시성 보완은 로컬 전체 검증과 사용자 승인 후 개발 DB V10 적용·최신 서버 기동을 완료했다. 상세 구현·제한은 [WEB_PUSH_REMINDERS](WEB_PUSH_REMINDERS.md)를 따른다. 운영 서버·HTTPS 배포·실기기 Push 수신은 후속 단계다.
+이 문서는 jeongeum-band-scheduler의 구현을 위한 설계 기준이다. 인증·명단/계정·팀/곡·예약·반복/날짜 개방·변경/교환·악기 고장·공지/알림함·Web Push/시작 알림·탈퇴/팀 해체와 가입 전/후 관리자 지정을 main에 반영했다. 개발 DB V12·기존 데이터 보존과 최신 Backend 368건/Frontend 334건 검증은 각 기능 문서와 README를 따른다. [MEMBER_TEAM_MANAGEMENT](MEMBER_TEAM_MANAGEMENT.md), [MEMBER_TEAM_LIFECYCLE](MEMBER_TEAM_LIFECYCLE.md), [WEB_PUSH_REMINDERS](WEB_PUSH_REMINDERS.md)에 구현·검증 경계를 기록했다. 합성 HTTPS 환경의 PC/iPhone 공지와 iPhone 시작 알림 수신·클릭은 확인했고 실제 운영 origin·Android·운영 외부 백업/복원은 후속 범위다.
+
+2026-10-17 사용자는 운영 배포 사전 점검·구성안 작성과 한국 접속 지연·운영 여유 우선을 승인했다. 서울 4GB 단일 VPS는 기술 권고이며 구매 확정이 아니다. 현재 구조와 운영 자산의 차이·안전한 데이터/origin 전환·배포 전 통과 조건은 [DEPLOYMENT_PREFLIGHT](DEPLOYMENT_PREFLIGHT.md)를 따른다. 사전 점검 이후 운영 Docker/Compose/Caddy는 구현·합성 검증을 완료했으며, 이미지 registry 발행과 외부 백업 자동화는 후속 범위다.
 
 운영 정책의 기준 문서는 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md)와 [RESERVATION_RULES.md](RESERVATION_RULES.md)이다. 이 문서의 **확정 정책**은 사용자 결정의 요약이고, **기술 설계안**은 그 정책을 구현하기 위한 구조다. 세부 버전·성능 한도·설정 수치는 구현과 검증을 거쳐 고정한다.
 
-서비스는 정음(JEONGEUM) 동아리원 약 45명의 합주실 예약과 합주 일정을 지원한다. 단일 저장소, 단일 Next.js 코드베이스, 단일 Spring 애플리케이션, PostgreSQL을 사용한다. Reormo/rehearsal-pwa는 아이디어 참고 대상이며 이 프로젝트의 코드·데이터·저장소·배포 환경과 분리한다.
+서비스는 정음(JEONGEUM) 동아리원 약 40명의 합주실 예약과 합주 일정을 지원한다. 단일 저장소, 단일 Next.js 코드베이스, 단일 Spring 애플리케이션, PostgreSQL을 사용한다. Reormo/rehearsal-pwa는 아이디어 참고 대상이며 이 프로젝트의 코드·데이터·저장소·배포 환경과 분리한다.
 
 ## 2. 전체 구조
 

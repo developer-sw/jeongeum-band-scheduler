@@ -3,9 +3,9 @@ name: CI
 on:
   push:
     branches: [main, 'codex/**', 'chore/**', 'feature/**', 'fix/**']
-    paths: ['backend/**', 'frontend/**', '.node-version', '.github/workflows/ci.yaml']
+    paths: ['backend/**', 'frontend/**', 'deploy/**', 'scripts/Test-ProductionContainers.ps1', 'scripts/production-container-qa.mjs', '.node-version', '.github/workflows/ci.yaml']
   pull_request:
-    paths: ['backend/**', 'frontend/**', '.node-version', '.github/workflows/ci.yaml']
+    paths: ['backend/**', 'frontend/**', 'deploy/**', 'scripts/Test-ProductionContainers.ps1', 'scripts/production-container-qa.mjs', '.node-version', '.github/workflows/ci.yaml']
   workflow_dispatch:
 
 permissions:
@@ -60,3 +60,18 @@ jobs:
       - run: npm run lint
       - run: npm run test
       - run: npm run build
+
+  production-containers:
+    name: Production containers with synthetic database
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - name: Build and verify isolated HTTPS stack
+        shell: pwsh
+        run: ./scripts/Test-ProductionContainers.ps1

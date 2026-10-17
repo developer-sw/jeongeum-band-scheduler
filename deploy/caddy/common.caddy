@@ -1,0 +1,32 @@
+# Initial deployment is a direct TLS edge (DNS-only), not an upstream CDN trust configuration.
+header {
+	X-Content-Type-Options nosniff
+	Referrer-Policy strict-origin-when-cross-origin
+	X-Frame-Options DENY
+	-Server
+}
+
+# Discard client-supplied proxy identity. reverse_proxy reconstructs its own
+# X-Forwarded-For/Proto/Host and preserves Cookie, Set-Cookie, method and URI.
+request_header -Forwarded
+request_header -X-Forwarded-For
+request_header -X-Forwarded-Proto
+request_header -X-Forwarded-Host
+request_header -X-Forwarded-Port
+request_header -X-Real-IP
+
+@api path /api/v1 /api/v1/*
+handle @api {
+	header Cache-Control no-store
+	reverse_proxy backend:8080
+}
+
+handle /_next/static/* {
+	header Cache-Control "public, max-age=31536000, immutable"
+	reverse_proxy frontend:3000
+}
+
+handle {
+	header Cache-Control no-store
+	reverse_proxy frontend:3000
+}

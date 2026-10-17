@@ -1,0 +1,16 @@
+{
+	admin 127.0.0.1:2019
+	auto_https disable_redirects
+	servers {
+		protocols h1 h2
+	}
+}
+
+http://localhost {
+	redir https://localhost:{$QA_HTTPS_PORT}{uri} permanent
+}
+
+https://localhost {
+	tls internal
+	import /etc/caddy/common.caddy
+}
