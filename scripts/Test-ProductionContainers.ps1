@@ -15,7 +15,8 @@ param(
     [ValidateRange(1024, 65535)] [int]$HttpsPort = 18443,
     [string]$NodeCommand = 'node',
     [switch]$SkipBuild,
-    [switch]$KeepQaResources
+    [switch]$KeepQaResources,
+    [string]$ResultPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -37,6 +38,47 @@ $qaResourcesStarted = $false
 $qaPassed = $false
 $qaFailureCode = $null
 $qaChecks = [Collections.Generic.List[string]]::new()
+$qaResultPath = $null
+
+function Assert-QaResultPath {
+    param([string]$Path, [Parameter(Mandatory)] [string]$RepositoryRoot)
+    if ([string]::IsNullOrEmpty($Path)) { return $null }
+    if (-not [IO.Path]::IsPathFullyQualified($Path)) { throw 'QA_RESULT_PATH_REJECTED' }
+    $fullRoot = [IO.Path]::GetFullPath($RepositoryRoot)
+    $localRoot = Join-Path $fullRoot '.local'
+    $fullPath = [IO.Path]::GetFullPath($Path)
+    $comparison = if ($IsWindows) { [StringComparison]::OrdinalIgnoreCase } else { [StringComparison]::Ordinal }
+    if (-not [string]::Equals([IO.Path]::GetDirectoryName($fullPath), $localRoot, $comparison) -or
+        [IO.Path]::GetFileName($fullPath) -cnotmatch '^production-image-release-qa-(?:[a-f0-9]{32}|[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})\.json$') {
+        throw 'QA_RESULT_PATH_REJECTED'
+    }
+    foreach ($parent in @($fullRoot, $localRoot)) {
+        $item = Get-Item -Force -LiteralPath $parent -ErrorAction SilentlyContinue
+        if ($null -ne $item -and ((-not $item.PSIsContainer) -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint))) {
+            throw 'QA_RESULT_PARENT_REJECTED'
+        }
+    }
+    # Get-Item also detects dangling links, unlike File.Exists/Test-Path.
+    if ($null -ne (Get-Item -Force -LiteralPath $fullPath -ErrorAction SilentlyContinue)) { throw 'QA_RESULT_ALREADY_EXISTS' }
+    return $fullPath
+}
+
+function Write-QaResultExport {
+    param([Parameter(Mandatory)] [string]$Path, [Parameter(Mandatory)] [string]$RepositoryRoot,
+        [Parameter(Mandatory)] [Collections.IDictionary]$Summary)
+    $checkedPath = Assert-QaResultPath -Path $Path -RepositoryRoot $RepositoryRoot
+    $safeSummary = [ordered]@{}
+    foreach ($name in @('passed', 'checks', 'cleanupVerified', 'resourcesKept', 'developmentDatabaseAccessed', 'actualPushSent', 'restoreScope')) {
+        $safeSummary[$name] = $Summary[$name]
+    }
+    # CreateNew is essential: a destination that appeared since validation
+    # must never overwrite a previous result or follow a target symlink.
+    $stream = [IO.FileStream]::new($checkedPath, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+    try {
+        $bytes = [Text.UTF8Encoding]::new($false).GetBytes(($safeSummary | ConvertTo-Json -Depth 4))
+        $stream.Write($bytes, 0, $bytes.Length)
+    } finally { $stream.Dispose() }
+}
 
 function Assert-QaScope {
     if ($qaProject -cne "jeongeum-prod-qa-$qaSuffix" -or $qaProject -notmatch '^jeongeum-prod-qa-[a-f0-9]{12}$') {
@@ -290,6 +332,9 @@ function Invoke-QaHttpPhase {
 }
 
 try {
+    # Validate the optional release proof destination before creating QA
+    # directories, starting processes, or inspecting Docker resources.
+    $qaResultPath = Assert-QaResultPath -Path $ResultPath -RepositoryRoot $qaRepoRoot
     if ($HttpPort -eq $HttpsPort) { throw 'QA_PORTS_MUST_DIFFER' }
     foreach ($source in @($qaProductionCompose, $qaOverrideCompose, $qaHelper)) {
         if (-not (Test-Path -LiteralPath $source -PathType Leaf)) { throw 'QA_REQUIRED_ASSET_MISSING' }
@@ -454,15 +499,27 @@ try {
             Write-Output 'QA cleanup could not be verified; no broader cleanup was attempted.'
         }
     }
+    $summary = [ordered]@{
+        project = $qaProject; passed = $qaPassed; error = $qaFailureCode; checks = $qaChecks.ToArray()
+        cleanupVerified = $cleanupPassed; resourcesKept = [bool]$KeepQaResources
+        developmentDatabaseAccessed = $false; actualPushSent = $false
+        restoreScope = 'Separate database in the same synthetic QA PostgreSQL cluster'
+    }
     if (Test-Path -LiteralPath $qaDirectory -PathType Container) {
-        $summary = [ordered]@{
-            project = $qaProject; passed = $qaPassed; error = $qaFailureCode; checks = $qaChecks.ToArray()
-            cleanupVerified = $cleanupPassed; resourcesKept = [bool]$KeepQaResources
-            developmentDatabaseAccessed = $false; actualPushSent = $false
-            restoreScope = 'Separate database in the same synthetic QA PostgreSQL cluster'
-        }
         [IO.File]::WriteAllText((Join-Path $qaDirectory 'result.json'), ($summary | ConvertTo-Json -Depth 4), [Text.UTF8Encoding]::new($false))
         Write-Output "QA evidence: $qaDirectory"
+    }
+    if ($qaResultPath) {
+        try { Write-QaResultExport -Path $qaResultPath -RepositoryRoot $qaRepoRoot -Summary $summary } catch {
+            $qaPassed = $false
+            $qaFailureCode = 'QA_RESULT_EXPORT_FAILED'
+            $summary.passed = $false
+            $summary.error = $qaFailureCode
+            if (Test-Path -LiteralPath $qaDirectory -PathType Container) {
+                [IO.File]::WriteAllText((Join-Path $qaDirectory 'result.json'), ($summary | ConvertTo-Json -Depth 4), [Text.UTF8Encoding]::new($false))
+            }
+            Write-Output 'QA result export failed; no existing destination was overwritten.'
+        }
     }
 }
 if (-not $qaPassed) { throw "Production container QA did not pass ($qaFailureCode)." }

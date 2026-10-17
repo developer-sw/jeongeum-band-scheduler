@@ -1,5 +1,23 @@
 # 테스트 및 운영 검증 계획
 
+## 2026-10-17 운영 이미지 발행 준비
+
+[PRODUCTION_IMAGE_RELEASE](PRODUCTION_IMAGE_RELEASE.md)의 수동 workflow와 release helper를 대상으로 Docker/registry/GitHub API를 대체한 계약 검사를 추가했다. main/원본 저장소/성공 CI·엄격한 버전과 경로·archive 무결성·비공개 package·image ID/manifest digest·기존 tag 충돌·부분 실패/재시도·비밀값 배제를 검증했다. QA `ResultPath`의 parser·경로/덮어쓰기 방어도 Docker 없이 검사했다.
+
+| 실행 | 이번 결과 |
+|---|---|
+| `node --test scripts/production-image-release.test.mjs` | 28건 통과, 실패/건너뜀 0. Windows junction 경로 방어도 격리 임시 폴더에서 검증 |
+| `pwsh -NoProfile -File scripts/production-qa-result-export.test.ps1` | 15항목 통과. 상대/외부/중첩/기존 파일·parent/target 링크 거부, 내용 보존과 안전 필드 내보내기 |
+| PowerShell parser·`node --check` | QA 실행기·PS 검증기·Node helper 구문 성공 |
+| actionlint 1.7.12 | CI·수동 발행 workflow 정적 검사 성공. 공식 checksum 대조 도구 사용, shellcheck/pyflakes 별도 실행 안 함 |
+| 기존 합성 QA 결과 호환성 | 이전 57개 결과(이름은 51종, 재시작/복원 6개 중복)를 새 validator가 수용. 기존 결과 파일을 읽은 호환성 검사이며 새 QA 실행 아님 |
+
+독립 검토로 확인한 단기 registry token 재사용과 최종 artifact 재실행 이름 충돌을 수정했다. 각 manifest 조회 직전 token을 갱신하며 candidate는 같은 run/SHA로 보존하고 최종 결과에는 attempt를 붙인다. 기존 Backend 368건·Frontend 334건과 컨테이너 57개를 이번 단계에서 재실행하지 않았다.
+
+실제 workflow dispatch·GHCR Push/Pull·새 컨테이너 기동·개발 DB 접근/변경은 이번 준비 검증에서 실행하지 않는다. 기존 운영 컨테이너 PR #23 병합 main `911c181`의 [CI 39006934855](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/39006934855)는 Backend 368건·Frontend 334건·합성 57개 성공이며 이번 새 발행 도구의 검증과 구분한다.
+
+후속 승인된 GitHub 반영에서는 현재 커밋의 Backend·Frontend·운영 컨테이너·발행 계약 4개 CI job을 확인한다. 원격의 합성 컨테이너 실행은 GitHub runner의 임시 DB를 사용하며 로컬 개발 DB/서버를 실행하거나 변경하지 않는다. 실제 통과 여부는 초안 PR과 해당 run을 따른다.
+
 ## 2026-10-17 운영 컨테이너 합성 검증
 
 운영 Docker·Compose·Caddy 구현 승인 후 별도 `jeongeum-prod-qa-*` 프로젝트의 합성 DB·계정만으로 이미지 기동·CA를 신뢰한 HTTPS·Secure 쿠키/CSRF·현재 권한·예약·앱 재시작과 같은 QA 클러스터의 별도 DB 복원 후 실제 앱 조회를 검증한다. 자세한 실행 명령과 결과는 [PRODUCTION_CONTAINERS](PRODUCTION_CONTAINERS.md)를 따른다. 비공개 시험 상태/덤프는 Git에서 제외하고, 생성 전 resolved 구성과 종료 전 자원 라벨을 검사해 실제 개발 DB/볼륨에 접근하거나 정리하지 않는다. 아래 사전 점검의 미실행 표시는 이전 단계 기록이다.

@@ -2,6 +2,8 @@
 
 최초 작성: 2026-10-09 / 최신 사전 점검·주요 공개 가격 재확인: 2026-10-17 (Asia/Seoul)
 
+최신 후속: 운영 컨테이너 PR #23은 main `911c181`에 병합됐고 main CI의 Backend 368건·Frontend 334건·합성 검사 57개가 성공했다. 현재는 [운영 이미지 발행 준비](PRODUCTION_IMAGE_RELEASE.md)를 진행한다. GHCR의 비공개 package·검증 이미지 archive·SHA/version tag·최종 digest·수동 준비/발행 분리를 구현하며, 실제 발행·서버 구매·DB 이전·배포는 실행하지 않는다. 아래 초안 PR 예정 표시는 이전 단계 기록이다.
+
 후속 완료: 운영 Docker·Compose·Caddy 구현과 합성 DB의 실제 HTTPS·권한/예약·재시작·별도 DB 복원 검증 57개를 통과했다. 새 실행 자산·QA 명령·최종 증빙과 남은 실제 운영 검증은 [PRODUCTION_CONTAINERS](PRODUCTION_CONTAINERS.md)를 따른다. 기존 개발 DB·실행 서버를 보존하고 QA 자원을 정리했다. 이후 승인된 GitHub 반영의 원격 CI 결과는 해당 초안 PR에서 확인한다. 구매·실배포는 하지 않았다. 아래 사전 점검 표의 자산 미구현·미실행 표시는 그 점검 시점의 상태다.
 
 ## 1. 범위와 현재 상태

@@ -3,9 +3,9 @@ name: CI
 on:
   push:
     branches: [main, 'codex/**', 'chore/**', 'feature/**', 'fix/**']
-    paths: ['backend/**', 'frontend/**', 'deploy/**', 'scripts/Test-ProductionContainers.ps1', 'scripts/production-container-qa.mjs', '.node-version', '.github/workflows/ci.yaml']
+    paths: ['backend/**', 'frontend/**', 'deploy/**', 'scripts/Test-ProductionContainers.ps1', 'scripts/production-container-qa.mjs', 'scripts/production-qa-result-export.test.ps1', 'scripts/production-image-release.mjs', 'scripts/production-image-release.test.mjs', '.node-version', '.github/workflows/ci.yaml', '.github/workflows/release-images.yaml']
   pull_request:
-    paths: ['backend/**', 'frontend/**', 'deploy/**', 'scripts/Test-ProductionContainers.ps1', 'scripts/production-container-qa.mjs', '.node-version', '.github/workflows/ci.yaml']
+    paths: ['backend/**', 'frontend/**', 'deploy/**', 'scripts/Test-ProductionContainers.ps1', 'scripts/production-container-qa.mjs', 'scripts/production-qa-result-export.test.ps1', 'scripts/production-image-release.mjs', 'scripts/production-image-release.test.mjs', '.node-version', '.github/workflows/ci.yaml', '.github/workflows/release-images.yaml']
   workflow_dispatch:
 
 permissions:
@@ -75,3 +75,19 @@ jobs:
       - name: Build and verify isolated HTTPS stack
         shell: pwsh
         run: ./scripts/Test-ProductionContainers.ps1
+
+  production-image-release-contract:
+    name: Production image release contract tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - run: node --test scripts/production-image-release.test.mjs
+      - name: Verify private QA result export boundaries without Docker
+        shell: pwsh
+        run: pwsh -NoProfile -File scripts/production-qa-result-export.test.ps1
