@@ -2,6 +2,8 @@
 
 기준일: 2026-10-17, Asia/Seoul. 기반 main `bf2a474`, 작업 브랜치 `codex/production-containers`. 앞선 미커밋 사전 점검 문서와 사용자 UI·DB를 보존한다.
 
+후속 상태: [PR #23](https://github.com/developer-sw/jeongeum-band-scheduler/pull/23)을 사용자 승인으로 main `911c181`에 병합했으며 [main CI](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/39006934855)의 Backend 368건·Frontend 334건·합성 검사 57개가 성공했다. 다음 [운영 이미지 발행 준비](PRODUCTION_IMAGE_RELEASE.md)는 별도 브랜치에서 진행하며 이 문서의 registry 미발행·실배포 미실행 경계는 유지한다.
+
 ## 범위
 
 사용자가 운영 Docker·Compose·Caddy 구현과 합성 DB 통합 검증을 승인했다. 이 작업은 로컬 Docker의 격리 환경을 대상으로 하며 서버 구매·공개 도메인 연결·실제 개발 DB 이전·외부 Push 발송·GitHub 반영을 수행하는 승인이 아니다. 서울 4GB는 [사전 구성안](DEPLOYMENT_PREFLIGHT.md)의 기술 권고이며 VM의 실측 용량 보장이 아니다.
@@ -39,6 +41,8 @@ pwsh -NoProfile -File ./scripts/Test-ProductionContainers.ps1
 # 동일 소스의 세 이미지가 이미 빌드됐을 때만 빌드를 생략한다.
 pwsh -NoProfile -File ./scripts/Test-ProductionContainers.ps1 -SkipBuild
 ```
+
+발행 준비 도구는 선택적 `-ResultPath`로 `.local/production-image-release-qa-<UUID>.json`의 새 결과 파일을 받는다. 이는 비민감 검사 결과만 내보내는 인터페이스이며 경로 이탈·symlink·기존 파일 덮어쓰기를 거부한다. 기본 QA 명령과 57개 검사는 유지한다. dump·세션·CA가 있는 원래 QA 디렉터리는 발행 artifact에 포함하지 않는다.
 
 검증기는 `jeongeum-prod-qa-<무작위 ID>`만 사용하고 기존 개발 `.env`·비밀 파일·DB를 읽지 않는다. inherited 앱/DB/Compose 변수로 다른 대상으로 바뀌지 않게 분리한다. 컨테이너·볼륨·네트워크의 프로젝트 이름과 라벨을 확인하며 개발 이름/외부 볼륨을 정리 대상으로 받지 않는다. CA 인증서는 해당 QA Caddy에서 복사해 Node HTTPS 검증기에만 전달한다. 시스템 신뢰 저장소 변경·TLS 검증 생략·공개 ACME 발급은 하지 않는다.
 

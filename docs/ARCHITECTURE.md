@@ -2,6 +2,8 @@
 
 갱신일: 2026-10-17 (Asia/Seoul)
 
+운영 이미지 발행 준비: 검증한 Linux amd64 이미지 3개를 재빌드 없이 GHCR에 전달하는 수동 workflow와 출처/CI·SHA/version·최종 manifest digest 검증을 추가한다. 준비 job은 registry 쓰기 권한이 없고 발행 job만 명시적 입력으로 활성화한다. 실제 GHCR 발행·운영 배포는 미실행이며 [PRODUCTION_IMAGE_RELEASE](PRODUCTION_IMAGE_RELEASE.md)를 따른다.
+
 최신 후속: 운영 Docker·Compose·Caddy 자산과 `production` 프로필, secret 파일 주입·정확한 내부 프록시 신뢰·기본 worker OFF를 구현했다. 별도 합성 DB/HTTPS의 권한·예약·앱 종료/재시작·별도 DB 복원 등 57개 검사를 통과했다. 파일별 책임과 실제 결과는 [PRODUCTION_CONTAINERS](PRODUCTION_CONTAINERS.md)를 따른다. 이 로컬 격리 구현은 운영 VPS·공개 CA·외부 백업과 실서비스 성능 검증 완료를 뜻하지 않는다.
 
 ## 1. 문서 범위와 상태

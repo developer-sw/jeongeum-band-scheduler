@@ -1,5 +1,11 @@
 # 프로젝트 전제와 확정 요구사항
 
+2026-10-17 GitHub 반영 승인: 사용자가 **운영 이미지 발행 준비의 커밋·Push·main 대상 초안 PR·CI 확인**을 승인했다. `codex/production-image-release`의 로컬 검증 소스와 관련 문서만 게시하고 기존 Backend/Frontend·운영 컨테이너·새 발행 계약 CI를 확인한다. 실제 이미지 발행 workflow 실행·GHCR Push·운영 배포·개발 DB 접근/변경은 하지 않는다. 정식 PR 전환·main 병합은 이번 범위가 아니다. 아래 로컬 준비 단계의 미공개·후속 승인 표시는 당시 기록이며 게시 및 원격 CI 상태는 해당 PR의 실제 결과를 따른다.
+
+2026-10-17 최신 작업: 사용자가 **운영 이미지 발행 준비**를 요청했다. main `911c181`에서 `codex/production-image-release`로 분기해 GHCR 비공개 이미지용 수동 준비/발행 workflow, 검증한 이미지 archive 전달, SHA/version 충돌 방지와 최종 digest 기록을 구현했다. Node 계약 28건·PS export 15항목과 workflow 정적 검사를 통과했다. 실제 registry 발행·package 공개 범위 변경·서버/도메인 구매·배포·개발 DB 접근/변경은 하지 않았다. 이번 단계는 로컬 준비·검증까지이며 커밋·Push·PR은 후속 승인 범위다. 구성과 실행 제한은 [PRODUCTION_IMAGE_RELEASE](PRODUCTION_IMAGE_RELEASE.md)를 따른다.
+
+직전 완료: 사용자 승인으로 운영 컨테이너 [PR #23](https://github.com/developer-sw/jeongeum-band-scheduler/pull/23)을 정식 전환·main 병합했다(`911c181`). [병합 main CI 39006934855](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/39006934855)의 Backend 368건·Frontend 334건·운영 합성 검사 57개와 빌드가 성공했다. 아래 초안·병합 미승인·원격 CI 미실행 표시는 각 단계 당시 기록이다.
+
 2026-10-17 GitHub 반영 승인: 사용자가 **운영 컨테이너 변경사항의 GitHub 반영과 CI 검증**을 승인했다. `codex/production-containers`의 검증된 Docker·Compose·Caddy·합성 검증기와 관련 사전 점검/구현 문서를 커밋·Push하고 main 대상 초안 PR에서 기존 Backend/Frontend와 새 운영 컨테이너 CI를 확인한다. 실제 개발 DB·기존 서버·회원/예약·사용자 UI를 변경하지 않는다. 정식 PR 전환·main 병합·서버 구매·실배포는 이번 승인에 포함하지 않는다. 아래 구현 당시의 미공개·원격 CI 미실행 표시는 해당 시점의 기록이며 게시 및 CI 상태는 해당 PR을 기준으로 확인한다.
 
 2026-10-17 운영 컨테이너 구현·합성 검증 완료: 사용자가 **운영용 Docker·Compose·Caddy 구현과 합성 DB 통합 검증**을 요청했다. 앞선 사전 점검 문서 5개의 미커밋 변경을 보존한 채 `codex/production-containers`에서 Linux 이미지·운영 프로필·격리 네트워크/볼륨·secret 파일·HTTPS 프록시·합성 검증기를 구현했다. Linux JAR·Frontend 빌드/타입/lint/334건과 실제 HTTPS·권한·예약·재시작·별도 QA DB 복원 57개 검사를 통과했다. 합성 DB 39개 테이블·29개 시퀀스·세션·Flyway V1~V12가 재시작/복원 후 일치했고 해당 QA 자원을 모두 정리했다. 실제 개발 DB는 접근하지 않았으며 기존 컨테이너·볼륨·실행 서버와 업무 코드/UI를 보존했다. CI 검증 job은 추가했으나 커밋·Push·원격 CI·구매·실제 운영 배포는 하지 않았다. 구현·실행 결과와 남은 운영 경계는 [PRODUCTION_CONTAINERS](PRODUCTION_CONTAINERS.md)를 따른다. 아래 사전 점검의 ‘테스트/컨테이너 기동을 하지 않는다’는 이전 단계 기록이다.
