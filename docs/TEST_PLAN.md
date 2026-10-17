@@ -1,5 +1,11 @@
 # 테스트 및 운영 검증 계획
 
+## 2026-10-17 실제 발행·공개 범위 보완
+
+PR #24 병합 main `e84c183`의 CI 39022663319에서 Backend 368건·Frontend 334건·컨테이너 QA 57개·발행 계약 28건/PS 15항목이 성공했다. 첫 실제 실행 39023497060의 prepare는 성공했고 publish는 SHA/version tag 생성 후 `RELEASE_PACKAGE_PRIVACY_REJECTED`로 실패했다. package가 실제 Public이라는 브라우저 표시 및 익명 manifest/config 조회로 확인했으며 원본 candidate의 이미지 ID/source/version·manifest digest와 QA 57개/정리 성공 증빙이 일치한다. 로컬에서는 image tar 전체 checksum을 다시 계산하지 않았고 main의 검증된 발행 코드가 archive 검사·pull 비교를 통과한 뒤 privacy 검사에서 중단된 흐름과 구분한다. 최종 release artifact가 없으므로 이 실행을 완전 성공으로 표시하지 않는다.
+
+사용자의 명시적 공개 사용 승인 후 private/public 선택·candidate와 publish 선택 불일치 거부·기존 visibility 변경 금지·공개 source의 비공개 신규 package bootstrap 사전 차단·각 SHA 후 즉시 공개 범위/연결 검사를 추가했다. 기존 태그 충돌·재개·digest/비밀값 경계는 유지한다. 보완한 Node 회귀 38건이 실패/건너뜀 0으로 통과했고 Node 구문·actionlint 두 workflow·diff 검사를 통과했다. 독립 검토에서도 추가 확정 차단 결함을 발견하지 못했다. 실제 원격 재검증 결과는 해당 PR/run에 기록한다.
+
 ## 2026-10-17 운영 이미지 발행 준비
 
 [PRODUCTION_IMAGE_RELEASE](PRODUCTION_IMAGE_RELEASE.md)의 수동 workflow와 release helper를 대상으로 Docker/registry/GitHub API를 대체한 계약 검사를 추가했다. main/원본 저장소/성공 CI·엄격한 버전과 경로·archive 무결성·비공개 package·image ID/manifest digest·기존 tag 충돌·부분 실패/재시도·비밀값 배제를 검증했다. QA `ResultPath`의 parser·경로/덮어쓰기 방어도 Docker 없이 검사했다.

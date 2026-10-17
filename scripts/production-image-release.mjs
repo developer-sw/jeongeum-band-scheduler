@@ -44,6 +44,10 @@ const REQUIRED_QA_CHECKS = [
   "restored_database_serves_existing_sessions_and_reservation_apis",
 ];
 const validVersion = (value) => typeof value === "string" && value.length <= 80 && VERSION.test(value);
+function releaseVisibility(value = "private") {
+  insist(["private", "public"].includes(value), "RELEASE_VISIBILITY_REJECTED");
+  return value;
+}
 
 export function fail(code) { throw Object.assign(new Error(code), { releaseCode: code }); }
 function insist(condition, code) { if (!condition) fail(code); }
@@ -52,9 +56,10 @@ function exactKeys(value, keys, code) {
   insist(object(value) && Object.keys(value).sort().join("|") === [...keys].sort().join("|"), code);
 }
 export function parseArguments(args) {
-  insist(args.length === 5 && ["prepare", "publish"].includes(args[0]) && args[1] === "--version"
-    && args[3] === "--directory" && validVersion(args[2]) && args[4] === "release-artifacts", "RELEASE_ARGUMENTS_REJECTED");
-  return { phase: args[0], version: args[2], directory: args[4] };
+  insist([5, 7].includes(args.length) && ["prepare", "publish"].includes(args[0]) && args[1] === "--version"
+    && args[3] === "--directory" && validVersion(args[2]) && args[4] === "release-artifacts"
+    && (args.length === 5 || (args[5] === "--visibility" && ["private", "public"].includes(args[6]))), "RELEASE_ARGUMENTS_REJECTED");
+  return { phase: args[0], version: args[2], directory: args[4], visibility: args.length === 7 ? args[6] : "private" };
 }
 export function validateContext(env) {
   insist(env.GITHUB_EVENT_NAME === "workflow_dispatch" && env.GITHUB_REF === "refs/heads/main"
@@ -169,7 +174,8 @@ async function github(io, env, route, optional = false) {
 }
 export async function githubGate(io, env, context) {
   const repo = await github(io, env, `/repos/${REPOSITORY}`);
-  insist(repo.full_name === REPOSITORY && repo.default_branch === "main" && ["User", "Organization"].includes(repo.owner?.type), "RELEASE_REPOSITORY_REJECTED");
+  insist(repo.full_name === REPOSITORY && repo.default_branch === "main" && ["User", "Organization"].includes(repo.owner?.type)
+    && ["public", "private", "internal"].includes(repo.visibility), "RELEASE_REPOSITORY_REJECTED");
   const main = await github(io, env, `/repos/${REPOSITORY}/git/ref/heads/main`);
   insist(main.object?.sha === context.sourceSha, "RELEASE_MAIN_SHA_MOVED");
   const runs = await github(io, env, `/repos/${REPOSITORY}/actions/workflows/ci.yaml/runs?event=push&branch=main&head_sha=${context.sourceSha}&per_page=100`);
@@ -184,13 +190,14 @@ export async function githubGate(io, env, context) {
     const matches = jobs.jobs.filter((job) => job.name === name);
     insist(matches.length === 1 && matches[0].status === "completed" && matches[0].conclusion === "success", "RELEASE_CI_JOBS_NOT_SUCCESSFUL");
   }
-  return { ownerType: repo.owner.type, proof: { runId: run.id, url: `${SOURCE}/actions/runs/${run.id}`,
+  return { ownerType: repo.owner.type, repositoryVisibility: repo.visibility, proof: { runId: run.id, url: `${SOURCE}/actions/runs/${run.id}`,
     sourceSha: context.sourceSha, event: "push", branch: "main", workflow: ".github/workflows/ci.yaml", jobs: [...REQUIRED_JOBS] } };
 }
 function compareImages(actual, expected) {
   insist(JSON.stringify(actual) === JSON.stringify(expected), "RELEASE_TESTED_IMAGE_CHANGED");
 }
 export async function prepare(options, io) {
+  const visibility = releaseVisibility(options.visibility);
   const context = validateContext(io.env);
   await assertCheckout(io, context);
   await assertLocalDocker(io);
@@ -221,17 +228,19 @@ export async function prepare(options, io) {
   const directory = await artifactDirectory(root, options.directory, true);
   await io.exec("docker", ["image", "save", "--output", path.join(directory, "images.tar"), ...before.map((image) => image.localTag)], { timeout: 10 * 60 * 1000 });
   const archive = await archiveFingerprint(path.join(directory, "images.tar"));
-  const candidate = { schemaVersion: 1, repository: REPOSITORY, sourceSha: context.sourceSha, version: options.version,
+  const candidate = { schemaVersion: 2, repository: REPOSITORY, sourceSha: context.sourceSha, version: options.version, visibility,
     runId: context.runId, preparedAttempt: context.runAttempt, platform: "linux/amd64", ci: gate.proof,
     images: before, archive, qaSha256: createHash("sha256").update(`${JSON.stringify(qa, null, 2)}\n`).digest("hex") };
   await output(directory, "qa-summary.json", qa);
   await output(directory, "candidate.json", candidate);
   return { phase: "prepare", sourceSha: context.sourceSha, version: options.version, imageCount: 3 };
 }
-export function validateCandidate(candidate, qa, context, version) {
-  exactKeys(candidate, ["schemaVersion", "repository", "sourceSha", "version", "runId", "preparedAttempt", "platform", "ci", "images", "archive", "qaSha256"], "RELEASE_CANDIDATE_FIELDS_REJECTED");
-  insist(candidate.schemaVersion === 1 && candidate.repository === REPOSITORY && candidate.sourceSha === context.sourceSha
+export function validateCandidate(candidate, qa, context, version, expectedVisibility = "private") {
+  const visibility = releaseVisibility(expectedVisibility);
+  exactKeys(candidate, ["schemaVersion", "repository", "sourceSha", "version", "visibility", "runId", "preparedAttempt", "platform", "ci", "images", "archive", "qaSha256"], "RELEASE_CANDIDATE_FIELDS_REJECTED");
+  insist(candidate.schemaVersion === 2 && candidate.repository === REPOSITORY && candidate.sourceSha === context.sourceSha
     && candidate.version === version && validVersion(version) && candidate.runId === context.runId
+    && candidate.visibility === visibility
     && Number.isSafeInteger(candidate.preparedAttempt) && candidate.preparedAttempt > 0 && candidate.preparedAttempt <= context.runAttempt
     && candidate.platform === "linux/amd64", "RELEASE_CANDIDATE_CONTEXT_REJECTED");
   exactKeys(candidate.ci, ["runId", "url", "sourceSha", "event", "branch", "workflow", "jobs"], "RELEASE_CI_PROOF_REJECTED");
@@ -254,13 +263,23 @@ export function validateCandidate(candidate, qa, context, version) {
     compareImages(image, validated);
   }
 }
-export async function packageGate(io, env, ownerType, component, allowMissing = true) {
+export async function packageGate(io, env, ownerType, component, allowMissing = true, repositoryVisibility, expectedVisibility = "private") {
+  const visibility = releaseVisibility(expectedVisibility);
   insist(COMPONENTS.includes(component) && ["User", "Organization"].includes(ownerType), "RELEASE_COMPONENT_REJECTED");
+  insist(["public", "private", "internal"].includes(repositoryVisibility), "RELEASE_REPOSITORY_REJECTED");
   const scope = ownerType === "Organization" ? "orgs" : "users";
   const packageName = encodeURIComponent(`jeongeum-band-scheduler/${component}`);
   const metadata = await github(io, env, `/${scope}/developer-sw/packages/container/${packageName}`, true);
-  if (metadata === null) { insist(allowMissing, "RELEASE_PACKAGE_READBACK_REQUIRED"); return; }
-  insist(metadata.visibility === "private" && metadata.repository?.full_name === REPOSITORY, "RELEASE_PACKAGE_PRIVACY_REJECTED");
+  if (metadata === null) {
+    insist(allowMissing, "RELEASE_PACKAGE_READBACK_REQUIRED");
+    // The first real publication created public packages despite the expected
+    // private default. When private is selected, missing metadata on a public
+    // source cannot prove a safe bootstrap; require a verified private package.
+    insist(visibility !== "private" || repositoryVisibility !== "public", "RELEASE_PRIVATE_PACKAGE_BOOTSTRAP_REQUIRED");
+    return;
+  }
+  insist(metadata.visibility === visibility, "RELEASE_PACKAGE_PRIVACY_REJECTED");
+  insist(metadata.repository?.full_name === REPOSITORY, "RELEASE_PACKAGE_REPOSITORY_REJECTED");
 }
 export async function registryToken(io, env, component) {
   insist(COMPONENTS.includes(component), "RELEASE_COMPONENT_REJECTED");
@@ -316,6 +335,7 @@ async function temporaryAuth(io) {
   } };
 }
 export async function publish(options, io) {
+  const visibility = releaseVisibility(options.visibility);
   const context = validateContext(io.env);
   await assertCheckout(io, context);
   const directory = await artifactDirectory(io.root, options.directory);
@@ -323,14 +343,14 @@ export async function publish(options, io) {
   insist(entries.every((entry) => ALLOWED_FILES.includes(entry)) && ["images.tar", "candidate.json", "qa-summary.json"].every((name) => entries.includes(name)), "RELEASE_ARTIFACT_CONTENTS_REJECTED");
   const candidate = await jsonRead(path.join(directory, "candidate.json"));
   const qa = await jsonRead(path.join(directory, "qa-summary.json"));
-  validateCandidate(candidate, qa, context, options.version);
+  validateCandidate(candidate, qa, context, options.version, visibility);
   insist(JSON.stringify(await archiveFingerprint(path.join(directory, "images.tar"))) === JSON.stringify(candidate.archive), "RELEASE_ARCHIVE_HASH_MISMATCH");
   await assertLocalDocker(io);
   const gate = await githubGate(io, io.env, context);
   const states = [];
   // Preflight every component before the first registry write.
   for (const image of candidate.images) {
-    await packageGate(io, io.env, gate.ownerType, image.component);
+    await packageGate(io, io.env, gate.ownerType, image.component, true, gate.repositoryVisibility, visibility);
     const sha = await currentManifest(io, image.component, `sha-${context.sourceSha}`);
     const version = await currentManifest(io, image.component, options.version);
     validateExisting(sha, version, image.imageId);
@@ -353,6 +373,9 @@ export async function publish(options, io) {
         await io.exec("docker", ["image", "tag", image.localTag, shaRef], { env: childEnv });
         await io.exec("docker", ["image", "push", shaRef], { env: childEnv, timeout: 15 * 60 * 1000 });
       }
+      // Verify each package immediately, before another component or any
+      // version tag is written. Require the explicitly selected visibility and link.
+      await packageGate(io, io.env, gate.ownerType, image.component, false, gate.repositoryVisibility, visibility);
       state.sha = await currentManifest(io, image.component, `sha-${context.sourceSha}`);
       insist(state.sha?.config === image.imageId, "RELEASE_PUSH_READBACK_MISMATCH");
       await io.exec("docker", ["image", "pull", `${image.repository}@${state.sha.digest}`], { env: childEnv, timeout: 10 * 60 * 1000 });
@@ -367,9 +390,9 @@ export async function publish(options, io) {
       const promoted = await currentManifest(io, image.component, options.version);
       insist(promoted?.digest === sha.digest && promoted.config === image.imageId, "RELEASE_PROMOTION_READBACK_MISMATCH");
     }
-    // New packages must also remain private and linked after their first push.
-    for (const { image } of states) await packageGate(io, io.env, gate.ownerType, image.component, false);
-    const release = { schemaVersion: 1, repository: REPOSITORY, sourceSha: context.sourceSha, version: options.version,
+    // New packages must also match the selected visibility and source after promotion.
+    for (const { image } of states) await packageGate(io, io.env, gate.ownerType, image.component, false, gate.repositoryVisibility, visibility);
+    const release = { schemaVersion: 2, repository: REPOSITORY, sourceSha: context.sourceSha, version: options.version, visibility,
       runId: context.runId, ci: candidate.ci, images: states.map(({ image, sha }) => ({ component: image.component,
         imageId: image.imageId, digest: sha.digest, reference: `${image.repository}@${sha.digest}` })) };
     const environment = states.map(({ image, sha }) => `${image.component.toUpperCase()}_IMAGE=${image.repository}@${sha.digest}`).join("\n") + "\n";
