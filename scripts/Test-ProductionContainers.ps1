@@ -50,7 +50,8 @@ function Assert-QaScope {
     }
     foreach ($candidate in @($qaLocalRoot, $qaDirectory)) {
         if (Test-Path -LiteralPath $candidate) {
-            if ((Get-Item -LiteralPath $candidate).Attributes -band [IO.FileAttributes]::ReparsePoint) {
+            # .local is hidden on Unix; inspect it without skipping hidden items.
+            if ((Get-Item -Force -LiteralPath $candidate).Attributes -band [IO.FileAttributes]::ReparsePoint) {
                 throw 'QA_REPARSE_POINT_REJECTED'
             }
         }
@@ -434,6 +435,8 @@ try {
         }
     }
     Write-Output "Production QA failed: $qaFailureCode. See the private QA directory."
+    # Publish only source coordinates and the CLR type, never exception messages.
+    Write-Output ("QA failure location: line {0} ({1})." -f [int]$qaFailureRecord.InvocationInfo.ScriptLineNumber, $qaFailureRecord.Exception.GetType().FullName)
 } finally {
     $cleanupPassed = -not $qaResourcesStarted
     if ($qaResourcesStarted -and -not $KeepQaResources) {
