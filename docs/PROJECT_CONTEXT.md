@@ -1,5 +1,9 @@
 # 프로젝트 전제와 확정 요구사항
 
+2026-10-17 실제 발행 후 공개 범위 확정: 사용자가 PR #24의 정식 전환·main 병합과 실제 이미지 발행을 승인했다. main `e84c183`의 CI 4개 job이 성공했고 첫 `v1.0.0-rc.1` 실행 `39023497060`에서 이미지 3개와 SHA/version tag가 생성됐다. 그러나 실제 package가 Public이라 마지막 비공개 검사가 실패해 표준 최종 artifact는 없다. 원본 candidate의 이미지 ID·source label·QA 57개 증빙과 실제 registry의 manifest/config digest·두 tag 일치를 읽기 전용으로 확인했다. 기존 개발 DB·서버·실제 회원·비밀 설정은 접근/변경하지 않았다.
+
+설명 후 사용자는 **공개 이미지 사용 승인**을 명시했다. `codex/production-image-visibility-guard`에서 공개 범위를 명시적으로 선택하고 candidate·발행 전/각 SHA 후·최종 결과가 같은 범위인지 검증하도록 보완한다. 기본 private 검사는 유지하며 새 private package 생성이 불확실한 공개 저장소는 쓰기 전에 차단한다. 이번 승인 범위의 필요한 수정·GitHub 반영·main 병합·새 `v1.0.0-rc.2` 공개 발행을 이어가며 기존 rc.1 태그를 덮어쓰거나 package를 삭제하지 않는다. 상세 결과는 [PRODUCTION_IMAGE_RELEASE](PRODUCTION_IMAGE_RELEASE.md)와 실제 PR/run을 따른다. 아래 비공개 고정·발행 미승인 설명은 이전 단계 기록이다.
+
 2026-10-17 GitHub 반영 승인: 사용자가 **운영 이미지 발행 준비의 커밋·Push·main 대상 초안 PR·CI 확인**을 승인했다. `codex/production-image-release`의 로컬 검증 소스와 관련 문서만 게시하고 기존 Backend/Frontend·운영 컨테이너·새 발행 계약 CI를 확인한다. 실제 이미지 발행 workflow 실행·GHCR Push·운영 배포·개발 DB 접근/변경은 하지 않는다. 정식 PR 전환·main 병합은 이번 범위가 아니다. 아래 로컬 준비 단계의 미공개·후속 승인 표시는 당시 기록이며 게시 및 원격 CI 상태는 해당 PR의 실제 결과를 따른다.
 
 2026-10-17 최신 작업: 사용자가 **운영 이미지 발행 준비**를 요청했다. main `911c181`에서 `codex/production-image-release`로 분기해 GHCR 비공개 이미지용 수동 준비/발행 workflow, 검증한 이미지 archive 전달, SHA/version 충돌 방지와 최종 digest 기록을 구현했다. Node 계약 28건·PS export 15항목과 workflow 정적 검사를 통과했다. 실제 registry 발행·package 공개 범위 변경·서버/도메인 구매·배포·개발 DB 접근/변경은 하지 않았다. 이번 단계는 로컬 준비·검증까지이며 커밋·Push·PR은 후속 승인 범위다. 구성과 실행 제한은 [PRODUCTION_IMAGE_RELEASE](PRODUCTION_IMAGE_RELEASE.md)를 따른다.

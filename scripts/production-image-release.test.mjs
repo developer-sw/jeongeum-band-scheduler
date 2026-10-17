@@ -65,6 +65,7 @@ async function fixture(t) {
   const commands = [], requests = [], registry = new Map(), published = new Set();
   const state = { dirty: false, mainSha: sourceSha, ciStatus: "completed", ciConclusion: "success", badJob: null,
     inspectChanges: null, failPushOnce: null, failPromotionOnce: null, packageStatus: null, packageVisibility: "private", packageLinked: true,
+    repositoryVisibility: "public", packageRepository: REPOSITORY, missingPackages: new Set(), packageVisibilityAfterPush: {}, packageLinkedAfterPush: {},
     dockerEndpoint: "unix:///var/run/docker.sock", dockerOs: "linux" };
   const io = { root, tempRoot: root, env: env(), async exec(file, args, settings = {}) {
     commands.push({ file, args: [...args], settings });
@@ -110,7 +111,7 @@ async function fixture(t) {
     const parsed = new URL(url);
     assert.ok(["api.github.com", "ghcr.io"].includes(parsed.hostname));
     if (parsed.hostname === "api.github.com") {
-      if (parsed.pathname.endsWith(`/repos/${REPOSITORY}`)) return response({ full_name: REPOSITORY, default_branch: "main", owner: { type: "User" } });
+      if (parsed.pathname.endsWith(`/repos/${REPOSITORY}`)) return response({ full_name: REPOSITORY, default_branch: "main", visibility: state.repositoryVisibility, owner: { type: "User" } });
       if (parsed.pathname.endsWith("/git/ref/heads/main")) return response({ object: { sha: state.mainSha } });
       if (parsed.pathname.endsWith("/ci.yaml/runs")) return response({ workflow_runs: [{ id: 2002, event: "push", head_branch: "main", head_sha: sourceSha,
         path: ".github/workflows/ci.yaml", status: state.ciStatus, conclusion: state.ciConclusion }] });
@@ -118,7 +119,10 @@ async function fixture(t) {
       if (parsed.pathname.includes("/packages/container/")) {
         const component = COMPONENTS.find((item) => decodeURIComponent(parsed.pathname).endsWith(`/${item}`));
         if (state.packageStatus) return response({}, state.packageStatus);
-        return published.has(component) ? response({ visibility: state.packageVisibility, repository: state.packageLinked ? { full_name: REPOSITORY } : null }) : response({}, 404);
+        if (state.missingPackages.has(component) && !published.has(component)) return response({}, 404);
+        const visibility = published.has(component) ? state.packageVisibilityAfterPush[component] ?? state.packageVisibility : state.packageVisibility;
+        const linked = published.has(component) ? state.packageLinkedAfterPush[component] ?? state.packageLinked : state.packageLinked;
+        return response({ visibility, repository: linked ? { full_name: state.packageRepository } : null });
       }
     }
     if (parsed.hostname === "ghcr.io" && parsed.pathname === "/token") return response({ token: "fixture-registry-bearer" });
@@ -131,12 +135,20 @@ async function fixture(t) {
   } };
   return { root, io, commands, requests, registry, published, state };
 }
-async function prepared(t) { const result = await fixture(t); await prepare(options(), result.io); return result; }
+async function prepared(t, selected = {}) { const result = await fixture(t); await prepare({ ...options(), ...selected }, result.io); return result; }
 const candidateFrom = (f) => readFile(path.join(f.root, "release-artifacts/candidate.json"), "utf8").then(JSON.parse);
 
 test("CLI accepts only manual phases, strict version and fixed artifact directory", () => {
   assert.equal(parseArguments(["prepare", "--version", "v0.0.0", "--directory", "release-artifacts"]).version, "v0.0.0");
   assert.equal(parseArguments(["publish", "--version", version, "--directory", "release-artifacts"]).phase, "publish");
+  assert.equal(parseArguments(["publish", "--version", version, "--directory", "release-artifacts"]).visibility, "private");
+  for (const visibility of ["private", "public"]) {
+    assert.equal(parseArguments(["publish", "--version", version, "--directory", "release-artifacts", "--visibility", visibility]).visibility, visibility);
+  }
+  for (const visibility of ["", "PUBLIC", "internal", "public;echo", "public\n"]) {
+    assert.throws(() => parseArguments(["publish", "--version", version, "--directory", "release-artifacts", "--visibility", visibility]), assertCode("RELEASE_ARGUMENTS_REJECTED"));
+  }
+  assert.throws(() => parseArguments(["publish", "--version", version, "--directory", "release-artifacts", "--public", "public"]), assertCode("RELEASE_ARGUMENTS_REJECTED"));
   const longest = `v${"1".repeat(75)}.0.0`;
   assert.equal(longest.length, 80);
   assert.equal(parseArguments(["prepare", "--version", longest, "--directory", "release-artifacts"]).version, longest);
@@ -155,6 +167,15 @@ test("release context denies PR, fork, non-main, short SHA and remote Docker ove
     { DOCKER_HOST: "tcp://remote" }, { DOCKER_CONTEXT: "remote-production" }, { ECE_KEYLOG: "1" }]) {
     assert.throws(() => validateContext({ ...env(), ...patch }));
   }
+});
+test("invalid direct visibility selections stop before checkout, Docker or network", async (t) => {
+  const f = await fixture(t);
+  for (const visibility of [null, "internal", "PUBLIC"]) {
+    await assert.rejects(prepare({ ...options(), visibility }, f.io), assertCode("RELEASE_VISIBILITY_REJECTED"));
+    await assert.rejects(publish({ ...options(), visibility }, f.io), assertCode("RELEASE_VISIBILITY_REJECTED"));
+  }
+  assert.equal(f.commands.length, 0);
+  assert.equal(f.requests.length, 0);
 });
 test("Docker guard permits only local Linux sockets and rejects remote active contexts", async (t) => {
   const f = await fixture(t);
@@ -215,6 +236,17 @@ test("main gate requires current exact source and every required completed CI jo
   f.state.ciStatus = "completed";
   for (const job of REQUIRED_JOBS) { f.state.badJob = job; await assert.rejects(githubGate(f.io, f.io.env, context()), assertCode("RELEASE_CI_JOBS_NOT_SUCCESSFUL")); }
 });
+test("repository visibility is explicit, validated and returned to package preflight", async (t) => {
+  const f = await fixture(t);
+  for (const visibility of ["public", "private", "internal"]) {
+    f.state.repositoryVisibility = visibility;
+    assert.equal((await githubGate(f.io, f.io.env, context())).repositoryVisibility, visibility);
+  }
+  for (const visibility of [undefined, null, "PUBLIC", "unknown"]) {
+    f.state.repositoryVisibility = visibility;
+    await assert.rejects(githubGate(f.io, f.io.env, context()), assertCode("RELEASE_REPOSITORY_REJECTED"));
+  }
+});
 test("dirty worktree and invalid CLI stop before build or network activity", async (t) => {
   const f = await fixture(t);
   f.state.dirty = true;
@@ -230,6 +262,8 @@ test("prepare builds three labelled single-platform images, QA checks identity, 
   const candidate = await candidateFrom(f);
   const safeQa = JSON.parse(await readFile(path.join(directory, "qa-summary.json"), "utf8"));
   validateCandidate(candidate, safeQa, context(), version);
+  assert.equal(candidate.schemaVersion, 2);
+  assert.equal(candidate.visibility, "private");
   assert.equal(candidate.archive.sha256, (await archiveFingerprint(path.join(directory, "images.tar"))).sha256);
   assert.equal(JSON.stringify(candidate).includes(f.io.env.GITHUB_TOKEN), false);
   assert.equal(JSON.stringify(safeQa).includes("private-fixture"), false);
@@ -278,7 +312,7 @@ test("candidate rejects changed run/source/version, unknown fields and repositor
   const f = await prepared(t);
   const candidate = await candidateFrom(f);
   const safe = qaSummary(qa());
-  for (const patch of [{ runId: "9999" }, { sourceSha: "b".repeat(40) }, { version: "v9.9.9" }, { unexpected: "private" }]) {
+  for (const patch of [{ runId: "9999" }, { sourceSha: "b".repeat(40) }, { version: "v9.9.9" }, { visibility: "public" }, { visibility: "internal" }, { schemaVersion: 1 }, { unexpected: "private" }]) {
     assert.throws(() => validateCandidate({ ...candidate, ...patch }, safe, context(), version));
   }
   const injected = structuredClone(candidate);
@@ -287,20 +321,63 @@ test("candidate rejects changed run/source/version, unknown fields and repositor
   validateCandidate(candidate, safe, { ...context(), runAttempt: 2 }, version);
   assert.throws(() => validateCandidate(candidate, safe, { ...context(), runAttempt: 0 }, version));
 });
-test("package metadata distinguishes missing private default from authentication failure", async (t) => {
-  const f = await fixture(t);
-  await packageGate(f.io, f.io.env, "User", "backend");
-  await assert.rejects(packageGate(f.io, f.io.env, "User", "backend", false), assertCode("RELEASE_PACKAGE_READBACK_REQUIRED"));
-  f.state.packageStatus = 401;
-  await assert.rejects(packageGate(f.io, f.io.env, "User", "backend"), assertCode("RELEASE_GITHUB_AUTH_REJECTED"));
-  f.state.packageStatus = 403;
-  await assert.rejects(packageGate(f.io, f.io.env, "User", "backend"), assertCode("RELEASE_GITHUB_AUTH_REJECTED"));
+test("prepare and publish visibility must match the candidate before any registry or Docker access", async (t) => {
+  for (const visibility of ["private", "public"]) {
+    const f = await prepared(t, { visibility });
+    const candidate = await candidateFrom(f);
+    const other = visibility === "private" ? "public" : "private";
+    assert.equal(candidate.visibility, visibility);
+    validateCandidate(candidate, qaSummary(qa()), context(), version, visibility);
+    assert.throws(() => validateCandidate(candidate, qaSummary(qa()), context(), version, other), assertCode("RELEASE_CANDIDATE_CONTEXT_REJECTED"));
+    f.commands.length = 0; f.requests.length = 0;
+    await assert.rejects(publish({ ...options(), visibility: other }, f.io), assertCode("RELEASE_CANDIDATE_CONTEXT_REJECTED"));
+    assert.equal(f.requests.length, 0);
+    assert.equal(f.commands.some(({ file }) => file === "docker"), false);
+  }
 });
-test("public, internal and unlinked existing packages are rejected", async (t) => {
-  const f = await fixture(t); f.published.add("backend");
-  for (const visibility of ["public", "internal"]) { f.state.packageVisibility = visibility; await assert.rejects(packageGate(f.io, f.io.env, "User", "backend"), assertCode("RELEASE_PACKAGE_PRIVACY_REJECTED")); }
+test("package metadata distinguishes approved bootstrap context, missing readback and authentication failure", async (t) => {
+  const f = await fixture(t);
+  f.state.missingPackages.add("backend");
+  await packageGate(f.io, f.io.env, "User", "backend", true, "private");
+  await assert.rejects(packageGate(f.io, f.io.env, "User", "backend", false, "private"), assertCode("RELEASE_PACKAGE_READBACK_REQUIRED"));
+  await assert.rejects(packageGate(f.io, f.io.env, "User", "backend", true, "public"), assertCode("RELEASE_PRIVATE_PACKAGE_BOOTSTRAP_REQUIRED"));
+  f.state.packageStatus = 401;
+  await assert.rejects(packageGate(f.io, f.io.env, "User", "backend", true, "public"), assertCode("RELEASE_GITHUB_AUTH_REJECTED"));
+  f.state.packageStatus = 403;
+  await assert.rejects(packageGate(f.io, f.io.env, "User", "backend", true, "public"), assertCode("RELEASE_GITHUB_AUTH_REJECTED"));
+});
+test("existing package privacy and repository link failures have distinct safe error codes", async (t) => {
+  const f = await fixture(t);
+  for (const visibility of ["public", "internal", undefined]) {
+    f.state.packageVisibility = visibility;
+    await assert.rejects(packageGate(f.io, f.io.env, "User", "backend", true, "public"), assertCode("RELEASE_PACKAGE_PRIVACY_REJECTED"));
+  }
   f.state.packageVisibility = "private"; f.state.packageLinked = false;
-  await assert.rejects(packageGate(f.io, f.io.env, "User", "backend"), assertCode("RELEASE_PACKAGE_PRIVACY_REJECTED"));
+  await assert.rejects(packageGate(f.io, f.io.env, "User", "backend", true, "public"), assertCode("RELEASE_PACKAGE_REPOSITORY_REJECTED"));
+  f.state.packageLinked = true; f.state.packageRepository = "other-owner/other-repository";
+  await assert.rejects(packageGate(f.io, f.io.env, "User", "backend", true, "public"), assertCode("RELEASE_PACKAGE_REPOSITORY_REJECTED"));
+});
+test("explicit public policy requires exact public metadata and never changes private package visibility", async (t) => {
+  const f = await fixture(t);
+  for (const visibility of ["private", "internal", undefined, "unknown"]) {
+    f.state.packageVisibility = visibility;
+    await assert.rejects(packageGate(f.io, f.io.env, "User", "backend", true, "public", "public"), assertCode("RELEASE_PACKAGE_PRIVACY_REJECTED"));
+  }
+  f.state.packageVisibility = "public";
+  await packageGate(f.io, f.io.env, "User", "backend", true, "public", "public");
+  assert.ok(f.requests.every(({ settings }) => settings.method === undefined));
+  assert.equal(f.commands.length, 0);
+});
+test("a missing package on the public source stops every registry write even in the third component", async (t) => {
+  for (const component of COMPONENTS) {
+    const f = await prepared(t);
+    f.state.missingPackages.add(component);
+    f.commands.length = 0;
+    await assert.rejects(publish(options(), f.io), assertCode("RELEASE_PRIVATE_PACKAGE_BOOTSTRAP_REQUIRED"));
+    assert.equal(f.published.size, 0);
+    assert.equal(f.commands.some(({ args }) => args[0] === "login" || args[0] === "buildx" || args[0] === "image"), false);
+    assert.equal((await readdir(path.join(f.root, "release-artifacts"))).includes("release.json"), false);
+  }
 });
 test("registry reads distinguish tag 404 and auth 401; reject index and digest spoofing", async () => {
   const io = { async fetch() { return response({}, 404); } };
@@ -348,6 +425,8 @@ test("successful publish preflights all tags, uses stdin-only auth, digest pulls
   const files = await readdir(path.join(f.root, "release-artifacts"));
   assert.ok(files.includes("release.json") && files.includes("release.env"));
   const release = JSON.parse(await readFile(path.join(f.root, "release-artifacts/release.json"), "utf8"));
+  assert.equal(release.schemaVersion, 2);
+  assert.equal(release.visibility, "private");
   assert.equal(release.images.length, 3);
   const environment = await readFile(path.join(f.root, "release-artifacts/release.env"), "utf8");
   assert.equal(environment.trim().split("\n").length, 3);
@@ -360,6 +439,55 @@ test("successful publish preflights all tags, uses stdin-only auth, digest pulls
   assert.ok(f.commands.every((item) => !JSON.stringify(item.args).includes(f.io.env.GITHUB_TOKEN)));
   assert.equal((await readdir(f.root)).some((name) => name.startsWith("jeongeum-image-release-")), false);
   assert.equal(JSON.stringify(release).includes("fixture-token"), false);
+});
+test("explicit public publication succeeds and resumes without overwriting prior version references", async (t) => {
+  const f = await prepared(t, { visibility: "public" });
+  f.state.packageVisibility = "public";
+  const prior = manifest(ids.backend);
+  f.registry.set("backend:v1.0.0-rc.1", prior);
+  await publish({ ...options(), visibility: "public" }, f.io);
+  const release = JSON.parse(await readFile(path.join(f.root, "release-artifacts/release.json"), "utf8"));
+  assert.equal(release.visibility, "public");
+  assert.equal(release.schemaVersion, 2);
+  assert.equal(f.commands.filter(({ args }) => args[1] === "push").length, 3);
+  assert.ok(COMPONENTS.every((component) => f.registry.has(`${component}:${version}`)));
+  assert.strictEqual(f.registry.get("backend:v1.0.0-rc.1"), prior);
+  f.commands.length = 0; f.io.env.GITHUB_RUN_ATTEMPT = "2";
+  await publish({ ...options(), visibility: "public" }, f.io);
+  assert.equal(f.commands.some(({ args }) => args[1] === "push" || args[1] === "imagetools"), false);
+});
+test("private remains the default and public selection does not convert existing private packages", async (t) => {
+  for (const visibility of ["private", "public"]) {
+    const f = await prepared(t, { visibility });
+    f.state.packageVisibility = visibility === "private" ? "public" : "private";
+    f.commands.length = 0;
+    const selected = visibility === "private" ? options() : { ...options(), visibility };
+    await assert.rejects(publish(selected, f.io), assertCode("RELEASE_PACKAGE_PRIVACY_REJECTED"));
+    assert.equal(f.commands.some(({ args }) => args[0] === "login" || args[0] === "image" || args[0] === "buildx"), false);
+    assert.equal(f.published.size, 0);
+    assert.ok(f.requests.every(({ settings }) => settings.method === undefined));
+  }
+});
+test("explicit public bootstrap still checks the selected visibility immediately after each SHA push", async (t) => {
+  for (const [index, component] of COMPONENTS.entries()) {
+    const f = await prepared(t, { visibility: "public" });
+    f.state.packageVisibility = "public";
+    f.state.missingPackages = new Set(COMPONENTS);
+    f.state.packageVisibilityAfterPush[component] = "private";
+    f.commands.length = 0;
+    await assert.rejects(publish({ ...options(), visibility: "public" }, f.io), assertCode("RELEASE_PACKAGE_PRIVACY_REJECTED"));
+    assert.equal(f.commands.filter(({ args }) => args[1] === "push").length, index + 1);
+    assert.equal(f.commands.some(({ args }) => args[1] === "imagetools"), false);
+    assert.equal((await readdir(path.join(f.root, "release-artifacts"))).includes("release.json"), false);
+  }
+});
+test("a private source can bootstrap missing packages while retaining private linked readback", async (t) => {
+  const f = await prepared(t);
+  f.state.repositoryVisibility = "private";
+  f.state.missingPackages = new Set(COMPONENTS);
+  await publish(options(), f.io);
+  assert.equal(f.published.size, 3);
+  assert.equal((await readdir(path.join(f.root, "release-artifacts"))).includes("release.json"), true);
 });
 test("publish refreshes registry credentials for later reads after long-running image operations", async (t) => {
   const f = await prepared(t);
@@ -418,9 +546,31 @@ test("fully completed publication is idempotent and never pushes or promotes aga
   await publish(options(), f.io);
   assert.equal(f.commands.some((item) => item.args[1] === "push" || item.args[1] === "imagetools"), false);
 });
-test("post-push package privacy failure produces no release outputs", async (t) => {
-  const f = await prepared(t); f.state.packageVisibility = "public";
-  await assert.rejects(publish(options(), f.io), assertCode("RELEASE_PACKAGE_PRIVACY_REJECTED"));
-  assert.equal((await readdir(path.join(f.root, "release-artifacts"))).includes("release.json"), false);
-  assert.equal((await readdir(f.root)).some((name) => name.startsWith("jeongeum-image-release-")), false);
+test("each SHA push stops immediately on public readback before later images or version promotion", async (t) => {
+  for (const [index, component] of COMPONENTS.entries()) {
+    const f = await prepared(t);
+    f.state.packageVisibilityAfterPush[component] = "public";
+    f.commands.length = 0;
+    await assert.rejects(publish(options(), f.io), assertCode("RELEASE_PACKAGE_PRIVACY_REJECTED"));
+    assert.equal(f.commands.filter(({ args }) => args[1] === "push").length, index + 1);
+    assert.equal(f.commands.some(({ args }) => args[1] === "imagetools"), false);
+    assert.equal(f.registry.has(`${component}:sha-${sourceSha}`), true);
+    assert.equal(f.registry.has(`${component}:${version}`), false);
+    assert.equal((await readdir(path.join(f.root, "release-artifacts"))).some((file) => file === "release.json" || file === "release.env"), false);
+    assert.equal((await readdir(f.root)).some((name) => name.startsWith("jeongeum-image-release-")), false);
+  }
+});
+test("each SHA push stops immediately on unlinked readback and preserves the original candidate", async (t) => {
+  for (const [index, component] of COMPONENTS.entries()) {
+    const f = await prepared(t);
+    const originalCandidate = await candidateFrom(f);
+    f.state.packageLinkedAfterPush[component] = false;
+    f.commands.length = 0;
+    await assert.rejects(publish(options(), f.io), assertCode("RELEASE_PACKAGE_REPOSITORY_REJECTED"));
+    assert.equal(f.commands.filter(({ args }) => args[1] === "push").length, index + 1);
+    assert.equal(f.commands.some(({ args }) => args[1] === "imagetools"), false);
+    assert.equal((await readdir(path.join(f.root, "release-artifacts"))).includes("release.json"), false);
+    assert.deepEqual(await candidateFrom(f), originalCandidate);
+    assert.equal((await readdir(f.root)).some((name) => name.startsWith("jeongeum-image-release-")), false);
+  }
 });
