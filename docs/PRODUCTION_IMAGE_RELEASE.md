@@ -1,5 +1,21 @@
 # 운영 이미지 발행과 공개 범위 검증
 
+## 최신 완료 기록 — v1.0.0-rc.2
+
+2026-10-17 사용자 승인으로 [PR #24](https://github.com/developer-sw/jeongeum-band-scheduler/pull/24)·[PR #25](https://github.com/developer-sw/jeongeum-band-scheduler/pull/25)를 main `8b24285bafda76ef21c3ae6148f34452a08d2483`까지 병합했다. [main CI 39024812366](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/39024812366)의 Backend 368건·Frontend 334건·합성 검사 57개·Node 38건·PS export 15항목과 빌드/타입/lint가 성공했다.
+
+[발행 39025711724](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/39025711724)의 prepare/publish 모두 성공했다. 선택은 `visibility=public`, version은 `v1.0.0-rc.2`이며 Linux amd64 이미지 3개를 발행했다. 최종 artifact `production-image-release-39025711724-1-8b24285bafda76ef21c3ae6148f34452a08d2483`(ID `12098901009`, 1209bytes)의 SHA256은 `7b87be91800ee0c9b29e0e545ac3e4cdfa50801f25f511519873d6d32407b97f`다. `release.json`·`release.env` 두 파일이 실제 archive와 일치함을 별도로 확인했다. artifact 보존기간은 7일이며 아래 digest를 배포 기준으로 보존한다.
+
+```text
+BACKEND_IMAGE=ghcr.io/developer-sw/jeongeum-band-scheduler/backend@sha256:4d2cbd4625c1aca375940c2c241cf8bb1e8113b78ac5facc0a7d96629f1c97e6
+FRONTEND_IMAGE=ghcr.io/developer-sw/jeongeum-band-scheduler/frontend@sha256:a53dc25bbdebc15fc82cbd42171f8ffae11de894d22f762c0be7aa443cb734e7
+CADDY_IMAGE=ghcr.io/developer-sw/jeongeum-band-scheduler/caddy@sha256:92794c3ed9b0400ba3793544385a11579206d300f56ead8c76d7c382cc65565e
+```
+
+독립 익명 조회에서 version/SHA/digest 참조의 manifest·config hash, Linux amd64·비root·source/revision/version label 일치를 확인했다. 기존 rc.1의 digest와 최초 공개 범위 검사 실패 이력은 보존했다. 로컬 최종 파일과 검증 결과는 Git 제외 `.local/production-image-release-39025711724/`에 남아 있다. 실제 개발 DB/기존 서버는 접근/변경하지 않았다. 새 서울 Lightsail 준비는 [AWS_LIGHTSAIL_DEPLOYMENT](AWS_LIGHTSAIL_DEPLOYMENT.md)를 따르며 서버에서 다시 빌드하거나 구현을 처음부터 시작하지 않는다.
+
+## 이전 준비·첫 실행 기록
+
 기준일: 2026-10-17, Asia/Seoul. 운영 컨테이너 [PR #23](https://github.com/developer-sw/jeongeum-band-scheduler/pull/23)의 main 병합 `911c181` 이후 `codex/production-image-release`에서 준비한다. 이번 범위는 발행 도구·수동 workflow·검증·문서이며 실제 GHCR 발행·서버 배포를 수행한 기록이 아니다.
 
 후속으로 사용자가 커밋·Push·main 대상 초안 PR·CI 확인을 승인했다. 검증한 준비 소스와 문서를 게시하며 현재 커밋의 원격 CI는 해당 PR에서 확인한다. 로컬 검사 결과와 원격 CI·실제 GHCR 발행 결과를 구분하고 수동 이미지 발행 workflow는 실행하지 않는다.

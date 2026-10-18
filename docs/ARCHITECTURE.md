@@ -1,6 +1,10 @@
 # 시스템 아키텍처
 
-갱신일: 2026-10-17 (Asia/Seoul)
+갱신일: 2026-10-18 (Asia/Seoul)
+
+2026-10-18 기본 운영 환경: 기존 서울 VM에 고정 IPv4·공식 Docker29.9.1/Compose5.6.0·서비스 자동 시작·브라우저 SSH 전용 제한·TCP443 IPv4/IPv6를 적용/검증했다. 실제 도메인/Caddy HTTPS·앱/DB 배포·외부 백업 복구·OS 보안 패치는 후속 범위다. [AWS_LIGHTSAIL_DEPLOYMENT](AWS_LIGHTSAIL_DEPLOYMENT.md)의 최신 결과를 따른다.
+
+최신 배포 기준: 사용자가 생성한 서울 Lightsail Ubuntu 24.04·2 vCPU·4GB·80GB를 재사용하고 Free Plan 크레딧/추가 비용 최소화 조건을 반영한다. 운영 Compose 제한 합계는 2816MiB이며 실제 VM의 자원/지연 검증은 남아 있다. `v1.0.0-rc.2` 공개 이미지·최종 digest 발행은 완료됐고 도메인은 미등록이다. [AWS_LIGHTSAIL_DEPLOYMENT](AWS_LIGHTSAIL_DEPLOYMENT.md)가 최신 준비/요금/제약이며 아래 미발행·구매 미확정 설명은 과거 단계 기록이다.
 
 이미지 공개 범위 후속: PR #24 병합 후 첫 실제 발행의 Public 상태를 확인하고 사용자가 공개 이미지 사용을 승인했다. 수동 workflow는 private/public을 명시적으로 선택하고 준비 candidate·실제 package·최종 digest 기록을 일치시킨다. 기본 private 검사는 유지하고 기존 package의 공개 범위는 자동 변경하지 않는다. [PRODUCTION_IMAGE_RELEASE](PRODUCTION_IMAGE_RELEASE.md)의 실행 기록과 제한을 따른다.
 
@@ -38,7 +42,7 @@ flowchart TD
 - Spring이 인증·권한·예약 정책·동시성·알림의 기준을 보장한다. Next.js의 UI 검증은 사용자 편의를 위한 보조 검증이다.
 - PostgreSQL은 애플리케이션 컨테이너와 별도의 컨테이너 및 지속 볼륨을 사용한다.
 - 알림함·outbox·예정 알림·세션도 PostgreSQL에 보관한다. Redis, Kafka, WebSocket/STOMP, 별도 작업 서버는 초기 구조에 추가하지 않는다.
-- 도메인과 서버는 아직 구매·생성하지 않았다. 배포 후보와 비용은 [DEPLOYMENT.md](DEPLOYMENT.md)에 기록한다.
+- 서버는 사용자가 생성한 서울 Lightsail 1대이며 고정 IP·Docker/방화벽 구성을 완료했다. 도메인은 미등록이고 앱/DB·HTTPS 배포는 남아 있다. 비용과 실제 이전 전 조건은 [AWS_LIGHTSAIL_DEPLOYMENT.md](AWS_LIGHTSAIL_DEPLOYMENT.md)에 기록한다.
 
 ## 3. 기술 구성
 
