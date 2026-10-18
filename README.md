@@ -9,7 +9,7 @@
 
   **Java · Spring Boot · PostgreSQL · Next.js · TypeScript**
 
-  [기능 현황](#-구현-현황) · [기술 스택](#-기술-스택) · [프로젝트 구조](#-프로젝트-구조) · [로컬 실행](#-로컬-실행) · [문서](#-기술-문서)
+  [기능 현황](#-구현-현황) · [기술 스택](#-기술-스택) · [프로젝트 구조](#-프로젝트-구조) · [운영 준비](#운영-배포-준비) · [로컬 실행](#-로컬-실행) · [문서](#-기술-문서)
 </div>
 
 ---
@@ -23,9 +23,9 @@
 - **사용 대상:** 정음 동아리의 전체 관리자, 팀장, 일반 회원
 - **개발 형태:** Spring Boot 백엔드와 Next.js 프론트엔드를 분리한 단일 Git 저장소
 - **UI 방향:** 동일한 코드베이스에서 모바일·데스크톱에 적합한 반응형 화면 제공
-- **현재 단계(2026-10-17):** 인증·회원·팀·곡·예약·반복 배정·날짜 개방·변경·교환·악기 고장·공지·알림함·Web Push·시작 1시간 전 알림·회원 탈퇴·팀 해체에 이어 **가입 전 관리자 지정·역할별 명단·카드 내 권한 변경과 다이어리 UI 보완**을 `main`에 반영. 개발 DB **Flyway V1~V12** 적용·기존 데이터 보존 확인. 앞선 합성 시험 환경에서 PC·iPhone 공지 수신/열기·iPhone 시작 알림·기기별 로그아웃·탈퇴 후 전체 기기 차단 확인
+- **현재 단계(2026-10-18):** 인증·회원·팀·곡·예약·반복 배정·날짜 개방·변경·교환·악기 고장·공지·알림함·Web Push·시작 1시간 전 알림·회원 탈퇴·팀 해체·가입 전후 관리자 지정과 다이어리 UI를 `main`에 반영. 개발 DB **Flyway V1~V12** 적용·기존 데이터 보존 확인. 운영 Docker·Compose·Caddy 구현과 합성 검증, **`v1.0.0-rc.2` 공개 이미지 3개 발행·digest 검증**까지 완료
 - **현재 UI:** 다이어리 홈·달력·주간 시간표·모바일 예약 바텀시트·계정 인사말·예약 변경/교환·관리자 악기 고장·공지·개인 알림함·기기별 알림 설정/클릭 진단·회원 탈퇴/팀 해체 확인 화면. 회원 관리는 전체 관리자·팀장·일반 회원의 세 영역과 카드 내 지정·해제, 다이어리는 PC 소개 정렬·모바일 로고/더보기 크기·제목 아이콘·응원 문구 보완. PC·모바일에서 같은 API와 예약 정책 사용
-- **배포 상태:** 로컬 개발·테스트 단계. 운영 도메인과 서버는 아직 연결하지 않음
+- **배포 상태:** 기존 서울 Lightsail의 **고정 IP 연결·Docker/Compose 설치·브라우저 SSH 전용 제한·TCP443 허용** 완료. 도메인 등록·DNS·실제 HTTPS 서비스·앱/운영 DB 배포·실데이터 이전은 미완료
 
 > **구현 상태 안내:** 기본 예약·취소는 [PR #6](https://github.com/developer-sw/jeongeum-band-scheduler/pull/6), 반복 고정 배정·날짜 개방·내 공연조 일정은 [PR #7](https://github.com/developer-sw/jeongeum-band-scheduler/pull/7), 다이어리 UI는 [PR #9](https://github.com/developer-sw/jeongeum-band-scheduler/pull/9), 단건 예약 변경은 [PR #10](https://github.com/developer-sw/jeongeum-band-scheduler/pull/10), 예약 교환은 [PR #12](https://github.com/developer-sw/jeongeum-band-scheduler/pull/12), 악기 고장 관리는 [PR #13](https://github.com/developer-sw/jeongeum-band-scheduler/pull/13), 전체 공지·개인 알림함은 [PR #15](https://github.com/developer-sw/jeongeum-band-scheduler/pull/15), Web Push·시작 1시간 전 알림·CSRF 보완은 [PR #17](https://github.com/developer-sw/jeongeum-band-scheduler/pull/17)로 `main`에 반영했습니다. [PR #18](https://github.com/developer-sw/jeongeum-band-scheduler/pull/18)은 당시 README 갱신이며, **회원 탈퇴·팀 해체·후속 관리자 UI·Push 클릭 복원 및 실기기 검증은 [PR #19](https://github.com/developer-sw/jeongeum-band-scheduler/pull/19), 병합 커밋 `0d660ae`로 반영했습니다.** **가입 전 관리자 지정·역할별 명단·카드 내 확인과 다이어리 UI 보완은 [PR #21](https://github.com/developer-sw/jeongeum-band-scheduler/pull/21)로 `main`에 반영했습니다.** 최신 기능 검증은 Backend **368건**·Frontend **334건**, 총 **702건**입니다. 운영 HTTPS 배포·Android 실기기·운영 외부 백업 복원은 후속 검증 범위입니다.
 
@@ -53,6 +53,9 @@
 | Web Push | ✅ 구현·PC/iPhone 실수신 확인 | 기기 구독·해제·계정 binding, VAPID/AES128GCM 발송·재시도·만료·재시작 복구, 클릭 목적지 120초·일회 복원, 로그아웃 시 해당 기기만 중단 |
 | 시작 1시간 전 알림 | ✅ 구현·iPhone 실수신 확인 | 예약·변경·취소·교환·반복 회차와 원자적 계획 연동, 현재 수신자/버전·계보 중복 검사, 제어된 시험 시계와 실제 스케줄러로 잠금 화면 수신·예약 열기 확인 |
 | 탈퇴·팀 해체 예약 정리 | ✅ 구현·main 반영 | 관리자 회원 탈퇴·팀 해체, 개인/팀 예약·대기 교환·반복 배정·예정 알림 정리, 회원 탈퇴 시 전체 기기/세션 종료, 존속 팀 예약·완료/작성자 이력 보존 |
+| 운영 컨테이너 | ✅ 구현·main 반영 | Docker·Compose·Caddy, 전용 DB 네트워크/볼륨·secret 파일, 격리 HTTPS·권한/예약·재시작·별도 DB 복원 57개 검사 |
+| 운영 이미지 | ✅ rc.2 발행·검증 | Linux amd64 Backend·Frontend·Caddy 공개 이미지, 출처/버전·SHA tag·최종 digest 대조, 명시적 공개 범위 검사 |
+| 운영 서버 준비 | 🧪 기본 구성 완료 | 서울 Lightsail 고정 IP·Docker/Compose·브라우저 SSH 전용·80/443 IPv4/IPv6 허용. 실제 앱/DB·공개 HTTPS·외부 백업 복구는 후속 |
 | PWA·운영 | 🧪 설치 확인·운영 준비 중 | manifest·아이콘·Push service worker·설치 안내, iPhone 홈 화면 앱 설치/권한/수신 확인. 운영 HTTPS·Android 실기기·운영 외부 백업 복원은 미완료 |
 
 ### 권한 모델
@@ -85,6 +88,7 @@ Push 구독은 인증된 본인과 해당 브라우저의 로그인 세션에 �
 | UI·데이터 | Tailwind CSS 4.3.3, TanStack Query 5.104.1 |
 | 테스트 | JUnit(Jupiter), Testcontainers(PostgreSQL), Vitest |
 | 개발·CI | Docker Compose, PowerShell, GitHub Actions |
+| 운영 구성 | Ubuntu 24.04 LTS, Docker Engine/Compose, Caddy, GHCR 공개 이미지 |
 
 백엔드는 Spring Boot BOM·`gradle.lockfile`, 프론트엔드는 `package-lock.json`을 이용해 의존성을 고정합니다. 로컬 데이터베이스는 Docker에서 실행하며, 애플리케이션은 개발 서버 또는 IDE에서 실행합니다.
 
@@ -93,7 +97,8 @@ Push 구독은 인증된 본인과 해당 브라우저의 로그인 세션에 �
 ```text
 jeongeum-band-scheduler/
 ├── .github/
-│   └── workflows/ci.yaml               # Backend·Frontend CI
+│   ├── workflows/ci.yaml               # Backend·Frontend·합성 컨테이너·발행 계약 CI
+│   └── workflows/release-images.yaml   # 명시적 입력의 이미지 준비/발행
 ├── backend/
 │   ├── src/main/java/kr/jeongeum/scheduler/
 │   │   ├── auth/                        # 로그인·가입·세션 인증·원자적 CSRF 초기화
@@ -136,13 +141,38 @@ jeongeum-band-scheduler/
 │   ├── src/lib/                         # API 클라이언트·Query 설정
 │   ├── src/providers/
 │   └── package.json
-├── scripts/                              # 로컬 환경·앱 실행·검증
+├── deploy/
+│   ├── compose.production.yaml          # 운영 네트워크·볼륨·자원 제한·고정 이미지
+│   ├── compose.qa.yaml                  # 격리 합성 검증 설정
+│   ├── .env.production.example          # 비밀값 없는 운영 설정 예시
+│   ├── caddy/                           # 이미지·HTTPS/내부 프록시 설정
+│   └── postgres/init-app.sh             # 앱 전용 DB 계정 초기화
+├── scripts/                              # 로컬 실행·합성 컨테이너·이미지 발행 검증
 ├── tools/environment-check/             # Java·Docker·DB 환경 검증
 ├── docs/                                # 정책·API·ERD·보안·테스트·배포 문서
 ├── compose.yaml                         # 로컬 PostgreSQL 17.11
 ├── AGENTS.md                            # 프로젝트 작업 규칙
 └── README.md
 ```
+
+## 운영 배포 준비
+
+**2026-10-18 기준, 서버 기본 준비까지 완료했으며 실제 서비스는 아직 개방하지 않았습니다.**
+
+| 구분 | 확인한 상태 |
+| --- | --- |
+| 구현·이미지 | 운영 컨테이너 [PR #23](https://github.com/developer-sw/jeongeum-band-scheduler/pull/23), 이미지 발행 [PR #24](https://github.com/developer-sw/jeongeum-band-scheduler/pull/24), 공개 범위 보완 [PR #25](https://github.com/developer-sw/jeongeum-band-scheduler/pull/25) main 병합 |
+| 재사용할 릴리스 | `v1.0.0-rc.2`, Linux amd64 Backend·Frontend·Caddy 공개 이미지. [실제 발행](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/39025711724)의 prepare/publish 성공, [보존한 digest](docs/PRODUCTION_IMAGE_RELEASE.md)를 배포 기준으로 사용 |
+| 기존 서버 | AWS Lightsail 서울, Ubuntu 24.04 LTS·2 vCPU·4GB RAM·80GB SSD. 별도 EC2·RDS·로드 밸런서 없이 기존 VM 활용 |
+| 기본 구성 | 고정 IPv4 연결, Docker Engine **29.9.1**·Compose **5.6.0**, docker/containerd active·enabled, 네트워크/포트/볼륨 없는 `hello-world` 실행 확인 |
+| 접근 제한 | SSH TCP22는 **Lightsail 브라우저 SSH IPv4 전용**, 제한 후 새 연결 성공. 기존 HTTP80 유지·HTTPS443 IPv4/IPv6 허용, 앱/DB·원격 Docker API 포트는 미공개 |
+| 아직 남은 작업 | OS 보안 패치, 도메인/DNS·Caddy 공개 인증서, 실제 VM의 합성 앱/DB 배포·부하·외부 백업 복구, 승인된 실데이터 이전·운영 origin 로그인/Push 검증 |
+
+TCP443 방화벽 허용은 **실제 HTTPS 서비스나 인증서 발급 완료를 뜻하지 않습니다.** `bandjeongeum.cloud`는 아직 미등록이며 운영 접속 URL은 제공하지 않습니다. 고정 IP·SSH 접속 정보·계정별 크레딧·비밀 설정은 공개 README에 기록하지 않습니다.
+
+AWS Free Plan은 최대 6개월 또는 크레딧 소진 중 빠른 시점에 종료하며 크레딧의 표시 만료일과 구분합니다. 실제 회원 데이터 이전 전 플랜의 데이터 처리 조건을 확인하고, 추가 유료 자원·플랜 전환·도메인 결제·실제 데이터 이전/서비스 전환은 별도 확인 후 진행합니다. 일반 요금·플랜 조건·단계별 절차와 공식 근거는 [Lightsail 배포 계획](docs/AWS_LIGHTSAIL_DEPLOYMENT.md)을 따릅니다.
+
+기존 개발 DB·관리자·회원·팀·예약·Docker 볼륨을 유지하며 새 migration이나 관리자 계정 재생성 없이 이전을 준비합니다. 이미 검증한 릴리스의 digest와 [운영 Compose](deploy/compose.production.yaml)를 재사용하고 실제 운영 VM에서 다시 빌드하지 않습니다. 상세 실행 경계는 [운영 컨테이너](docs/PRODUCTION_CONTAINERS.md), [이미지 발행](docs/PRODUCTION_IMAGE_RELEASE.md), [사전 점검](docs/DEPLOYMENT_PREFLIGHT.md)에 기록했습니다.
 
 ## 🚀 로컬 실행
 
@@ -308,11 +338,13 @@ Spring Session JDBC를 사용하며 `HttpOnly`·`SameSite=Lax` 세션 쿠키와 
 
 ## 🧪 테스트 및 CI
 
-2026-10-17 게시 기준, 최신 기능 검증은 **2026-10-16에 확인한 Backend 368건·Frontend 334건, 총 702건**입니다. 로컬 자동 회귀·CI·합성 환경의 브라우저 조작·사용자 실기기 관찰을 구분해 기록합니다. 아래 수치는 해당 소스의 실행 기록이며 README 변경 자체를 새로운 기능 검증으로 집계하지 않습니다.
+2026-10-18 갱신 기준, 앱 소스 `main` `8b24285`의 [기존 CI](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/39024812366)에서 **Backend 368건·Frontend 334건, 총 702건**과 운영 합성 검사·발행 계약 검증을 확인했습니다. 아래 수치는 해당 소스의 기존 실행 기록이며, 이번 README 갱신 과정에서 애플리케이션 테스트를 재실행한 결과가 아닙니다. 로컬 자동 회귀·CI·합성 브라우저·사용자 실기기 관찰·서버 구성 확인을 구분합니다.
 
 - **Backend:** JUnit/PostgreSQL Testcontainers **20개 suite·368건 통과**, 실패·오류·skip 0, `compileJava`·`bootJar` 통과. 명단 통합 25건·가입 예정 권한 13건과 탈퇴/해체·인증·90일 세션·CSRF·예약·변경·교환·반복·고장·공지·알림·Push/worker 회귀 포함
 - **Frontend:** **23개 파일·334건 통과**, worker 35건·앱 클릭 복원 21건 포함. TypeScript·ESLint(경고 0)·Next.js production build 20개 route 확인. 로컬 격리 webpack 빌드와 원격 CI의 기본 Turbopack 빌드를 구분
-- **GitHub Actions:** 최신 PR #21 기능 커밋 `44c9fab`의 [Push 실행](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/38900217557)과 [PR 실행](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/38900246980)에서 Backend·Frontend **총 4개 job 성공**. 테스트·양쪽 빌드·타입·lint·프론트엔드 생산 의존성 감사를 CI로 확인
+- **GitHub Actions:** PR #25 병합 소스 `8b24285`의 [main CI](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/39024812366)에서 **Backend·Frontend·합성 운영 컨테이너·이미지 발행 계약 4개 job 성공**. 문서 전용 변경은 `ci.yaml`의 경로 필터에 따라 자동 실행에서 제외
+- **운영 컨테이너·발행:** 격리 합성 HTTPS의 권한·예약·재시작·별도 DB 복원 **57개 검사**, 이미지 발행 Node 계약 **38건**·PowerShell export **15항목** 통과. [rc.2 발행](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/39025711724)과 최종 이미지 digest/출처 대조 완료. 기존 rc.1의 공개 범위 검사 실패 이력은 보존
+- **실제 VM 기본 구성:** 고정 IP 연결·Docker/Compose·서비스 자동 시작 설정·일회 컨테이너 실행, 브라우저 SSH 전용 제한 후 새 접속, 80/443 방화벽 상태 확인. 실제 VM의 앱 기동·HTTPS·부하·DB 복원이나 재부팅 시험을 완료한 것으로 집계하지 않음
 - **관리자 지정·분류:** 가입 전 지정/해제·개인 초대 권한 적용·공개 역할/명단 ID 위조 차단·수동 연결의 기존 권한 보존·가입/연결/지정 경합·후반 실패 rollback·마지막 활성 관리자 보호 확인. 관리자 우선 단일 표시·동명이인 분리·카드 내 오류/재조회/완료·그룹 이동 후 포커스·중복 실행 차단도 검증
 - **예약·교환·고장·공지 경합:** 실제 PostgreSQL 잠금 timeout·후반 저장 실패의 전체 rollback, 동일 키 재확인·중복 방지, 현재 권한·점유·한도·계보 보존 확인. 최초 중요 작성만 알림·수신자 격리·읽음 시각 경계 포함
 - **실제 스케줄러·재시작:** Spring Boot 종료·새 JVM 재시작과 데이터 보존, 자정 cron 등록·누락 날짜 복구·자동 재시도, 독립 JVM의 시작 계획·발송 lease 복구·중복 방지 확인
@@ -332,7 +364,7 @@ Spring Session JDBC를 사용하며 `HttpOnly`·`SameSite=Lax` 세션 쿠키와 
 
 검증 범위와 재현 절차는 [명단·관리자 지정](docs/MEMBER_TEAM_MANAGEMENT.md), [다이어리](docs/DIARY_UI_REDESIGN.md), [예약 변경](docs/RESERVATION_CHANGES.md), [예약 교환](docs/RESERVATION_EXCHANGES.md), [악기 고장](docs/INSTRUMENT_FAULTS.md), [공지·알림함](docs/NOTICES_NOTIFICATIONS.md), [Web Push·시작 알림](docs/WEB_PUSH_REMINDERS.md), [회원 탈퇴·팀 해체](docs/MEMBER_TEAM_LIFECYCLE.md)에 기록했습니다.
 
-**미완료 범위:** 운영 HTTPS 배포·도메인/서버 연결·운영 외부 백업 복원·실서비스 트래픽, Android 실기기 설치/수신/클릭, 실제 OS의 오프라인·가상 키보드·스크린리더·200% 확대 검증입니다. 기기별 로그아웃은 iPhone 중단→PC 유지 방향을 확인했으며 반대 방향과 모든 OS/실행 상태까지 확인한 것은 아닙니다. 이전 V7~V9 적용 전 백업 파일 자체의 복원은 미검증이며 V10/V11/V12 적용 전 새 백업의 로컬 격리 복원과 구분합니다.
+**미완료 범위:** OS 보안 패치·도메인 등록/DNS·공개 HTTPS·실제 VM 앱/DB 배포·실데이터 이전·운영 외부 백업 복구·VM 부하/실서비스 트래픽, 운영 origin Push와 Android 실기기 설치/수신/클릭, 실제 OS의 오프라인·가상 키보드·스크린리더·200% 확대 검증입니다. 기기별 로그아웃은 iPhone 중단→PC 유지 방향을 확인했으며 반대 방향과 모든 OS/실행 상태까지 확인한 것은 아닙니다. 이전 V7~V9 적용 전 백업 파일 자체의 복원은 미검증이며 V10/V11/V12 적용 전 새 백업의 로컬 격리 복원과 구분합니다.
 
 시험 계정·임시 HTTPS·합성 DB는 검증 후 종료했습니다. 실제 개발 계정·예약·Docker 영속 볼륨은 보존했으며 공개 시험 계정이나 운영 접속 주소는 제공하지 않습니다. iPhone 클릭 문제의 재발과 후속 복원을 확인했지만 단말의 상세 native 이벤트 기록은 수집하지 않아 모든 iOS 상태의 해결을 보장하지 않습니다. 탈퇴 후 미수신은 사용자 관찰이며 이미 제공자가 수락한 이전 알림을 철회할 수 없습니다. 네트워크·OS 지연·발송 후 기록 전 중단의 외부 중복 가능성도 남습니다.
 
@@ -397,7 +429,11 @@ npm.cmd run build
 | [NOTIFICATIONS](docs/NOTIFICATIONS.md) | 알림함·Web Push·시작 전 알림 정책과 구현/운영 검증 구분 |
 | [INITIAL_SETUP](docs/INITIAL_SETUP.md) | 백엔드·프론트엔드 초기 설정과 검증 |
 | [DEV_ENVIRONMENT](docs/DEV_ENVIRONMENT.md) | 로컬 DB·Docker·JDK와 선택적 스마트폰 LAN 접속 안내 |
-| [DEPLOYMENT](docs/DEPLOYMENT.md) | HTTPS 배포·백업·운영 비용 계획 |
+| [DEPLOYMENT](docs/DEPLOYMENT.md) | 현재 배포 상태·데이터/origin 전환·운영 비용과 과거 비교 |
+| [DEPLOYMENT_PREFLIGHT](docs/DEPLOYMENT_PREFLIGHT.md) | 소스 사전 점검·환경변수·배포 전 검증·기존 데이터 보존 |
+| [PRODUCTION_CONTAINERS](docs/PRODUCTION_CONTAINERS.md) | 운영 Docker·Compose·Caddy·secret/네트워크·합성 HTTPS/재시작/복원 57개 검사 |
+| [PRODUCTION_IMAGE_RELEASE](docs/PRODUCTION_IMAGE_RELEASE.md) | rc.2 공개 이미지 발행·출처/버전·최종 digest·수동 발행과 권한 경계 |
+| [AWS_LIGHTSAIL_DEPLOYMENT](docs/AWS_LIGHTSAIL_DEPLOYMENT.md) | 서울 Lightsail 기본 구성 결과·일반 비용·Free Plan 조건·남은 배포 순서 |
 | [AGENTS.md](AGENTS.md) | 개발 에이전트 작업 및 변경 보존 규칙 |
 
 ## 🔖 개발 이력
@@ -424,6 +460,10 @@ npm.cmd run build
 | [#19](https://github.com/developer-sw/jeongeum-band-scheduler/pull/19) | 관리자 회원 탈퇴·팀 해체·V11·예약/알림/기기/세션 정리·Push 클릭 120초 일회 복원·352/289건·브라우저 28항목·PC/iPhone 실기기 확인 |
 | [#20](https://github.com/developer-sw/jeongeum-band-scheduler/pull/20) | 탈퇴·팀 해체·실기기 Push 확인·V11·검증 상태를 반영한 README 갱신 |
 | [#21](https://github.com/developer-sw/jeongeum-band-scheduler/pull/21) | 가입 전 관리자 지정·개인 초대 권한 적용·역할별 명단·카드 내 권한 확인·V12·다이어리/모바일 헤더 보완·368/334건 |
+| [#22](https://github.com/developer-sw/jeongeum-band-scheduler/pull/22) | 관리자 지정·다이어리 UI·V12·검증 기록을 반영한 README 갱신 |
+| [#23](https://github.com/developer-sw/jeongeum-band-scheduler/pull/23) | 운영 Docker·Compose·Caddy·secret 파일·격리 합성 HTTPS/재시작/별도 DB 복원 57개 검사 |
+| [#24](https://github.com/developer-sw/jeongeum-band-scheduler/pull/24) | 검증 이미지 전달·수동 준비/발행 workflow·SHA/version tag·출처와 digest 검증 |
+| [#25](https://github.com/developer-sw/jeongeum-band-scheduler/pull/25) | 명시적 이미지 공개 범위·조기 검사·계약 보완. 이후 rc.2 공개 이미지 3개 발행 성공 |
 
 현재는 **핵심 기능 구현 후 운영 준비 검증 단계**이며, 동아리 대상 운영 배포·실사용 지표는 아직 없습니다. 운영 HTTPS·외부 백업 복원과 남은 실기기/접근성 검증을 거쳐 실제 사용자에게 제공할 예정입니다.
 

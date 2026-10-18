@@ -1,5 +1,15 @@
 # 테스트 및 운영 검증 계획
 
+2026-10-18 README·연결 문서 최신화: PR #23~25 병합, main `8b24285` CI 4개 job 성공과 rc.2 발행 prepare/publish 성공을 GitHub에서 읽기 전용으로 재확인했다. README와 운영 관련 8개 문서의 로컬 파일 참조 175개가 존재하고 보존한 이미지 참조 3개가 일치했다. 공개 기록의 알려진 민감 값 패턴·문서 전용 변경·비공개 파일 Git 제외·`git diff --check` 검사도 통과했다. `ci.yaml`은 README/docs 경로만 바뀌면 자동 CI를 실행하지 않으며 기존 앱 테스트를 새 실행 결과로 보고하지 않는다. 앱/DB·원격 서버 설정은 이번 문서 갱신에서 변경하지 않는다.
+
+2026-10-18 승인된 VM 기본 구성 검증: 기존 서버의 고정 IPv4 생성/연결 뒤 새 SSH로 접속했다. 공식 apt Docker29.9.1/Compose5.6.0·docker/containerd active/enabled·포트/볼륨 없는 `hello-world --rm --network none` 실행과 컨테이너/볼륨 없음·원격 Docker API 미공개를 확인했다. SSH를 Lightsail 브라우저 IPv4 전용으로 제한한 뒤 별도 새 연결/명령 실행에 성공했고 PC의 직접 TCP22 연결은 한 번의 5초 시험에서 시간 초과였다. 최종 cloud 규칙은 TCP80/443 IPv4·IPv6 전체와 브라우저전용SSH22다. OS UFW/sshd·권한을 변경하지 않았다. 증빙 화면/명령은 Git 제외 비공개 구성 기록에 보존했다. 실제 앱 HTTPS·부하·DB 이전/복구·Push·재부팅·OS 보안 패치 검증이나 앱 테스트 재실행을 완료한 것으로 집계하지 않는다.
+
+2026-10-18 사용자 승인 읽기 전용 점검: 직접 로그인 후 AWS Billing/크레딧·Budgets·Lightsail/Networking과 기존 VM 브라우저 SSH의 OS·자원·CLI/서비스·수신 포트·UFW/DOCKER-USER 상태를 확인했다. 실제 크레딧 상계는 Bills 서비스 데이터가 준비되지 않아 미검증이며 플랜 UI는 남은 일수만 확인했다. 설치·기동·재부팅·네트워크 변경·리소스 생성·실제 DB 접근/이전·앱 테스트 재실행은 없었다. [AWS_LIGHTSAIL_DEPLOYMENT](AWS_LIGHTSAIL_DEPLOYMENT.md)의 실제 관찰과 Git 제외 비공개 점검 기록을 기준으로 하며 기존 합성 57검사를 새 VM 부하/복구 완료로 집계하지 않는다.
+
+2026-10-17 Lightsail/Free Plan 검토: 기존 main `8b24285`의 Backend 368건·Frontend 334건·컨테이너 57개·Node 38건·PS export 15항목과 실제 `rc.2` 발행 결과를 재사용했다. 이번에는 문서/설정 대조·공식 조건/요금 조사만 수행했고 앱 테스트·DB·Docker·AWS/SSH 접속을 재실행하지 않았다. 기존 VM 성능·고정 IP/방화벽·공개 HTTPS·외부 백업·독립 복구·실데이터 이전·운영 origin Push는 통과로 표시하지 않는다. [AWS_LIGHTSAIL_DEPLOYMENT](AWS_LIGHTSAIL_DEPLOYMENT.md)의 다음 실행 순서를 따른다.
+
+이전 계획 작성 단계의 문서 검증 결과: 당시 변경 문서 8개의 로컬 파일 참조 126개가 존재하고 rc.2 이미지 참조 3개가 보존한 `release.env`와 일치했다. Compose의 메모리 제한 합계 2816MiB와 비용 산술을 대조했고 비공개 계정 기록의 Git 제외·`git diff --check`를 확인했다. 독립 검토에서 찾은 Push 기능/worker 활성 순서의 모호함을 수정했다. 애플리케이션 테스트를 새로 통과한 수치로 집계하지 않는다.
+
 ## 2026-10-17 실제 발행·공개 범위 보완
 
 PR #24 병합 main `e84c183`의 CI 39022663319에서 Backend 368건·Frontend 334건·컨테이너 QA 57개·발행 계약 28건/PS 15항목이 성공했다. 첫 실제 실행 39023497060의 prepare는 성공했고 publish는 SHA/version tag 생성 후 `RELEASE_PACKAGE_PRIVACY_REJECTED`로 실패했다. package가 실제 Public이라는 브라우저 표시 및 익명 manifest/config 조회로 확인했으며 원본 candidate의 이미지 ID/source/version·manifest digest와 QA 57개/정리 성공 증빙이 일치한다. 로컬에서는 image tar 전체 checksum을 다시 계산하지 않았고 main의 검증된 발행 코드가 archive 검사·pull 비교를 통과한 뒤 privacy 검사에서 중단된 흐름과 구분한다. 최종 release artifact가 없으므로 이 실행을 완전 성공으로 표시하지 않는다.

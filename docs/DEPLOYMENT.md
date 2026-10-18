@@ -2,9 +2,11 @@
 
 최초 작성: 2026-10-09 / 최신 사전 점검·주요 공개 가격 재확인: 2026-10-17 (Asia/Seoul)
 
-최신 실제 실행: 운영 이미지 준비 PR #24를 main `e84c183`에 병합하고 main CI 4개 job을 통과했다. 첫 이미지 3개는 Public으로 발행돼 비공개 검사에서 중단됐고, 설명 후 사용자가 공개 사용을 승인했다. 명시적 visibility 선택과 조기 검사 보완 후 새 버전의 최종 발행을 검증한다. 기존 개발 DB/서버와 package·태그는 보존하며 서버 배포는 하지 않는다. [PRODUCTION_IMAGE_RELEASE](PRODUCTION_IMAGE_RELEASE.md)를 따른다.
+최신 운영 기준(2026-10-18): 사용자가 생성한 서울 Lightsail Ubuntu 24.04 LTS·2 vCPU·4GB·80GB·dual-stack 서버를 활용한다. 후속 승인으로 실제 고정IP 연결·Docker29.9.1/Compose5.6.0 설치/동작·브라우저 SSH 전용 제한/새 접속·TCP443 IPv4/IPv6 허용을 완료했다. AWS Free Plan 유지와 추가 비용 최소화 조건을 반영했으며 `bandjeongeum.cloud`는 미등록이다. [AWS_LIGHTSAIL_DEPLOYMENT](AWS_LIGHTSAIL_DEPLOYMENT.md)에 실제 결과·월 요금·플랜/승인 경계·다음 순서를 정리했다. 계정별 잔액/주소·명령·화면은 Git 제외 비공개 기록에 둔다. OS 보안 패치·공개 HTTPS·앱/DB 이전/배포·외부 백업 복구는 남아 있다.
 
-최신 후속: 운영 컨테이너 PR #23은 main `911c181`에 병합됐고 main CI의 Backend 368건·Frontend 334건·합성 검사 57개가 성공했다. 현재는 [운영 이미지 발행 준비](PRODUCTION_IMAGE_RELEASE.md)를 진행한다. GHCR의 비공개 package·검증 이미지 archive·SHA/version tag·최종 digest·수동 준비/발행 분리를 구현하며, 실제 발행·서버 구매·DB 이전·배포는 실행하지 않는다. 아래 초안 PR 예정 표시는 이전 단계 기록이다.
+최신 실제 실행: PR #24·#25를 main `8b24285`까지 병합하고 [main CI 4개 job](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/39024812366)을 통과했다. [실제 공개 발행](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/39025711724)에서 `v1.0.0-rc.2` 이미지 3개와 최종 artifact·digest 대조를 완료했다. 이를 재사용하고 rc.1 최초 실패 이력과 태그는 보존한다. [PRODUCTION_IMAGE_RELEASE](PRODUCTION_IMAGE_RELEASE.md)를 따른다. 아래 준비/후속 문단과 사전 비교표는 당시 기록이며 서버를 새로 구매하거나 발행을 처음부터 시작할 계획이 아니다.
+
+이전 기록(PR #23 직후): 운영 컨테이너는 main `911c181`에 병합됐고 main CI의 Backend 368건·Frontend 334건·합성 검사 57개가 성공했다. 당시에는 [운영 이미지 발행 준비](PRODUCTION_IMAGE_RELEASE.md)를 진행했으며 실제 발행·서버 구매·DB 이전·배포는 실행하지 않았다. 이후 발행 완료와 사용자 서버 보유 상태는 위 최신 기준을 따른다.
 
 후속 완료: 운영 Docker·Compose·Caddy 구현과 합성 DB의 실제 HTTPS·권한/예약·재시작·별도 DB 복원 검증 57개를 통과했다. 새 실행 자산·QA 명령·최종 증빙과 남은 실제 운영 검증은 [PRODUCTION_CONTAINERS](PRODUCTION_CONTAINERS.md)를 따른다. 기존 개발 DB·실행 서버를 보존하고 QA 자원을 정리했다. 이후 승인된 GitHub 반영의 원격 CI 결과는 해당 초안 PR에서 확인한다. 구매·실배포는 하지 않았다. 아래 사전 점검 표의 자산 미구현·미실행 표시는 그 점검 시점의 상태다.
 
@@ -12,7 +14,7 @@
 
 이 문서는 약 40명의 정음 동아리를 위한 개발환경·운영 구성 계획이다. 2026-10-17 현재 관리자 가입 전/후 지정·V12·후속 UI까지 PR #21로 main에 병합했고 PR #22로 README를 갱신했다. 기능 검증은 Backend 368건·Frontend 334건이며 기능 PR과 병합 main CI도 성공했다. 최신 소스 감사·환경변수 계약·기존 데이터/origin 이전·배포 전 통과 조건은 [DEPLOYMENT_PREFLIGHT](DEPLOYMENT_PREFLIGHT.md)를 따른다.
 
-사용자는 **한국 접속 지연·운영 여유 우선**을 확정했다. 이에 서울 4GB 단일 VPS를 우선 기술 권고로 삼는다. 사전 점검은 구성안 문서 작성까지였고, 후속 승인으로 운영 컨테이너 구현·합성 검증과 GitHub 반영을 진행했다. 서버 생성·도메인 구매·실제 DB 이전/배포는 실행하지 않았다. 저장소 밖 계정의 현재 소유/구매 상태를 조회하지 않았으므로 도메인·서버 보유 여부와 최종 비용은 실제 준비 때 확인한다.
+사용자는 한국 접속 지연을 유지하면서 **이미 생성한 서울 Lightsail과 Free Plan 크레딧으로 추가 비용을 최소화**하도록 요청했다. 서버 실행·고정 IP·Docker/방화벽은 실제 확인/구성을 완료했으며 도메인·공개 HTTPS·앱 배포는 남아 있다. 추가 유료 리소스·업그레이드·도메인 결제와 실제 데이터 이전/전환은 사전에 보고하고 확인받는다.
 
 확정 운영 정책은 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), 기술 구조는 [ARCHITECTURE.md](ARCHITECTURE.md)를 따른다. 이 문서의 금액은 **견적 비교**, 서버·백업·로그 설정은 **기술 설계안**이다. 도메인 구매 가능성·서버 재고·성능을 확인한 배포 완료 상태를 뜻하지 않는다.
 
@@ -40,7 +42,7 @@
 | 2026-10-30 | 첫 실제 운영 시작 목표 |
 | 2026-12-11 | 이번 운영 종료 목표 |
 
-이 표는 초기 목표 기록이다. 10/23의 구현 시작 가정과 달리 핵심 기능은 이미 구현했으며 날짜를 근거로 미완료 운영 검증을 생략하지 않는다. 10/30~12/11은 정확히 6주이고, 10/23부터 서버를 유지한다면 약 7주이므로 비용 비교는 여유를 둔 2개월로 계산한다. 실제 자원 생성일·전환 점검 창과 첫 운영일은 구매·배포 전에 확인한다.
+이 표는 초기 목표 기록이다. 핵심 기능과 이미지 발행은 이미 완료했으며 날짜를 근거로 미완료 운영 검증을 생략하지 않는다. 서버는 이미 생성돼 배포 전에도 사용료/크레딧 소모가 시작된다. 비용 비교의 2개월은 예산 참고 기간이며 실제 점검 창·첫 운영일과 플랜 종료일은 별도로 확인한다.
 
 첫 운영 전에는 확정 기능의 핵심 흐름, DB 동시성·권한·한도·교환 검증, 알림 작업 복구, 실제 모바일 사용, 외부 백업 복원을 확인한다. 목표 일정 때문에 승인된 변경·교환·공지·Push·알림함 기능을 임의로 운영 후 기능으로 미루지 않는다.
 
@@ -68,7 +70,7 @@ Windows와 WSL의 경로·인증·환경변수를 무의식적으로 혼용하�
 | Next.js | 운영용 프론트 이미지, 개인화 응답은 공용 캐시 제외 |
 | Spring Boot | 운영용 백엔드 이미지, API·작업자·알림 스케줄 처리 |
 | PostgreSQL | 별도 컨테이너, DB 데이터 지속 볼륨, 외부 공개 포트 없음 |
-| 백업 작업 | DB 논리 백업을 암호화해 외부 R2로 전송, 상태 확인 |
+| 백업 작업 | DB 논리 백업을 암호화해 서버 밖에 저장·복구 확인. R2 또는 Lightsail Object Storage는 비용 검토·승인 후 선택 |
 
 - 애플리케이션은 Docker 이미지로 교체하고 DB 볼륨은 독립 유지한다. 앱 컨테이너 내부 임시 경로에 DB를 저장하지 않는다.
 - 첫 운영의 DB는 VPS에서 직접 운영한다. 별도 관리형 DB 요금을 기본 비용에 추가하지 않으며, 직접 DB 운영·복구 책임이 따른다.
@@ -79,7 +81,7 @@ Windows와 WSL의 경로·인증·환경변수를 무의식적으로 혼용하�
 
 ## 5. 도메인·HTTPS·네트워크
 
-기존 도메인 후보는 bandjeongeum.cloud다. 이전 기록에서는 미구매였으며 이번 점검에서 현재 보유·가용성은 확인하지 않았다. 사용자 브라우저는 하나의 origin을 사용하고 /api/v1 및 하위 경로는 Spring으로, 화면·정적 파일은 Next.js로 전달한다.
+`bandjeongeum.cloud`는 사용자 확인으로 아직 미등록이다. 현재 이름 가용성·연간 결제액·등록업체는 미확정이다. 사용자 브라우저는 하나의 origin을 사용하고 /api/v1 및 하위 경로는 Spring으로, 화면·정적 파일은 Next.js로 전달한다. DNS는 Lightsail 무료 범위 또는 기존 Cloudflare DNS안을 비교해 확정하며 초기에는 검증한 고정 IPv4의 A 레코드·직접 HTTPS를 사용한다.
 
 Cloudflare는 DNS와 선택적 Proxy에 활용하고 Caddy는 origin HTTPS와 경로 전달을 맡는다. 초기 DNS-only에서 Caddy 인증서·HTTPS를 먼저 확인한 뒤 Proxy를 적용하는 순서를 권고한다. Proxy 적용 시 origin 인증서를 검증하는 Full (strict)·신뢰 IP·개인화 캐시 제외를 함께 검증한다. 실제 인증서 발급·갱신은 아직 시험하지 않았다.
 
@@ -91,7 +93,11 @@ Cloudflare는 DNS와 선택적 Proxy에 활용하고 Caddy는 origin HTTPS와 �
 
 [Caddy 자동 HTTPS](https://caddyserver.com/docs/automatic-https), [Cloudflare Full (strict)](https://developers.cloudflare.com/ssl/origin-configuration/ssl-modes/full-strict/)
 
-## 6. 2개월 비용 비교
+## 6. 현재 비용 기준과 과거 비교 기록
+
+현재 기준은 **기존 Lightsail $24/월**이다. 외부 백업 후보 $1을 선택하면 $25/월, snapshot 20~80GB 보관 예시까지 포함하면 $26~29/월이며 도메인·세금·초과 사용량은 별도다. Free Plan 크레딧이 영구 무료 요금제를 의미하지 않고 6개월/소진 종료도 별도로 확인한다. 세부 조건과 승인 전 선택은 [최신 비용표](AWS_LIGHTSAIL_DEPLOYMENT.md#월-비용과-크레딧-적용)를 따른다.
+
+이하 공급자·도메인 금액은 **사전 점검 당시 비교 기록**이다. 이미 생성한 서버를 재구매하거나 당시 도메인 할인액으로 결제하도록 권고하는 표가 아니다.
 
 무료 체험·신규 가입 크레딧을 지속 운영의 최소 비용으로 계산하지 않는다. USD 공개 요금을 기준으로 하며 아래 금액은 세금·환율·해외 결제 수수료·초과 트래픽·무료 범위를 넘는 백업·추가 서비스 비용을 제외한다.
 
@@ -129,7 +135,7 @@ CX23의 2026-06-15 이후 공개 요금은 서버 $6.49/월, IPv4 $0.60/월이�
 
 ### 6.3 배포 후보의 결정 상태
 
-사용자는 한국 접속 지연·운영 여유 우선을 선택했다. 공식 가격과 기존 기술 구조를 기준으로 Lightsail 서울 4GB를 우선 권고하고, 2GB·유럽 4GB는 비교 대안으로 남긴다. 공급자·최종 예산·실제 계정/재고·보유 도메인과 최종 구매는 아직 확정하지 않았다. 구체 구성과 후속 검증 게이트는 [DEPLOYMENT_PREFLIGHT](DEPLOYMENT_PREFLIGHT.md)를 따른다.
+사용자가 서울 Lightsail 4GB를 이미 생성했다. 기존 인스턴스 재사용을 우선하며 2GB·유럽 비교안은 과거 기록이다. 추가 자원·도메인 결제·백업 저장 위치와 실제 VM 성능은 미확정이다. [AWS_LIGHTSAIL_DEPLOYMENT](AWS_LIGHTSAIL_DEPLOYMENT.md)와 기존 데이터 보존/검증 게이트를 함께 따른다.
 
 Railway는 배포 편의 후보로 남지만 메모리·CPU·volume 사용량 기반 실제 비용과 DB 운영·백업 책임을 따로 검증해야 한다. 관리형 PostgreSQL의 모든 운영 기능이 자동 제공된다고 가정하지 않는다. 아직 사용량을 측정하지 않았으므로 단일한 보장 월 금액을 이 표에 넣지 않는다.
 
@@ -191,14 +197,14 @@ CI의 기본 GITHUB_TOKEN은 repository contents 읽기 권한으로 두고 작�
 
 ## 11. 아직 확인할 항목
 
-- 최종 VPS 공급자·region·구매 가능성과 성능/지연 측정 결과.
+- 기존 서울 Lightsail의 OS 보안 패치·실제 앱 부하/지연, 계정의 정확한 플랜 종료·실제 사용료/크레딧 상계. x86_64·고정 IP·Docker 설치·방화벽·브라우저 SSH 재접속은 확인 완료.
 - bandjeongeum.cloud의 구매 가능성·일반 가격 적용·갱신 설정.
-- GitHub 비공개 저장소에 적용 가능한 branch protection 범위와 CI 사용량. 로그인·저장소 연결은 완료했다.
-- 운영 서버의 Docker·PostgreSQL 구성. 로컬 engine·DB·Testcontainers 실행은 완료했다.
-- 운영 컨테이너·배포 설정의 버전 고정. 초기 앱·개발 DB·검증 CI action의 버전은 고정했다.
-- R2 계정·bucket·최소 권한 token·암호화 키 보관·실제 dump 크기·보존 설정·복원 결과.
+- 현재 공개 GitHub 저장소의 branch protection 범위·CI 사용량·운영 접근권. 로그인·저장소 연결은 완료했다.
+- 운영 서버의 PostgreSQL·앱·Caddy 구성. 원격 Docker/Compose 설치와 일회 컨테이너 실행은 완료했으며 실제 운영 DB는 아직 생성·복원하지 않았다.
+- 이미 고정한 rc.2와 PostgreSQL digest를 실제 서버 설정에 적용했는지 확인.
+- 외부 백업 저장소(R2/Lightsail Object Storage 등)의 비용 선택·승인·최소 권한·암호화 키 보관·실제 dump 크기·보존 설정·복원 결과.
 - 선택한 서버 자원에서 memory·기동·예약·알림 작업·백업의 실측.
 - 새 V12 최종 백업·원본 보존과 새 운영 DB 복원, 이전 origin의 Push 구독·대기 작업 처리·새 도메인 로그인/재설치·재구독 절차.
-- 운영 이미지·Compose·Caddy·프로필/secret 주입·release/rollback·외부 백업 자동화와 실패 관측.
+- 검증된 rc.2 이미지·Compose·Caddy·프로필/secret을 실제 VM에 적용한 결과, 외부 백업 자동화·복구/rollback과 실패 관측.
 
 이 확인 항목은 이미 정한 예약·권한 정책을 다시 질문하거나 변경하기 위한 목록이 아니다. 실제 구현·계정 연결·구매·배포를 시작할 때 해결할 준비 항목이다.

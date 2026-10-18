@@ -1,5 +1,7 @@
 # 운영 배포 사전 점검과 구성안
 
+최신 기준(2026-10-17): 운영 컨테이너·합성 검증과 PR #24/#25 병합 및 `v1.0.0-rc.2` 공개 발행을 완료했다. 사용자는 서울 Lightsail 2 vCPU·4GB·80GB·Ubuntu 24.04 서버를 생성했고 Free Plan/크레딧 활용과 추가 비용 최소화를 요청했다. 도메인은 미등록이다. [AWS_LIGHTSAIL_DEPLOYMENT](AWS_LIGHTSAIL_DEPLOYMENT.md)가 기존 서버 재사용·현행 요금/Free Plan 제약·다음 실행의 최신 기준이다. 아래 본문은 최초 점검 당시 기록이며 ‘서버 후보/자산 미구현’ 목록을 재구현/구매하는 지시로 보지 않는다. 데이터/origin 보존·외부 복구·실운영 검증 조건은 계속 적용한다.
+
 점검일: 2026-10-17, Asia/Seoul. 기준: `main`의 `bf2a474`(PR #21 기능·PR #22 README 병합). 작업 브랜치: `codex/deployment-preflight`.
 
 후속 구현: 이후 사용자 승인으로 운영 컨테이너 자산·격리 합성 통합 검증을 진행한다. [PRODUCTION_CONTAINERS](PRODUCTION_CONTAINERS.md)가 최신 구현/결과이며 아래 ‘아직 없음/미구현/미실행’은 이 사전 점검 당시 상태다. 실제 운영 구매·데이터 이전·공개 배포 승인은 구분한다.

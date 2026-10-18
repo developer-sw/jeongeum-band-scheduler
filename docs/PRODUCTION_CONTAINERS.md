@@ -1,8 +1,10 @@
 # 운영 컨테이너 구현과 합성 통합 검증
 
+최신 후속(2026-10-18): PR #24/#25의 main `8b24285`에서 `v1.0.0-rc.2` 공개 이미지 3개와 최종 artifact/digest를 검증했다. [릴리스 기록](PRODUCTION_IMAGE_RELEASE.md)을 재사용하며 아래 registry 미발행 문구는 구현 당시 기록이다. 사용자가 생성한 서울 Lightsail 4GB의 고정 IP·Docker/Compose·SSH/443 방화벽 준비를 완료했다. [AWS_LIGHTSAIL_DEPLOYMENT](AWS_LIGHTSAIL_DEPLOYMENT.md)의 실제 결과/비용·Free Plan 제약을 따르며 OS 보안 패치·공개 HTTPS·앱/DB 이전/배포·외부 백업 복구는 후속 범위다.
+
 기준일: 2026-10-17, Asia/Seoul. 기반 main `bf2a474`, 작업 브랜치 `codex/production-containers`. 앞선 미커밋 사전 점검 문서와 사용자 UI·DB를 보존한다.
 
-후속 상태: [PR #23](https://github.com/developer-sw/jeongeum-band-scheduler/pull/23)을 사용자 승인으로 main `911c181`에 병합했으며 [main CI](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/39006934855)의 Backend 368건·Frontend 334건·합성 검사 57개가 성공했다. 다음 [운영 이미지 발행 준비](PRODUCTION_IMAGE_RELEASE.md)는 별도 브랜치에서 진행하며 이 문서의 registry 미발행·실배포 미실행 경계는 유지한다.
+이전 기록(PR #23 직후): 사용자 승인으로 main `911c181`에 병합했으며 [main CI](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/39006934855)의 Backend 368건·Frontend 334건·합성 검사 57개가 성공했다. 당시 다음 단계는 [운영 이미지 발행 준비](PRODUCTION_IMAGE_RELEASE.md)였고 registry 발행·실제 배포는 수행하지 않았다. 이후 rc.2 발행과 서버 기본 구성은 위 최신 후속 기록을 따른다.
 
 ## 범위
 
