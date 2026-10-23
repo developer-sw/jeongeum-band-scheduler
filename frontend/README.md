@@ -1,6 +1,6 @@
 # Frontend
 
-Next.js 16.4.0 · React 19.3.0 · TypeScript 6.0.3 · Tailwind 4.3.3 · TanStack Query 5.104.1. 버전은 공식 npm registry와 프레임워크 안내를 확인해 고정하고 `package-lock.json`으로 재현한다.
+Next.js 16.4.2 · React 19.3.0 · TypeScript 6.0.3 · Tailwind 4.3.3 · TanStack Query 5.104.1. 버전은 공식 npm registry와 프레임워크 안내를 확인해 고정하고 `package-lock.json`으로 재현한다.
 
 프로젝트 루트의 `scripts/Start-Frontend.ps1`로 실행한다. 기본 주소는 `http://127.0.0.1:3000`이며 `/api/*`를 같은 origin에서 백엔드로 전달한다. 서버 전용 `APP_API_ORIGIN`은 운영 **빌드 전에** 설정해야 한다. 브라우저 공개 변수에는 내부 API 주소나 비밀값을 넣지 않는다.
 
@@ -19,7 +19,7 @@ App Router의 로그인·초대 가입·현재 회원 홈·전체 관리자 초�
 
 비밀번호와 초대 원문은 URL·브라우저 저장소·Query 캐시에 넣지 않는다. 로그인·발급 같은 민감 요청은 일시적인 요청으로 처리하고 화면 종료 때 관련 상태를 정리한다. 세션 상실·로그아웃은 개인 캐시를 제거하되 현재 회원 Query의 관찰자를 유지한다. 취소된 이전 요청의 401 응답이 새 로그인 세션을 지우지 않도록 응답 처리 시 AbortSignal을 확인한다.
 
-ESLint 10.12.0·TypeScript ESLint 8.71.1·Next 공식 plugin 16.4.0·React Hooks 7.1.1을 직접 flat 설정으로 구성했다. 현재 React 일반 preset·jsx-a11y preset은 ESLint 10 peer 미지원이므로 포함하지 않는다. 의미 있는 구조·대체 텍스트·키보드 이동은 화면에서 확인하고 업무 UI 구현 때도 검증한다. [Next plugin 직접 구성](https://nextjs.org/docs/app/api-reference/config/eslint), [TypeScript ESLint](https://typescript-eslint.io/getting-started/), [React Hooks plugin](https://react.dev/reference/eslint-plugin-react-hooks)
+ESLint 10.12.0·TypeScript ESLint 8.71.1·Next 공식 plugin 16.4.2·React Hooks 7.1.1을 직접 flat 설정으로 구성했다. 현재 React 일반 preset·jsx-a11y preset은 ESLint 10 peer 미지원이므로 포함하지 않는다. 의미 있는 구조·대체 텍스트·키보드 이동은 화면에서 확인하고 업무 UI 구현 때도 검증한다. [Next plugin 직접 구성](https://nextjs.org/docs/app/api-reference/config/eslint), [TypeScript ESLint](https://typescript-eslint.io/getting-started/), [React Hooks plugin](https://react.dev/reference/eslint-plugin-react-hooks)
 
 2026-10-09 런타임 `npm audit --omit=dev`는 0건이다. 전체 감사의 high 4개 패키지는 Next 개발용 lint plugin → fast-glob → micromatch → braces에 전파된 같은 [미패치 권고](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm)다. 사이트 런타임 의존성에는 포함되지 않는다. lint 설정에 임의 외부 glob 입력을 받지 않고 CI에 운영 secret을 제공하지 않는다. 지원하지 않는 강제 버전 교체는 적용하지 않았으며 upstream 패치가 나오면 의존성을 갱신하고 검증한다.
 

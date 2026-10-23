@@ -1,5 +1,9 @@
 # 프로젝트 전제와 확정 요구사항
 
+2026-10-23 홈 화면 변경 GitHub·이미지 반영 요청: 사용자가 iPhone·Android의 설치 이름 `정음`과 따뜻한 로고 변경을 GitHub 및 운영 이미지에 반영하도록 요청했다. `codex/homescreen-branding`의 앱 metadata·manifest·PNG와 관련 문서를 검토·검증한 뒤 커밋·Push·main 대상 초안 PR 및 CI를 확인한다. 정식 전환·main 병합은 기존 별도 승인 규칙을 따른다. 새 이미지 발행은 병합 main의 동일 SHA CI 성공 이후 기존 발행 workflow를 재사용하며, 기존 rc.2와 tag/digest를 보존한다. 현재 공개 준비 페이지의 이름·아이콘 적용과 앱 이미지 발행을 구분한다. 실제 회원 데이터 이전·앱 공개 전환·AWS 플랜 전환·추가 유료 자원은 이번 요청에 포함하지 않는다.
+
+후속 보완: 초안 PR #27의 첫 Frontend CI가 기존 Next.js 16.4.0 보안 audit로 차단돼 Next.js·공식 lint plugin을 16.4.2로 패치했다. Node·React와 업무 정책은 유지한다. 운영 의존성 audit와 홈 화면 이미지 검증, 새 HEAD CI를 다시 확인하며 최초 실패를 성공으로 덮어 기록하지 않는다.
+
 2026-10-18 README GitHub 반영: 사용자가 README 최신화·업데이트 반영을 요청했다. 기존 운영 준비 문서와 이번 기본 구성 기록을 보존한 채 README·연결 문서만 커밋·Push하고 main 대상 초안 PR과 CI 상태를 확인한다. 문서 전용 수정은 기존 CI 경로 필터의 자동 실행 대상이 아니며 기존 main/rc.2 검증과 새 문서 검사를 구분한다. 이번 단계에서 앱 소스·서버 설정·실제 DB/볼륨·이미지를 변경하지 않는다. 정식 전환·main 병합은 별도 승인 규칙을 유지한다.
 
 2026-10-18 사용자 승인 기본 구성 완료: 기존 서울 VM에 고정 IPv4를 생성·연결하고 공식 apt Docker29.9.1/Compose5.6.0을 설치했다. docker/containerd active·enabled와 포트/볼륨 없는 일회 시험/자동 정리를 확인했다. SSH는 Lightsail 브라우저 IPv4 전용으로 제한해 새 접속을 검증했고 cloud TCP443을 IPv4/IPv6에 허용했다. 기존80 유지, 앱/DB/원격Docker 포트 미공개, OS UFW/sshd·권한은 변경하지 않았다. 접속 주소·명령·증빙은 Git 제외 비공개 구성 기록에 두고 [AWS_LIGHTSAIL_DEPLOYMENT](AWS_LIGHTSAIL_DEPLOYMENT.md)에 완료 상태를 반영했다. OS 보안 패치·도메인/DNS·인증서·합성 배포/외부 백업 복구·실데이터 이전은 후속 범위다. 기존 로컬 DB/볼륨·회원/팀/예약·미커밋 코드와 rc.2 이미지/검증은 보존했다. 아래 미설치·미연결·443 없음 설명은 구성 전 점검이다.

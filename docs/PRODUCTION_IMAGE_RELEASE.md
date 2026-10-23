@@ -1,5 +1,17 @@
 # 운영 이미지 발행과 공개 범위 검증
 
+## 진행 중 — 홈 화면 이름·로고 반영
+
+2026-10-23 사용자가 홈 화면 변경의 GitHub·운영 이미지 반영을 요청했다. 설치 이름 `정음`, 따뜻한 로고의 iPhone 180px·Android 192/512px·maskable PNG가 새 Frontend에 포함되는지 검증하고 `codex/homescreen-branding`의 초안 PR·CI를 준비한다. 현재 발행된 rc.2는 이 변경을 포함하지 않으며 아래 rc.2 digest는 그대로 보존한다. 공개 준비 페이지에 같은 이름·아이콘을 적용한 결과만으로 새 앱 이미지의 발행을 완료했다고 표시하지 않는다.
+
+정식 전환·main 병합은 별도 승인 후 진행한다. 이후 해당 main SHA의 CI 4개 job이 성공하면 새 버전 후보 `v1.0.0-rc.3`을 기존 수동 workflow의 `visibility=public`, `publish=true`로 발행한다. 새 버전·SHA의 기존 tag가 있으면 원래 가드에 따라 대조하고 덮어쓰지 않는다. 현재 발행 도구는 Frontend만 따로 배포하지 않고 같은 main 소스의 Backend·Frontend·Caddy 세 이미지를 빌드·57개 합성 검사 후 동일 archive에서 발행한다. PostgreSQL pin은 유지하며 실제 운영 서버·DB·공개 서비스는 이 이미지 발행만으로 변경되지 않는다.
+
+홈 화면 검증은 기존 57개 API/컨테이너 계약과 별도로 새 Frontend 이미지의 HTML application/Apple 제목·아이콘 link, manifest 이름/ID/시작 URL/일반·maskable 구분과 PNG 5개의 응답·크기·원본 SHA를 확인한다. 로컬 미발행 preview의 결과와 최종 GHCR 이미지 검증을 구분하고 최종 release artifact·manifest/config digest·출처 label이 확인된 후에만 새 운영 참조를 사용한다. 기존 설치 항목의 자동 갱신이나 실기기 새 설치까지 자동 검사했다고 주장하지 않는다.
+
+로컬 준비 결과: Frontend 타입·lint·전체 334건과 새 운영 이미지 빌드, 설치 metadata/manifest/PNG 11개 검사가 통과했다. 검증 컨테이너는 비root·읽기 전용·네트워크/공개 포트 없음으로 실행 후 정상 종료했다. DB·기존 실행 서버·rc.2 이미지는 변경하지 않았다. 이 결과는 새 main SHA의 최종 발행 완료나 실제 서비스 공개를 뜻하지 않는다.
+
+첫 원격 Frontend CI는 기존 Next.js 16.4.0의 보안 audit로 차단됐다. Next.js·공식 lint plugin 16.4.2와 lockfile로 보완한 뒤 위 로컬 검사와 운영 의존성 audit 0건을 확인했다. 기존 실패 실행을 보존하고 새 HEAD의 CI가 통과해야 병합/발행 단계로 진행한다. 개발 도구의 별도 audit 제한은 [TEST_PLAN](TEST_PLAN.md)에 기록한다.
+
 ## 최신 완료 기록 — v1.0.0-rc.2
 
 2026-10-17 사용자 승인으로 [PR #24](https://github.com/developer-sw/jeongeum-band-scheduler/pull/24)·[PR #25](https://github.com/developer-sw/jeongeum-band-scheduler/pull/25)를 main `8b24285bafda76ef21c3ae6148f34452a08d2483`까지 병합했다. [main CI 39024812366](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/39024812366)의 Backend 368건·Frontend 334건·합성 검사 57개·Node 38건·PS export 15항목과 빌드/타입/lint가 성공했다.
