@@ -10,6 +10,8 @@
 
 로컬 준비 결과: Frontend 타입·lint·전체 334건과 새 운영 이미지 빌드, 설치 metadata/manifest/PNG 11개 검사가 통과했다. 검증 컨테이너는 비root·읽기 전용·네트워크/공개 포트 없음으로 실행 후 정상 종료했다. DB·기존 실행 서버·rc.2 이미지는 변경하지 않았다. 이 결과는 새 main SHA의 최종 발행 완료나 실제 서비스 공개를 뜻하지 않는다.
 
+첫 원격 Frontend CI는 기존 Next.js 16.4.0의 보안 audit로 차단됐다. Next.js·공식 lint plugin 16.4.2와 lockfile로 보완한 뒤 위 로컬 검사와 운영 의존성 audit 0건을 확인했다. 기존 실패 실행을 보존하고 새 HEAD의 CI가 통과해야 병합/발행 단계로 진행한다. 개발 도구의 별도 audit 제한은 [TEST_PLAN](TEST_PLAN.md)에 기록한다.
+
 ## 최신 완료 기록 — v1.0.0-rc.2
 
 2026-10-17 사용자 승인으로 [PR #24](https://github.com/developer-sw/jeongeum-band-scheduler/pull/24)·[PR #25](https://github.com/developer-sw/jeongeum-band-scheduler/pull/25)를 main `8b24285bafda76ef21c3ae6148f34452a08d2483`까지 병합했다. [main CI 39024812366](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/39024812366)의 Backend 368건·Frontend 334건·합성 검사 57개·Node 38건·PS export 15항목과 빌드/타입/lint가 성공했다.

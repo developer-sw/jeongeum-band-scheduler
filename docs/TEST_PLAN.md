@@ -1,5 +1,7 @@
 # 테스트 및 운영 검증 계획
 
+2026-10-23 홈 화면 PR 보안 패치: 첫 Push/PR CI의 Frontend가 기존 Next.js 16.4.0에 대한 운영 의존성 audit에서 실패했다. 공식 [Image Optimization](https://github.com/advisories/GHSA-2464-fhr4-w9xw)·[App Router cache](https://github.com/advisories/GHSA-673q-mjm6-r5xr) 보안 공지와 [16.4.2 릴리스](https://github.com/vercel/next.js/releases/tag/v16.4.2)를 확인해 Next.js와 공식 lint plugin만 16.4.2로 고정하고 lockfile을 갱신했다. 이후 운영 의존성 audit 0건·타입·lint·334건·운영 이미지 빌드와 설치 정보 11개를 다시 통과했다. 전체 audit에는 개발 전용 Next lint plugin→fast-glob/micromatch/braces 경로의 high 4건이 남으며 운영 의존성 0건과 구분한다. `npm audit fix --force`가 제안한 plugin major downgrade는 적용하지 않았다. 이 로컬 결과를 새 HEAD 원격 CI 성공으로 대신하지 않는다.
+
 2026-10-23 홈 화면 GitHub·이미지 반영 준비: Frontend 타입 검사·lint와 전체 23파일·334건을 다시 실행해 통과했다. 실제 PNG 5개의 포맷/크기·불투명 배경, iPhone 180px fallback 일치 및 Android maskable 안전 여백을 검토했다. 신규 Frontend 운영 이미지의 로컬 빌드와 metadata/manifest/PNG 응답 11개 검사를 통과했다. 검사는 비root·읽기 전용·네트워크 없음·공개 포트 없음인 임시 컨테이너에서 수행했고 정상 종료했다. 원격 PR CI와 최종 병합 SHA의 이미지 발행은 이 미발행 preview 검증과 구분한다. 최종 GHCR 발행·main 병합·실데이터 이전·실기기 설치를 완료한 결과는 아니다.
 
 2026-10-23 홈 화면 이름·로고: manifest/Apple 설치 이름 `정음`, 따뜻한 로고의 iPhone PNG·Android 일반/maskable 아이콘을 반영했다. Frontend 타입 검사·lint와 관련 Push 테스트 26건이 통과했다. 공개 준비 페이지의 설치 meta/manifest, PNG 5개 URL의 HTTPS200·MIME·크기·원본 SHA 일치, 기존 edge health/www 이동을 실제 확인했다. 준비 페이지 CSP는 같은 origin의 이미지·manifest만 추가 허용했다. 모바일 실기기의 홈 화면 추가 UI·이미 설치한 아이콘 갱신은 자동 검증하지 않았으며 새로 추가해 확인해야 한다. 새 Frontend 운영 이미지 발행·실제 예약 앱 공개 전환은 수행하지 않았다.

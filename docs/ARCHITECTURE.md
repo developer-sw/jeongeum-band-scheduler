@@ -58,7 +58,7 @@ flowchart TD
 | 운영 | Docker Compose, Caddy, Cloudflare | 컨테이너 실행, HTTPS, DNS |
 | 테스트 | 백엔드 핵심 테스트, PostgreSQL Testcontainers | 실제 DB 제약·동시성 검증 |
 
-Java 21은 확정 기술이다. 초기 구성에서 공식 배포·지원 정보를 확인해 Spring Boot 4.1.1·Gradle 9.8.1, Next.js 16.4.0·React 19.3.0, PostgreSQL 17.11을 고정했다. 의존성 버전은 BOM·명시 버전·lock 파일로 관리한다. 설치되어 있는 도구 버전을 프레임워크 버전으로 간주하지 않는다.
+Java 21은 확정 기술이다. 초기 구성에서 공식 배포·지원 정보를 확인해 Spring Boot 4.1.1·Gradle 9.8.1, Next.js 16.4.0·React 19.3.0, PostgreSQL 17.11을 고정했다. 2026-10-23 홈 화면 반영 PR의 운영 의존성 audit 차단을 해소하기 위해 Next.js와 공식 ESLint plugin을 16.4.2로 패치했다. 의존성 버전은 BOM·명시 버전·lock 파일로 관리한다. 설치되어 있는 도구 버전을 프레임워크 버전으로 간주하지 않는다.
 
 ## 4. 구현이 유지해야 할 확정 정책
 

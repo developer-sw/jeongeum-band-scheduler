@@ -84,7 +84,7 @@ Push 구독은 인증된 본인과 해당 브라우저의 로그인 세션에 �
 | Backend 주요 구성 | Spring MVC, Spring Security, Spring Session JDBC, Spring Data JPA, Bean Validation |
 | Database | PostgreSQL 17.11, Flyway V1~V12 |
 | Push | Web Push·VAPID·AES128GCM, PostgreSQL 대기열·계획 worker |
-| Frontend | Next.js 16.4.0 (App Router), React 19.3.0, TypeScript 6.0.3 |
+| Frontend | Next.js 16.4.2 (App Router), React 19.3.0, TypeScript 6.0.3 |
 | UI·데이터 | Tailwind CSS 4.3.3, TanStack Query 5.104.1 |
 | 테스트 | JUnit(Jupiter), Testcontainers(PostgreSQL), Vitest |
 | 개발·CI | Docker Compose, PowerShell, GitHub Actions |
