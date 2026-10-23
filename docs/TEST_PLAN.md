@@ -1,5 +1,9 @@
 # 테스트 및 운영 검증 계획
 
+2026-10-23 홈 화면 GitHub·이미지 반영 준비: Frontend 타입 검사·lint와 전체 23파일·334건을 다시 실행해 통과했다. 실제 PNG 5개의 포맷/크기·불투명 배경, iPhone 180px fallback 일치 및 Android maskable 안전 여백을 검토했다. 신규 Frontend 운영 이미지의 로컬 빌드와 metadata/manifest/PNG 응답 11개 검사를 통과했다. 검사는 비root·읽기 전용·네트워크 없음·공개 포트 없음인 임시 컨테이너에서 수행했고 정상 종료했다. 원격 PR CI와 최종 병합 SHA의 이미지 발행은 이 미발행 preview 검증과 구분한다. 최종 GHCR 발행·main 병합·실데이터 이전·실기기 설치를 완료한 결과는 아니다.
+
+2026-10-23 홈 화면 이름·로고: manifest/Apple 설치 이름 `정음`, 따뜻한 로고의 iPhone PNG·Android 일반/maskable 아이콘을 반영했다. Frontend 타입 검사·lint와 관련 Push 테스트 26건이 통과했다. 공개 준비 페이지의 설치 meta/manifest, PNG 5개 URL의 HTTPS200·MIME·크기·원본 SHA 일치, 기존 edge health/www 이동을 실제 확인했다. 준비 페이지 CSP는 같은 origin의 이미지·manifest만 추가 허용했다. 모바일 실기기의 홈 화면 추가 UI·이미 설치한 아이콘 갱신은 자동 검증하지 않았으며 새로 추가해 확인해야 한다. 새 Frontend 운영 이미지 발행·실제 예약 앱 공개 전환은 수행하지 않았다.
+
 2026-10-18 README·연결 문서 최신화: PR #23~25 병합, main `8b24285` CI 4개 job 성공과 rc.2 발행 prepare/publish 성공을 GitHub에서 읽기 전용으로 재확인했다. README와 운영 관련 8개 문서의 로컬 파일 참조 175개가 존재하고 보존한 이미지 참조 3개가 일치했다. 공개 기록의 알려진 민감 값 패턴·문서 전용 변경·비공개 파일 Git 제외·`git diff --check` 검사도 통과했다. `ci.yaml`은 README/docs 경로만 바뀌면 자동 CI를 실행하지 않으며 기존 앱 테스트를 새 실행 결과로 보고하지 않는다. 앱/DB·원격 서버 설정은 이번 문서 갱신에서 변경하지 않는다.
 
 2026-10-18 승인된 VM 기본 구성 검증: 기존 서버의 고정 IPv4 생성/연결 뒤 새 SSH로 접속했다. 공식 apt Docker29.9.1/Compose5.6.0·docker/containerd active/enabled·포트/볼륨 없는 `hello-world --rm --network none` 실행과 컨테이너/볼륨 없음·원격 Docker API 미공개를 확인했다. SSH를 Lightsail 브라우저 IPv4 전용으로 제한한 뒤 별도 새 연결/명령 실행에 성공했고 PC의 직접 TCP22 연결은 한 번의 5초 시험에서 시간 초과였다. 최종 cloud 규칙은 TCP80/443 IPv4·IPv6 전체와 브라우저전용SSH22다. OS UFW/sshd·권한을 변경하지 않았다. 증빙 화면/명령은 Git 제외 비공개 구성 기록에 보존했다. 실제 앱 HTTPS·부하·DB 이전/복구·Push·재부팅·OS 보안 패치 검증이나 앱 테스트 재실행을 완료한 것으로 집계하지 않는다.
