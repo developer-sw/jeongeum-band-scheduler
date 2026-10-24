@@ -1,5 +1,21 @@
 # 개발 준비·배포·운영 계획
 
+## 최신 결과 — 2026-10-24
+
+승인된 AWS Basic 계정·결제 문의를 접수하고 실제 VM 재부팅 후 합성 PG·HTTPS 준비 화면의 자동 복구와 데이터/설정/자원 보존 16항목을 확인했다. 기존 QA `restart: no`를 바꾸지 않고 정확한 합성 PG만 시작하는 source unit·DB 준비 대기를 추가했다. **16:00:18 KST** 원래 hourly 발화, **16:00:24 KST** 새 S3 백업 검증, 부팅 metric의 새 CloudWatch datapoint와 경보 OK·Free Plan 유지를 확인했다. 새 3파일 설정의 보완 암호문은 기존 30파일 archive와 별도로 PC에 보관·실제 복원했다. [재부팅 검증](OPERATIONS_REBOOT_VALIDATION.md)을 최신 기준으로 삼는다.
+
+아래 두 문단은 재부팅 검증 전 합성 정기 백업 단계의 결과다.
+
+사용자 승인으로 Free Plan을 유지한 채 **합성 DB용 서울 S3·정기 백업/감시·이메일 경보**를 구성했다. 시간별 7일·주간별 28일·기본 Governance 7일·SSE-S3·공개 차단·최소 권한을 확인했고, 정확한 S3 VersionId의 업로드/재다운로드 SHA 대조와 권한 거부 시험을 통과했다. 서버 단발 서비스·타이머 활성/재시작, 시험용 10초 trigger를 통한 새 시간별 백업 생성 후 원래 hourly 설정 복구를 확인했다. 합성 DB 정지/백업 실패/이전 성공 보존/재기동 복구와 stale ALARM→OK·양쪽 메일 수신을 검증했다. 상세 완료·추가 미수신 평가 결과는 [OPERATIONS_BACKUP_PLAN](OPERATIONS_BACKUP_PLAN.md)을 따른다.
+
+S3 자동 백업의 PC 독립 PG 복원은 **10개·19.477초**, 39개 테이블·29개 시퀀스·Flyway V1~V12와 실제 PG 재시작 후 보존을 확인했다. 오프라인 실행기 회귀는 **27개**다. QA 원본은 **rc.2 / `8b24285`**, 새 앱 전환용 검증 이미지는 **rc.3 / `a00a791`**이다. 기존 수동 복원 20개·약 83초와 새 복원 결과를 합치지 않는다.
+
+현재 공개 주소는 `bandjeongeum.studio`의 준비 화면이며 실제 예약 앱은 공개하지 않았다. 지원 문의는 접수 후 답변 대기이며 Paid 전환·실회원 이전은 하지 않았다. PC 밖 복구키 보관·사본 확인은 사용자 확인으로 기록했다. 자동 PC 복사·새 운영 비밀 설정 복구·실제 백업 요금의 크레딧 상계·전체 RPO/RTO는 후속이다. 기존 로컬 데이터/볼륨과 공개 edge를 보존했다.
+
+## 이전 구성·견적·준비 기록
+
+아래 날짜별 미등록·미구현·미실행 및 비용 비교는 작성 당시 기록이다. 현재 백업 완료 여부는 위 최신 결과와 연결 문서를 우선한다. 기존 업무 정책과 실제 이전 승인 경계는 유지한다.
+
 최초 작성: 2026-10-09 / 최신 사전 점검·주요 공개 가격 재확인: 2026-10-17 (Asia/Seoul)
 
 최신 운영 기준(2026-10-18): 사용자가 생성한 서울 Lightsail Ubuntu 24.04 LTS·2 vCPU·4GB·80GB·dual-stack 서버를 활용한다. 후속 승인으로 실제 고정IP 연결·Docker29.9.1/Compose5.6.0 설치/동작·브라우저 SSH 전용 제한/새 접속·TCP443 IPv4/IPv6 허용을 완료했다. AWS Free Plan 유지와 추가 비용 최소화 조건을 반영했으며 `bandjeongeum.cloud`는 미등록이다. [AWS_LIGHTSAIL_DEPLOYMENT](AWS_LIGHTSAIL_DEPLOYMENT.md)에 실제 결과·월 요금·플랜/승인 경계·다음 순서를 정리했다. 계정별 잔액/주소·명령·화면은 Git 제외 비공개 기록에 둔다. OS 보안 패치·공개 HTTPS·앱/DB 이전/배포·외부 백업 복구는 남아 있다.
@@ -140,6 +156,8 @@ CX23의 2026-06-15 이후 공개 요금은 서버 $6.49/월, IPv4 $0.60/월이�
 Railway는 배포 편의 후보로 남지만 메모리·CPU·volume 사용량 기반 실제 비용과 DB 운영·백업 책임을 따로 검증해야 한다. 관리형 PostgreSQL의 모든 운영 기능이 자동 제공된다고 가정하지 않는다. 아직 사용량을 측정하지 않았으므로 단일한 보장 월 금액을 이 표에 넣지 않는다.
 
 ## 7. DB 백업과 복원
+
+현재 승인된 저장소는 **서울 비공개 S3 Standard**다. 실제 합성 백업/다운로드/독립 PG 복원과 경보 시험을 완료했으며, 설치 자산은 [deploy/backup](../deploy/backup/README.md), 정책·증거·남은 항목은 [OPERATIONS_BACKUP_PLAN](OPERATIONS_BACKUP_PLAN.md)을 따른다. 아래 R2·초기 보존안·미준비 표시는 사전 비교 기록이며 새 R2를 생성하거나 현재 S3 검증을 미실행으로 되돌리는 설명이 아니다.
 
 R2 Standard의 현재 월 무료 범위는 10 GB-month 저장, Class A 100만 작업, Class B 1,000만 작업이다. Internet egress는 무료이며 Infrequent Access에는 무료 저장 범위가 적용되지 않는다. 저장량만 아니라 작업 횟수도 확인한다. [Cloudflare R2 가격](https://developers.cloudflare.com/r2/pricing/)
 

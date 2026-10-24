@@ -1,6 +1,18 @@
 # 운영 이미지 발행과 공개 범위 검증
 
-## 진행 중 — 홈 화면 이름·로고 반영
+## 최신 발행 완료 — v1.0.0-rc.3
+
+2026-10-23 사용자 승인 후 [PR #27](https://github.com/developer-sw/jeongeum-band-scheduler/pull/27)을 main `a00a791b069f20943c5e956968e970bf138fa3dc`에 병합하고, [동일 main CI](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/39952132208)와 [공개 이미지 발행](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/39953900056)의 성공을 확인했다. 기존 발행 결과와 익명 registry 검증 기록을 대조했으며 세 이미지의 source/version label·Linux amd64·비root·version/SHA tag/digest 일치와 rc.2 보존을 확인했다.
+
+```text
+BACKEND_IMAGE=ghcr.io/developer-sw/jeongeum-band-scheduler/backend@sha256:7dd69db8f16bfb7282b4bed2a2ccf41b58f2e8f59a659e10f9a9ab82510e0a61
+FRONTEND_IMAGE=ghcr.io/developer-sw/jeongeum-band-scheduler/frontend@sha256:9957a66e491dfbba8d84a119015ab323c4fbaa95ced16381e42e7692732ca687
+CADDY_IMAGE=ghcr.io/developer-sw/jeongeum-band-scheduler/caddy@sha256:9876276ae2e2de72212e1028c5b3cba74a99ee32e7ce17dd7f0a7d4c2000cb5c
+```
+
+설치 이름 `정음`과 따뜻한 로고를 포함한 새 Frontend를 이후 앱 배포에 재사용한다. 현재 공개 도메인은 HTTPS 준비 화면이며 실제 회원 DB 이전·예약 앱 공개는 하지 않았다. 이번 백업·자동 복구 변경 게시에서는 새 앱 이미지 발행이나 기존 tag 덮어쓰기를 하지 않는다. 합성 DB 백업의 원본 rc.2와 새 앱 배포용 rc.3을 구분하고 [재부팅·백업 검증](OPERATIONS_REBOOT_VALIDATION.md)의 범위를 따른다.
+
+## 이전 준비 기록 — 홈 화면 이름·로고 반영
 
 2026-10-23 사용자가 홈 화면 변경의 GitHub·운영 이미지 반영을 요청했다. 설치 이름 `정음`, 따뜻한 로고의 iPhone 180px·Android 192/512px·maskable PNG가 새 Frontend에 포함되는지 검증하고 `codex/homescreen-branding`의 초안 PR·CI를 준비한다. 현재 발행된 rc.2는 이 변경을 포함하지 않으며 아래 rc.2 digest는 그대로 보존한다. 공개 준비 페이지에 같은 이름·아이콘을 적용한 결과만으로 새 앱 이미지의 발행을 완료했다고 표시하지 않는다.
 
@@ -12,7 +24,7 @@
 
 첫 원격 Frontend CI는 기존 Next.js 16.4.0의 보안 audit로 차단됐다. Next.js·공식 lint plugin 16.4.2와 lockfile로 보완한 뒤 위 로컬 검사와 운영 의존성 audit 0건을 확인했다. 기존 실패 실행을 보존하고 새 HEAD의 CI가 통과해야 병합/발행 단계로 진행한다. 개발 도구의 별도 audit 제한은 [TEST_PLAN](TEST_PLAN.md)에 기록한다.
 
-## 최신 완료 기록 — v1.0.0-rc.2
+## 이전 발행 완료 기록 — v1.0.0-rc.2
 
 2026-10-17 사용자 승인으로 [PR #24](https://github.com/developer-sw/jeongeum-band-scheduler/pull/24)·[PR #25](https://github.com/developer-sw/jeongeum-band-scheduler/pull/25)를 main `8b24285bafda76ef21c3ae6148f34452a08d2483`까지 병합했다. [main CI 39024812366](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/39024812366)의 Backend 368건·Frontend 334건·합성 검사 57개·Node 38건·PS export 15항목과 빌드/타입/lint가 성공했다.
 

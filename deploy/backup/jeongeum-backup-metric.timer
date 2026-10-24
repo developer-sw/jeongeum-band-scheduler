@@ -1,0 +1,12 @@
+[Unit]
+Description=JEONGEUM five-minute backup age monitoring
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=15s
+RandomizedDelaySec=5s
+Unit=jeongeum-backup-metric.service
+
+[Install]
+WantedBy=timers.target
