@@ -371,10 +371,13 @@ class ConfigurationTests(unittest.TestCase):
             self.assertEqual(json.loads(output.getvalue()), {"passed": False, "error": "CONFIG_BACKUP_OPERATION_FAILED"})
 
     def test_native_age_process_error_discards_partial_stdout_and_stderr(self):
+        # Linux CI may expose Python through a symlink. Use the real executable
+        # so this test reaches the mocked child failure after the real path guard.
+        executable = Path(sys.executable).resolve(strict=True)
         with patch.object(b, "age_call", wraps=ORIGINAL_AGE_CALL):
             with patch.object(b.subprocess, "run", return_value=subprocess.CompletedProcess(["fake"], 1, stdout=b"PARTIAL-SECRET", stderr=b"SECRET-ERROR")):
                 with self.assertRaisesRegex(b.ConfigurationError, "^CONFIG_BACKUP_AGE_AUTHENTICATION_OR_PROCESS_FAILED$"):
-                    b.age_call(Path(sys.executable), ["--decrypt"], None)
+                    b.age_call(executable, ["--decrypt"], None)
 
 
 ORIGINAL_AGE_CALL = b.age_call

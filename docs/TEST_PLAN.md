@@ -8,6 +8,8 @@
 
 `.github/workflows/ci.yaml`에 **Synthetic backup and recovery guard tests**를 추가하고 세 도구·회귀 파일의 경로를 push/PR 필터에 포함했다. Ubuntu 24.04에서 DB 백업·설정 복구·readiness의 총 **75개**를 실행하며 기존 Backend·Frontend·합성 컨테이너·발행 계약 job도 유지한다. actionlint 정적 검사는 통과했다. 원격 실행 여부·hardlink를 포함한 실제 결과는 해당 초안 PR의 현재 HEAD CI를 따르며 job 추가만으로 원격 성공을 주장하지 않는다.
 
+[PR #28의 첫 Linux CI](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/40073855916)에서 DB 27개와 설정 hardlink/예약 장치명 검사는 통과했으나, 자식 프로세스 실패 시험이 `sys.executable`의 심볼릭 링크를 사용해 의도한 실패 경로 전에 링크 거부에 걸렸다. 테스트에서만 실제 실행 파일의 정규 경로를 사용하도록 보완했고 운영 코드의 링크 거부는 유지했다. 해당 시험 1개와 로컬 전체 27개(26개 통과·hardlink 1개 건너뜀)를 다시 확인했다. 최초 실패를 보존하고 새 HEAD의 Linux 결과를 별도로 확인한다.
+
 ## 2026-10-24 최신 — 실제 VM 재부팅·hourly 백업
 
 | 검증 | 결과·실제 범위 |
