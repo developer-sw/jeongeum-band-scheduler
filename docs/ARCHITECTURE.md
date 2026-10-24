@@ -1,6 +1,12 @@
 # 시스템 아키텍처
 
-갱신일: 2026-10-18 (Asia/Seoul)
+갱신일: 2026-10-24 (Asia/Seoul)
+
+2026-10-24 최신 후속: 승인된 Basic 계정·결제 문의를 접수하고 실제 VM 재부팅을 검증했다. 정확한 기존 합성 PG만 시작하는 source unit과 백업 전처리로 DB healthy 대기를 보완했으며, QA Compose·각 컨테이너의 기존 restart 정책은 유지했다. 재부팅 전후 16항목에서 DB·권한·Flyway·원본 설정·컨테이너/볼륨 보존을 확인했다. 16:00 원래 hourly 발화의 새 S3 백업과 부팅 후 metric·CloudWatch OK, HTTPS 준비 화면을 확인했다. 기존 30파일 설정 암호문에 새 3파일의 별도 보완 암호문을 더해 PC 실제 복원을 검증했다. [재부팅 검증](OPERATIONS_REBOOT_VALIDATION.md)의 완료 범위와 제한을 따른다. Free Plan 유지, 지원 답변 검토·실회원 이전·앱 공개는 아직 남아 있다.
+
+아래는 재부팅 검증 전 합성 정기 백업 구성 결과다. 사용자 승인으로 Free Plan을 유지하고 **서울 비공개 S3 Standard·최소 IAM·정기 age 백업·CloudWatch/SNS 경보**를 합성 DB에 구성·검증했다. 시간별 7일·주간별 28일·기본 Governance 7일을 적용하고 exact-version 재다운로드 SHA와 권한 거부, 서비스·타이머 재시작 및 축약 trigger, 실패/복구·stale ALARM/OK·양쪽 이메일 수신을 확인했다. S3 암호문의 PC 별도 PostgreSQL 복원은 10개·19.477초로 39개 테이블·29개 시퀀스·V1~V12·PG 재시작 보존을 확인했다. QA 원본 rc.2(`8b24285`)와 새 배포용 rc.3(`a00a791`)는 구분한다. 현재 공개된 것은 준비 화면이며 실제 회원 데이터 이전·예약 앱 공개는 아직 하지 않았다. 새 운영 비밀 설정 복구·전체 RPO/RTO 등 남은 경계와 추가 미수신 시험 결과는 [OPERATIONS_BACKUP_PLAN](OPERATIONS_BACKUP_PLAN.md)을 따른다.
+
+아래 날짜별 미등록·미발행·외부 백업 미실행 설명은 당시 준비 기록이다. 현재 백업 저장소는 S3이며 R2를 새로 구성하지 않았다. 업무 정책과 앱 구조는 유지하고 실제 완료 범위는 위 최신 결과를 우선한다.
 
 2026-10-18 기본 운영 환경: 기존 서울 VM에 고정 IPv4·공식 Docker29.9.1/Compose5.6.0·서비스 자동 시작·브라우저 SSH 전용 제한·TCP443 IPv4/IPv6를 적용/검증했다. 실제 도메인/Caddy HTTPS·앱/DB 배포·외부 백업 복구·OS 보안 패치는 후속 범위다. [AWS_LIGHTSAIL_DEPLOYMENT](AWS_LIGHTSAIL_DEPLOYMENT.md)의 최신 결과를 따른다.
 
@@ -34,7 +40,8 @@ flowchart TD
     S --> W[Web Push 제공자]
     W --> U
     P --> B[암호화 DB 백업 작업]
-    B --> R[서버 외부 R2 Standard 저장소]
+    B --> R[서울 S3 Standard 비공개 저장소]
+    R --> DR[PC 별도 PostgreSQL 복원]
 ```
 
 - 브라우저는 하나의 HTTPS origin을 사용한다. 화면과 API의 코드·컨테이너·책임은 분리한다.

@@ -1,0 +1,12 @@
+[Unit]
+Description=JEONGEUM hourly synthetic encrypted backup
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+AccuracySec=30s
+RandomizedDelaySec=20s
+Unit=jeongeum-backup.service
+
+[Install]
+WantedBy=timers.target

@@ -1,5 +1,56 @@
 # 테스트 및 운영 검증 계획
 
+## 2026-10-24 게시 준비 — 로컬 회귀·새 CI
+
+게시 전 독립 검토에서 DB 백업 **27개**, 기존 합성 PG readiness **21개**가 통과했다. 설정 복구는 Windows 예약 장치 별칭(`CONIN$`/`CONOUT$`)·위 첨자 COM/LPT의 대소문자/확장자/중첩 경로 거부를 보완하고 새 회귀를 추가해 **27개 실행 중 26개 통과·hardlink 1개 건너뜀**이었다. 새 회귀는 32개 인증된 fake archive에서 복원 폴더 생성·쓰기 전 거부를 확인한다. 건너뜀은 로컬 sandbox 파일 시스템의 hardlink 생성 제한이며 통과로 집계하지 않는다.
+
+기본 OS TEMP가 fixture 쓰기를 거부한 최초 실패는 환경 실패로 보존했고, 프로세스의 TEMP/TMP/TMPDIR을 새 workspace `.local` 시험 폴더로 제한하여 재실행했다. 실제 DB·Docker·AWS·네트워크를 호출하지 않은 오프라인 검사이며 기존 서버의 실제 복원/재부팅 검사와 구분한다. 소스 보완 후 원격 서버의 helper를 재설치하거나 기존 archive를 덮어쓰지 않았다.
+
+`.github/workflows/ci.yaml`에 **Synthetic backup and recovery guard tests**를 추가하고 세 도구·회귀 파일의 경로를 push/PR 필터에 포함했다. Ubuntu 24.04에서 DB 백업·설정 복구·readiness의 총 **75개**를 실행하며 기존 Backend·Frontend·합성 컨테이너·발행 계약 job도 유지한다. actionlint 정적 검사는 통과했다. 원격 실행 여부·hardlink를 포함한 실제 결과는 해당 초안 PR의 현재 HEAD CI를 따르며 job 추가만으로 원격 성공을 주장하지 않는다.
+
+## 2026-10-24 최신 — 실제 VM 재부팅·hourly 백업
+
+| 검증 | 결과·실제 범위 |
+|---|---|
+| readiness 오프라인 | fake Docker 기반 **21개 통과**. 정확한 기존 합성 PG만 시작하고 ID/label/이미지/볼륨/공개 포트/상태 불일치·시간 초과·비밀 출력 방어 검사 |
+| 실제 source unit | systemd 정적 검증·enabled/active, 부팅 journal의 기존 합성 PG 시작 확인. QA Compose와 원본 합성 PG의 `restart: no` 유지, 컨테이너 5개 각각의 기존 정책 불변 |
+| VM 실제 재부팅 | 새 boot ID, 기존 컨테이너 5개 ID/이미지/mount/restart 정책과 전체 볼륨명 일치. PG·공개 준비 Caddy healthy, QA 앱 3개 중지 |
+| 실제 보존 | 원본 설정 30파일 SHA·39개 테이블 행 지문·29개 시퀀스·Flyway V1~V12 전체 이력·역할/pg_authid/ACL 지문 동일. 비공개 부팅 후 **16항목 통과** |
+| 실제 hourly 실행 | 원래 타이머가 **16:00:18 KST** 실행, **16:00:24 KST** 새 S3 시간별 객체 exact-version Head/Get·크기/SHA 검증 완료. 같은 주 주간본 유지. 부팅 후 수동 실행·축약 trigger 없음 |
+| 부팅 metric·외부 감시 | 현재 부팅 journal의 metric-published/stale:false·서비스 success/종료 0, 16:01:00 KST 새 datapoint(백업 나이 약 1.37분), 경보 원래 설정 보존·최종 OK |
+| HTTPS·플랜 | 기본 인증서 검증 GET200·공개 준비 화면 문구, 읽기 전용 플랜 API FREE·ACTIVE |
+| 추가 설정 복구 | 새 자산 3파일 별도 age 암호문 **4,356bytes**, 원본 불변·서버/PC 전체 SHA 일치·Windows age 인증 복원·3파일 disk SHA·현재 사용자/SYSTEM native ACL 확인 |
+
+AWS Basic 계정·결제 문의는 접수했으며 답변 대기다. 기존 30파일 archive는 보존하고 추가 3파일 archive와 함께 쓰며 단일 33파일 archive로 다시 만든 것이 아니다. 추가 복구는 Windows 실제 복원이며 helper 자체 Linux restore·자동 활성화·S3 설정 업로드는 없다. 유료 플랜/Support 전환·실회원 DB 접근/이전·앱 공개는 하지 않았다. 이 결과는 장시간 장애·90분 경보 수신 지연·전체 RPO/RTO 달성을 뜻하지 않는다. [OPERATIONS_REBOOT_VALIDATION](OPERATIONS_REBOOT_VALIDATION.md)에 정확한 범위와 점검 중 자동 시작 중단 절차를 기록한다. 아래 문의 미전송·재부팅/실제 hourly 미검증 설명은 선행 단계의 실행 경계다.
+
+## 2026-10-24 이전 단계 — 준비 설정 암호화·복원 검증
+
+`scripts/configuration-backup.py`·`.test.py`의 **26개 fake 검사**와 별도 읽기 검토를 완료했다. 실제 서버의 allowlist 30파일을 age v1.3.2로 암호화한 **64,967bytes**를 PC에 암호문만 전송하여 SHA를 대조하고, 새 Windows private 폴더에서 30파일 disk SHA·크기·현재 사용자/SYSTEM native ACL을 확인했다. 비공개 통합 **21개 검사**에는 참조 파일 map·QA 역할/DB 비밀번호 구분·worker/Push OFF·빈 VAPID·rc.2 원본/rc.3 배포 출처, 실제 변조/절단/다른 키/기존 destination 거부·부분 폴더 0·비밀값 stdout 0을 포함한다.
+
+별도 Linux 검증은 기존 PG17 이미지의 `network=none`·tmpfs·read-only·sh 파일 도구로 30파일 SHA·mode·uid/gid를 재현한 것이다. **실제 DB 시작·호스트 mount·DB volume 사용·helper 자체 Linux restore 실행은 하지 않았다.** 일회 도구 컨테이너 자동 제거와 기존 컨테이너 ID·볼륨명 보존을 확인했다. 원본 수정·설정 활성화·실회원 DB 접근·S3 새 업로드·새 AWS 자원 생성도 없다.
+
+이 수동 archive는 실제 기술 자격증명을 포함하며 기존 DB 자동 3파일 백업과 별개다. TLS/age/SSH 개인키·root API 키는 제외했고 원래 복구 키의 recipient 유도를 확인했다. **2026-10-24 PC 밖 복구 개인키 직접 보관·사본 확인 완료를 사용자에게 확인**했으며, 에이전트가 외부 사본을 직접 읽은 검증은 아니다. 당시 통합 시험 결과는 후속 사용자 확인으로 덮어쓰지 않는다. 현재 QA env의 이전 복원 대상 참조를 보존하여 향후 활성화 전 대조해야 한다. 새 실서비스용 DB/VAPID 생성·자동 설정 백업·전체 RTO·실회원 이전/공개는 미완료다. 상세 계약·실제 시험/제한은 [OPERATIONS_CONFIGURATION_RECOVERY](OPERATIONS_CONFIGURATION_RECOVERY.md)를 따른다.
+
+## 2026-10-24 이전 단계 — 합성 정기 백업 실제 검증
+
+| 검증 | 결과·범위 |
+|---|---|
+| 오프라인 실행기 | fake Docker/AWS/age/DB 회귀 **27개 통과**. 실제 외부 연결과 별개이며 기본 Windows sandbox 임시 폴더 권한 실패는 workspace TMP 재실행으로 원인을 분리 |
+| 실제 서버·S3 | 합성 snapshot·dump·age 암호화·정확한 VersionId의 Head/Get·크기/SHA 일치. 중복 Put 412, 버전 삭제·보존 변경·외부 prefix·다른 metric namespace 거부. 이전 정상 객체 보존 |
+| 서비스·타이머 | 백업·metric 단발 서비스 성공, 두 타이머 enabled/active·재시작 후 상태/주간본 보존. runtime 10초 trigger로 새 성공 시각·S3 시간별 객체 생성과 주간본 유지를 확인하고 원래 hourly 설정으로 복구 |
+| 실패·복구 | 합성 DB 실제 정지 후 백업 실패·이전 성공 보존, 동일 manifest로 DB 재기동 후 복구 확인 |
+| 경보·실수신 | 격리된 빈 성공 상태로 stale ALARM→정상 OK 복귀, 양쪽 SNS action 성공 및 사용자 ALARM·OK 메일 수신 확인 |
+| 미수신 평가 | 동일 경보의 데이터 없는 시험 차원에서 약 50.35초 후 missing datapoint breaching ALARM 확인. 원래 차원·집계/평가·활성 설정을 모두 복원하고 최종 OK·SNS action 성공 확인 |
+| S3 암호문 PC 독립 복원 | **10개·19.477초 통과**. 새 PostgreSQL 17.11 엔진/볼륨/내부 네트워크·호스트 포트 없음. 39개 테이블 전체 행·세션 지문, 29개 시퀀스, Flyway V1~V12, 제한 역할/소유권, PG 실제 stop/start 후 동일성 확인. 정상 종료·자원 보존·기존 개발 DB 미접근 |
+
+백업 QA 원본은 **rc.2 / `8b24285`**이며 새 배포용 **rc.3 / `a00a791`**과 구분한다. 앞선 수동 20개·약 83초 복원은 다른 실행이다. 새 10개는 PG만 검증했고 앱/API·worker·Push를 실행하지 않았다. 전송/키 회수·서버 재구축/서비스 공개는 19.477초에 포함되지 않는다.
+
+타이머는 축약 trigger로 검사했고 실제 hourly 경계는 기다리지 않았다. QA PG의 `restart: no`를 바꾸지 않았고 VM 중단/재부팅 복구·90분 경과 후 메일 지연은 검증하지 않았다. 자동 PC 복사·운영 비밀 설정 복구·실제 백업 요금 상계·전체 RPO/RTO·실회원 데이터 이전/공개는 후속이다. 완료 증빙·원본 실패 기록은 비공개로 보존하며 현재 상세 기준은 [OPERATIONS_BACKUP_PLAN](OPERATIONS_BACKUP_PLAN.md)을 따른다.
+
+## 이전 검증 기록 — 각 실행 시점의 결과
+
+아래 미발행·미실행 표시는 해당 기록 작성 당시의 경계다. 기존 기능 검증 결과와 최초 실패 이력을 보존하며 최신 합성 백업 결과와 섞어 새 실행 횟수로 합산하지 않는다.
+
 2026-10-23 홈 화면 PR 보안 패치: 첫 Push/PR CI의 Frontend가 기존 Next.js 16.4.0에 대한 운영 의존성 audit에서 실패했다. 공식 [Image Optimization](https://github.com/advisories/GHSA-2464-fhr4-w9xw)·[App Router cache](https://github.com/advisories/GHSA-673q-mjm6-r5xr) 보안 공지와 [16.4.2 릴리스](https://github.com/vercel/next.js/releases/tag/v16.4.2)를 확인해 Next.js와 공식 lint plugin만 16.4.2로 고정하고 lockfile을 갱신했다. 이후 운영 의존성 audit 0건·타입·lint·334건·운영 이미지 빌드와 설치 정보 11개를 다시 통과했다. 전체 audit에는 개발 전용 Next lint plugin→fast-glob/micromatch/braces 경로의 high 4건이 남으며 운영 의존성 0건과 구분한다. `npm audit fix --force`가 제안한 plugin major downgrade는 적용하지 않았다. 이 로컬 결과를 새 HEAD 원격 CI 성공으로 대신하지 않는다.
 
 2026-10-23 홈 화면 GitHub·이미지 반영 준비: Frontend 타입 검사·lint와 전체 23파일·334건을 다시 실행해 통과했다. 실제 PNG 5개의 포맷/크기·불투명 배경, iPhone 180px fallback 일치 및 Android maskable 안전 여백을 검토했다. 신규 Frontend 운영 이미지의 로컬 빌드와 metadata/manifest/PNG 응답 11개 검사를 통과했다. 검사는 비root·읽기 전용·네트워크 없음·공개 포트 없음인 임시 컨테이너에서 수행했고 정상 종료했다. 원격 PR CI와 최종 병합 SHA의 이미지 발행은 이 미발행 preview 검증과 구분한다. 최종 GHCR 발행·main 병합·실데이터 이전·실기기 설치를 완료한 결과는 아니다.

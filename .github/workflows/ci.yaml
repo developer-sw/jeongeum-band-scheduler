@@ -3,9 +3,9 @@ name: CI
 on:
   push:
     branches: [main, 'codex/**', 'chore/**', 'feature/**', 'fix/**']
-    paths: ['backend/**', 'frontend/**', 'deploy/**', 'scripts/Test-ProductionContainers.ps1', 'scripts/production-container-qa.mjs', 'scripts/production-qa-result-export.test.ps1', 'scripts/production-image-release.mjs', 'scripts/production-image-release.test.mjs', '.node-version', '.github/workflows/ci.yaml', '.github/workflows/release-images.yaml']
+    paths: ['backend/**', 'frontend/**', 'deploy/**', 'scripts/Test-ProductionContainers.ps1', 'scripts/production-container-qa.mjs', 'scripts/production-qa-result-export.test.ps1', 'scripts/production-image-release.mjs', 'scripts/production-image-release.test.mjs', 'scripts/production-backup*.py', 'scripts/configuration-backup*.py', 'scripts/backup-source-readiness*.py', '.node-version', '.github/workflows/ci.yaml', '.github/workflows/release-images.yaml']
   pull_request:
-    paths: ['backend/**', 'frontend/**', 'deploy/**', 'scripts/Test-ProductionContainers.ps1', 'scripts/production-container-qa.mjs', 'scripts/production-qa-result-export.test.ps1', 'scripts/production-image-release.mjs', 'scripts/production-image-release.test.mjs', '.node-version', '.github/workflows/ci.yaml', '.github/workflows/release-images.yaml']
+    paths: ['backend/**', 'frontend/**', 'deploy/**', 'scripts/Test-ProductionContainers.ps1', 'scripts/production-container-qa.mjs', 'scripts/production-qa-result-export.test.ps1', 'scripts/production-image-release.mjs', 'scripts/production-image-release.test.mjs', 'scripts/production-backup*.py', 'scripts/configuration-backup*.py', 'scripts/backup-source-readiness*.py', '.node-version', '.github/workflows/ci.yaml', '.github/workflows/release-images.yaml']
   workflow_dispatch:
 
 permissions:
@@ -16,6 +16,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  operations-backup:
+    name: Synthetic backup and recovery guard tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify encrypted backup contract with fake Docker and AWS
+        run: python3 -I -B scripts/production-backup.test.py
+      - name: Verify settings archive authentication and path boundaries
+        run: python3 -I -B scripts/configuration-backup.test.py
+      - name: Verify existing synthetic source start and readiness guards
+        run: python3 -I -B scripts/backup-source-readiness.test.py
+
   backend:
     name: Backend test and build
     runs-on: ubuntu-24.04

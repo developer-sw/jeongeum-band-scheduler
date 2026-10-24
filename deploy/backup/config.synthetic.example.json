@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "mode": "synthetic",
+  "project": "jeongeum-prod-qa-REPLACE_SUFFIX",
+  "container_id": "REPLACE_EXACT_64_HEX_POSTGRES_CONTAINER_ID",
+  "data_volume": "REPLACE_EXACT_QA_POSTGRES_VOLUME",
+  "database": "qa_REPLACE_SUFFIX",
+  "database_user": "postgres",
+  "application_owner": "qa_REPLACE_SUFFIX",
+  "postgres_image": "postgres:17.11-bookworm@sha256:REPLACE_PIN",
+  "release_images": {
+    "BACKEND_IMAGE": "ghcr.io/developer-sw/jeongeum-band-scheduler/backend@sha256:REPLACE_PIN",
+    "FRONTEND_IMAGE": "ghcr.io/developer-sw/jeongeum-band-scheduler/frontend@sha256:REPLACE_PIN",
+    "CADDY_IMAGE": "ghcr.io/developer-sw/jeongeum-band-scheduler/caddy@sha256:REPLACE_PIN",
+    "POSTGRES_IMAGE": "postgres:17.11-bookworm@sha256:REPLACE_PIN"
+  },
+  "source_sha": "REPLACE_REVIEWED_40_HEX_SOURCE_SHA",
+  "recipient": "REPLACE_PUBLIC_AGE_RECIPIENT_ONLY",
+  "bucket": "jeongeum-REPLACE_APPROVED_BUCKET",
+  "expected_account": "REPLACE_APPROVED_12_DIGIT_ACCOUNT",
+  "region": "ap-northeast-2",
+  "prefix": "synthetic/",
+  "aws_credentials_file": "/etc/jeongeum-backup/aws-credentials",
+  "state_directory": "/var/lib/jeongeum-backup",
+  "docker_binary": "/usr/bin/docker",
+  "age_binary": "/opt/jeongeum/backup/bin/age",
+  "aws_binary": "/usr/local/bin/aws",
+  "maximum_ciphertext_bytes": 1073741824
+}
