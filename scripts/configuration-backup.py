@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Explicit synthetic/preparation configuration archive. Never activates restored files."""
+"""Explicit configuration archives with scope opt-in. Never activates restored files."""
 import argparse
 import ctypes
 import datetime as dt
@@ -17,6 +17,8 @@ import tarfile
 import unicodedata
 
 SCOPE = "server-preparation-and-synthetic"
+INACTIVE_PRODUCTION_SCOPE = "inactive-production-settings"
+INACTIVE_PRODUCTION_STATE = "staged-inactive"
 MAX_FILES = 128
 MAX_TOTAL = 32 * 1024 * 1024
 MAX_MANIFEST = 256 * 1024
@@ -29,6 +31,10 @@ LIMITATIONS = [
     "Only explicit regular files are collected; no automatic discovery or environment activation.",
     "Recorded POSIX metadata is provenance; Windows access is protected by a separately verified parent ACL.",
 ]
+INACTIVE_PRODUCTION_LIMITATIONS = [
+    "Production settings are declared staged-inactive; this archive does not prove server activation state.",
+    *LIMITATIONS[1:],
+]
 
 
 class ConfigurationError(Exception):
@@ -38,6 +44,13 @@ class ConfigurationError(Exception):
 def need(value, code):
     if not value:
         raise ConfigurationError(code)
+
+
+def scope_profile(scope):
+    # An explicit closed set, not a way to bypass the legacy scope restriction.
+    need(isinstance(scope, str) and scope in (SCOPE, INACTIVE_PRODUCTION_SCOPE), "CONFIG_BACKUP_SCOPE_REJECTED")
+    production = scope == INACTIVE_PRODUCTION_SCOPE
+    return production, 2 if production else 1, INACTIVE_PRODUCTION_LIMITATIONS if production else LIMITATIONS
 
 
 def digest(value):
@@ -279,13 +292,16 @@ def source_metadata(value):
     return value
 
 
-def pack(config_path, recipient, executable, output_path):
+def pack(config_path, recipient, executable, output_path, *, scope=SCOPE):
+    production, version, limitations = scope_profile(scope)
     output = new_path(output_path)
     config_path = private_path(config_path)
     need(config_path.stat().st_size <= MAX_MANIFEST, "CONFIG_BACKUP_CONFIG_TOO_LARGE")
     config = json.loads(config_path.read_text(encoding="utf-8"))
-    need(isinstance(config, dict) and {"scope", "productionConfigurationCreated", "files"} <= set(config) <= {"scope", "productionConfigurationCreated", "files", "sourceMetadata"}
-         and config["scope"] == SCOPE and config["productionConfigurationCreated"] is False, "CONFIG_BACKUP_SCOPE_REJECTED")
+    required = {"scope", "productionConfigurationCreated", "files"} | ({"configurationState"} if production else set())
+    need(isinstance(config, dict) and required <= set(config) <= required | {"sourceMetadata"}
+         and config["scope"] == scope and config["productionConfigurationCreated"] is production
+         and (not production or config["configurationState"] == INACTIVE_PRODUCTION_STATE), "CONFIG_BACKUP_SCOPE_REJECTED")
     need(isinstance(config["files"], list) and 1 <= len(config["files"]) <= MAX_FILES, "CONFIG_BACKUP_FILE_COUNT_REJECTED")
     metadata = source_metadata(config.get("sourceMetadata", {}))
     public_recipient(recipient)
@@ -306,9 +322,11 @@ def pack(config_path, recipient, executable, output_path):
         records.append(record_for(path, member, data, info))
         total += len(data)
         need(total <= MAX_TOTAL, "CONFIG_BACKUP_TOTAL_LIMIT_REJECTED")
-    manifest = {"formatVersion": 1, "scope": SCOPE, "productionConfigurationCreated": False,
+    manifest = {"formatVersion": version, "scope": scope, "productionConfigurationCreated": production,
                 "createdAtUtc": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),
-                "sourcePlatform": "windows" if os.name == "nt" else "posix", "limitations": LIMITATIONS, "sourceMetadata": metadata, "files": records}
+                "sourcePlatform": "windows" if os.name == "nt" else "posix", "limitations": limitations, "sourceMetadata": metadata, "files": records}
+    if production:
+        manifest["configurationState"] = INACTIVE_PRODUCTION_STATE
     encoded = json.dumps(manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
     need(len(encoded) <= MAX_MANIFEST and total + len(encoded) <= MAX_TOTAL, "CONFIG_BACKUP_TOTAL_LIMIT_REJECTED")
     memory = io.BytesIO()
@@ -331,14 +349,21 @@ def pack(config_path, recipient, executable, output_path):
         if created:
             output.unlink()
         raise
-    return {"passed": True, "cipherSha256": digest(ciphertext), "ciphertextBytes": len(ciphertext), "fileCount": len(records),
-            "sourcesUnchanged": True, "productionConfigurationCreated": False}
+    result = {"passed": True, "cipherSha256": digest(ciphertext), "ciphertextBytes": len(ciphertext), "fileCount": len(records),
+              "sourcesUnchanged": True, "productionConfigurationCreated": production}
+    if production:
+        result.update(scope=scope, configurationState=INACTIVE_PRODUCTION_STATE)
+    return result
 
 
-def validate_manifest(value):
-    need(isinstance(value, dict) and set(value) == {"formatVersion", "scope", "productionConfigurationCreated", "createdAtUtc", "sourcePlatform", "limitations", "sourceMetadata", "files"}, "CONFIG_BACKUP_MANIFEST_REJECTED")
-    need(value["formatVersion"] == 1 and value["scope"] == SCOPE and value["productionConfigurationCreated"] is False
-         and value["sourcePlatform"] in ("windows", "posix") and value["limitations"] == LIMITATIONS, "CONFIG_BACKUP_MANIFEST_REJECTED")
+def validate_manifest(value, *, expected_scope=SCOPE):
+    production, version, limitations = scope_profile(expected_scope)
+    fields = {"formatVersion", "scope", "productionConfigurationCreated", "createdAtUtc", "sourcePlatform", "limitations", "sourceMetadata", "files"} | ({"configurationState"} if production else set())
+    need(isinstance(value, dict) and set(value) == fields, "CONFIG_BACKUP_MANIFEST_REJECTED")
+    need(type(value["formatVersion"]) is int and value["formatVersion"] == version
+         and value["scope"] == expected_scope and value["productionConfigurationCreated"] is production
+         and (not production or value["configurationState"] == INACTIVE_PRODUCTION_STATE)
+         and value["sourcePlatform"] in ("windows", "posix") and value["limitations"] == limitations, "CONFIG_BACKUP_MANIFEST_REJECTED")
     source_metadata(value["sourceMetadata"])
     need(isinstance(value["createdAtUtc"], str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", value["createdAtUtc"]), "CONFIG_BACKUP_MANIFEST_REJECTED")
     need(isinstance(value["files"], list) and 1 <= len(value["files"]) <= MAX_FILES, "CONFIG_BACKUP_FILE_COUNT_REJECTED")
@@ -364,7 +389,8 @@ def validate_manifest(value):
     return records
 
 
-def parse_archive(authenticated):
+def parse_archive(authenticated, *, expected_scope=SCOPE):
+    scope_profile(expected_scope)
     need(len(authenticated) <= MAX_CIPHER, "CONFIG_BACKUP_ARCHIVE_LIMIT_REJECTED")
     # Authenticate first (the caller), then fully verify gzip CRC with a hard
     # decompression ceiling before tarfile can consume extended-header records.
@@ -397,7 +423,7 @@ def parse_archive(authenticated):
             total += len(data); seen.add(member.name)
             if records is None:
                 manifest_data = data
-                records = validate_manifest(json.loads(data.decode("utf-8")))
+                records = validate_manifest(json.loads(data.decode("utf-8")), expected_scope=expected_scope)
             else:
                 need(digest(data) == records[member.name]["sha256"], "CONFIG_BACKUP_MEMBER_HASH_MISMATCH")
                 allowed_content(data)
@@ -408,7 +434,8 @@ def parse_archive(authenticated):
     return records, contents, manifest_data
 
 
-def restore(cipher_path, identity_path, executable, destination_path):
+def restore(cipher_path, identity_path, executable, destination_path, *, scope=SCOPE):
+    production, _version, _limitations = scope_profile(scope)
     destination = new_path(destination_path, directory=True)
     cipher_path = regular_path(cipher_path)
     identity = private_path(identity_path)  # age alone reads the identity's contents.
@@ -420,7 +447,7 @@ def restore(cipher_path, identity_path, executable, destination_path):
     # Decrypt the exact captured bytes whose SHA is reported, rather than
     # asking the child to reopen a pathname that could have changed meanwhile.
     authenticated = age_call(executable, ["--decrypt", "--identity", str(identity)], cipher_before)
-    records, contents, manifest_data = parse_archive(authenticated)
+    records, contents, manifest_data = parse_archive(authenticated, expected_scope=scope)
     need(file_snapshot(info) == file_snapshot(cipher_path.stat()) and digest(cipher_before) == digest(cipher_path.read_bytes()), "CONFIG_BACKUP_CIPHERTEXT_CHANGED")
     created_files, created_directories = [], []
     try:
@@ -454,9 +481,12 @@ def restore(cipher_path, identity_path, executable, destination_path):
             except OSError:
                 pass
         raise
-    return {"passed": True, "cipherSha256": digest(cipher_before), "ciphertextBytes": len(cipher_before), "fileCount": len(records),
-            "authenticated": True, "allFilesVerifiedBeforeWrite": True, "posixFileModesApplied": os.name != "nt", "filesActivated": False,
-            "productionConfigurationCreated": False}
+    result = {"passed": True, "cipherSha256": digest(cipher_before), "ciphertextBytes": len(cipher_before), "fileCount": len(records),
+              "authenticated": True, "allFilesVerifiedBeforeWrite": True, "posixFileModesApplied": os.name != "nt", "filesActivated": False,
+              "productionConfigurationCreated": production}
+    if production:
+        result.update(scope=scope, configurationState=INACTIVE_PRODUCTION_STATE)
+    return result
 
 
 def main():
@@ -471,9 +501,11 @@ def main():
     recovering = sub.add_parser("restore")
     for argument in ("cipher", "identity", "age", "destination"):
         recovering.add_argument("--" + argument, required=True)
+    for action in (packing, recovering):
+        action.add_argument("--scope", choices=(SCOPE, INACTIVE_PRODUCTION_SCOPE), default=SCOPE)
     try:
         args = parser.parse_args()
-        result = pack(args.config, args.recipient, args.age, args.output) if args.action == "pack" else restore(args.cipher, args.identity, args.age, args.destination)
+        result = pack(args.config, args.recipient, args.age, args.output, scope=args.scope) if args.action == "pack" else restore(args.cipher, args.identity, args.age, args.destination, scope=args.scope)
         print(json.dumps(result, separators=(",", ":")))
         return 0
     except SystemExit as error:
