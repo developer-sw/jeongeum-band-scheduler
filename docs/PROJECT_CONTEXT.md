@@ -1,5 +1,9 @@
 # 프로젝트 전제와 확정 요구사항
 
+## 2026-10-24 후속 — 비활성 운영 설정·실제 암호화 복원
+
+AWS 재문의 전송 후 사람의 답변을 기다리는 동안, 사용자 요청으로 새 미사용 운영 설정 16파일과 DB 비밀번호·VAPID 키를 로컬 비공개 폴더에 준비했다. rc.3 digest를 재사용하고 실제 age 암호화·독립 Windows 복원, 전체 SHA/ACL과 원본·복원 사본 각각 정적 검사 51항목을 확인했다. 새 명시적 `inactive-production-settings` 범위의 구현·검증은 [INACTIVE_PRODUCTION_SETTINGS](INACTIVE_PRODUCTION_SETTINGS.md)를 따른다. 서버 설치·DB 역할 생성·실회원 이전·앱 공개·추가 AWS 자원은 수행하지 않았다. 후속 사용자 승인으로 이 도구·검증·문서만 별도 브랜치에서 GitHub에 게시하며 실제 설정·키·암호문은 제외한다. 현재 HEAD의 원격 검증은 해당 초안 PR을 따르고 정식 전환·main 병합은 별도 승인 대상이다.
+
 ## 2026-10-24 게시 준비 — 백업·자동 복구·README
 
 사용자가 완료한 백업·자동 복구 자산의 GitHub 반영과 README 최신화를 승인했다. 현재 `codex/operations-backup-plan`에서 도구·systemd 자산·검증 문서를 먼저 커밋하고 README를 별도 커밋으로 반영해 main 대상 초안 PR·현재 HEAD CI를 확인한다. 정식 전환·main 병합은 별도 승인 규칙을 유지한다. 기존 rc.3 이미지·개발 DB/볼륨·원격 준비 화면과 자동 백업 설정은 이 게시 작업에서 변경하지 않는다.
