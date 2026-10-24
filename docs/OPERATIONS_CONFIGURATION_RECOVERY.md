@@ -1,5 +1,7 @@
 # 운영 준비 설정의 암호화 백업·복구 검증
 
+후속 준비(2026-10-24): 별도의 **새 미사용 운영 설정 16파일**을 로컬에 생성하고 신규 `inactive-production-settings` 범위로 실제 age 암호화·Windows 독립 복원을 완료했다. 기존 범위의 기본 동작과 v1 계약은 유지하며, 신규 범위만 명시적 opt-in·v2/생성 true/상태 staged-inactive를 요구한다. [신규 결과](INACTIVE_PRODUCTION_SETTINGS.md)를 따르고 아래 초기 시험의 새 운영 비밀값 미생성 설명과 구분한다. 서버 설치·실제 데이터 이전·활성화는 하지 않았다.
+
 게시 전 보완(2026-10-24): Windows 예약 장치명에 콘솔 별칭과 위 첨자 COM/LPT를 추가하여 Linux에서 만든 archive도 Windows 복원 폴더 생성·쓰기 전에 거부한다. 새 fake archive 회귀를 포함한 27개 중 로컬 26개 통과·hardlink 1개 건너뜀과 새 Linux CI 범위는 [TEST_PLAN](TEST_PLAN.md)을 따른다. 아래 실제 30파일·추가 3파일 복원은 당시 정상 allowlist를 사용한 결과이며, 소스 보완을 원격 서버에 재설치한 검증은 아니다.
 
 후속 상태(2026-10-24): AWS Basic 계정·결제 문의 접수와 실제 VM 재부팅·기존 합성 PG/준비 Caddy 자동 복구, 부팅 metric·CloudWatch 새 지표와 최종 OK를 확인했다. 재부팅 전후 **아래 원본 30파일의 SHA는 동일**하다. 새 readiness helper·source unit·백업 drop-in **3파일은 별도 추가 자산이며 기존 암호문에 들어 있지 않다**. 별도 age v1.3.2 암호문 **4,356bytes**의 원본 불변·서버/PC 전체 SHA 일치·실제 Windows 인증 복원·3파일 disk SHA와 현재 사용자/SYSTEM native ACL을 확인했다. **기존 30파일 archive + 별도 추가 3파일 archive를 함께 쓰는 수동 복구**이며 단일 33파일 archive·자동 활성화·S3 설정 업로드·helper 자체 Linux restore는 아니다. 현재 결과와 점검 절차는 [OPERATIONS_REBOOT_VALIDATION](OPERATIONS_REBOOT_VALIDATION.md)을 따른다. 아래 초기 설정 시험의 신규 자산 미설치·문의 미전송 설명은 당시 범위다.
@@ -34,7 +36,7 @@ DB는 합성이지만 설정에 포함된 기존 서버의 최소 IAM 자격증�
 
 ## 실행기의 방어 경계
 
-- 최대 128개 파일·평문 총 32MiB, 명시적인 `server-preparation-and-synthetic` 범위만 허용한다.
+- 최대 128개 파일·평문 총 32MiB이며 기본 범위는 `server-preparation-and-synthetic`이다. 신규 비활성 운영 설정은 pack·restore 양쪽에 별도 scope를 명시해야 하며 기본 호출에서 수락하지 않는다.
 - age **v1.3.2**와 공개 수신자로 암호화한다. 복구 개인키는 서버에 전송하지 않고 PC의 보호된 파일에서 age만 읽는다.
 - 원본 파일의 식별자·크기·mode·mtime·내용 SHA를 암호화 전후에 재확인한다. Windows의 lstat/fstat ctime 캐시 차이는 별도로 다루며 다른 동일성 검사는 유지한다.
 - symlink·hardlink·특수 파일·경로 탈출·중복·Windows 장치명/ADS·키 파일 표식을 거부한다. 기존 출력 파일이나 복원 폴더를 덮어쓰지 않는다.

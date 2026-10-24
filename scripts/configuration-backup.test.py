@@ -94,23 +94,29 @@ class ConfigurationTests(unittest.TestCase):
     def save_config(self):
         self.config.write_text(json.dumps(self.settings), encoding="utf-8")
 
-    def pack(self):
-        return b.pack(self.config, RECIPIENT, Path(sys.executable), self.output)
+    def pack(self, *, scope=b.SCOPE):
+        return b.pack(self.config, RECIPIENT, Path(sys.executable), self.output, scope=scope)
 
-    def restore(self):
-        return b.restore(self.output, self.identity, Path(sys.executable), self.destination)
+    def restore(self, *, scope=b.SCOPE):
+        return b.restore(self.output, self.identity, Path(sys.executable), self.destination, scope=scope)
 
-    def baseline_archive(self):
-        self.pack()
+    def baseline_archive(self, *, scope=b.SCOPE):
+        self.pack(scope=scope)
         return self.fake.archives[self.output.read_bytes()]
+
+    def configure_inactive_production(self):
+        self.settings.update(scope=b.INACTIVE_PRODUCTION_SCOPE, productionConfigurationCreated=True,
+                             configurationState=b.INACTIVE_PRODUCTION_STATE,
+                             sourceMetadata={"schema": "unit-staged-inactive", "productionSecretsCreated": True})
+        self.save_config()
 
     def install_archive(self, archive):
         self.output.write_bytes(self.fake.register(archive))
 
-    def rejected_restore(self, archive):
+    def rejected_restore(self, archive, *, scope=b.SCOPE):
         self.install_archive(archive)
         with self.assertRaises((b.ConfigurationError, tarfile.TarError, ValueError, UnicodeError)):
-            self.restore()
+            self.restore(scope=scope)
         self.assertFalse(self.destination.exists())
 
     def test_roundtrip_preserves_bytes_private_manifest_and_original_source(self):
@@ -146,6 +152,170 @@ class ConfigurationTests(unittest.TestCase):
             with self.assertRaises(b.ConfigurationError): self.pack()
             self.settings = original
         self.assertEqual(self.fake.calls, [])
+
+    def test_inactive_production_pack_requires_explicit_scope_before_age_or_output(self):
+        self.configure_inactive_production()
+        with self.assertRaisesRegex(b.ConfigurationError, "^CONFIG_BACKUP_SCOPE_REJECTED$"):
+            self.pack()
+        self.assertEqual(self.fake.calls, [])
+        self.assertFalse(self.output.exists())
+
+    def test_inactive_production_restore_requires_explicit_scope_before_destination(self):
+        self.configure_inactive_production()
+        self.pack(scope=b.INACTIVE_PRODUCTION_SCOPE)
+        with self.assertRaisesRegex(b.ConfigurationError, "^CONFIG_BACKUP_MANIFEST_REJECTED$"):
+            self.restore()
+        self.assertFalse(self.destination.exists())
+
+    def test_legacy_archive_cannot_be_reinterpreted_as_inactive_production(self):
+        archive = self.baseline_archive()
+        self.rejected_restore(archive, scope=b.INACTIVE_PRODUCTION_SCOPE)
+
+    def test_inactive_production_roundtrip_is_truthful_and_never_activates(self):
+        self.configure_inactive_production()
+        before = b.file_snapshot(self.source.stat()), self.source.read_bytes()
+        packed = self.pack(scope=b.INACTIVE_PRODUCTION_SCOPE)
+        restored = self.restore(scope=b.INACTIVE_PRODUCTION_SCOPE)
+        manifest = json.loads((self.destination / "manifest.json").read_bytes())
+        self.assertEqual(manifest["formatVersion"], 2)
+        self.assertIs(manifest["productionConfigurationCreated"], True)
+        self.assertEqual(manifest["configurationState"], "staged-inactive")
+        self.assertEqual(manifest["scope"], b.INACTIVE_PRODUCTION_SCOPE)
+        self.assertEqual(manifest["limitations"], b.INACTIVE_PRODUCTION_LIMITATIONS)
+        self.assertNotIn(b.LIMITATIONS[0], manifest["limitations"])
+        self.assertEqual(before, (b.file_snapshot(self.source.stat()), self.source.read_bytes()))
+        self.assertEqual(self.source.read_bytes(), (self.destination / "files/backend/backend-config.txt").read_bytes())
+        for result in (packed, restored):
+            self.assertIs(result["productionConfigurationCreated"], True)
+            self.assertEqual(result["scope"], b.INACTIVE_PRODUCTION_SCOPE)
+            self.assertEqual(result["configurationState"], "staged-inactive")
+            self.assertNotIn("sourcePath", json.dumps(result))
+        self.assertIs(restored["filesActivated"], False)
+        self.assertEqual(self.fake.calls, [["--version"], ["--encrypt", "--recipient", RECIPIENT],
+                                          ["--version"], ["--decrypt", "--identity", str(self.identity)]])
+
+    def test_inactive_production_config_is_exact_and_boolean_is_not_coerced(self):
+        self.configure_inactive_production()
+        original = copy.deepcopy(self.settings)
+        changes = [{"productionConfigurationCreated": value} for value in (False, 1, 0, "true", None)]
+        changes += [{"configurationState": value} for value in ("active", "inactive", True, None)]
+        changes += [{"scope": b.SCOPE}, {"formatVersion": 2}, {"filesActivated": False}]
+        for change in changes:
+            self.settings = copy.deepcopy(original)
+            self.settings.update(change); self.save_config()
+            with self.subTest(change=change), self.assertRaises(b.ConfigurationError):
+                self.pack(scope=b.INACTIVE_PRODUCTION_SCOPE)
+        self.settings = copy.deepcopy(original)
+        del self.settings["configurationState"]; self.save_config()
+        with self.assertRaises(b.ConfigurationError): self.pack(scope=b.INACTIVE_PRODUCTION_SCOPE)
+        self.assertEqual(self.fake.calls, [])
+        self.assertFalse(self.output.exists())
+
+    def test_legacy_config_boolean_and_new_state_are_not_coerced_or_ignored(self):
+        original = copy.deepcopy(self.settings)
+        for change in ({"productionConfigurationCreated": 0}, {"productionConfigurationCreated": "false"},
+                       {"configurationState": "staged-inactive"}):
+            self.settings = copy.deepcopy(original)
+            self.settings.update(change); self.save_config()
+            with self.subTest(change=change), self.assertRaises(b.ConfigurationError): self.pack()
+        self.assertEqual(self.fake.calls, [])
+        self.assertFalse(self.output.exists())
+
+    def test_inactive_production_manifest_version_state_and_boolean_fail_before_write(self):
+        self.configure_inactive_production()
+        entries = archive_entries(self.baseline_archive(scope=b.INACTIVE_PRODUCTION_SCOPE))
+        original = json.loads(entries[0][1])
+        changes = [{"formatVersion": value} for value in (1, True, 2.0, "2")]
+        changes += [{"productionConfigurationCreated": value} for value in (False, 1, "true")]
+        changes += [{"configurationState": value} for value in ("active", False, None)]
+        changes += [{"scope": b.SCOPE}, {"limitations": b.LIMITATIONS}, {"unexpected": True}]
+        for change in changes:
+            manifest = copy.deepcopy(original); manifest.update(change)
+            modified = [(entries[0][0], json.dumps(manifest).encode()), *entries[1:]]
+            with self.subTest(change=change):
+                self.rejected_restore(archive_bytes(modified), scope=b.INACTIVE_PRODUCTION_SCOPE)
+        manifest = copy.deepcopy(original); del manifest["configurationState"]
+        self.rejected_restore(archive_bytes([(entries[0][0], json.dumps(manifest).encode()), *entries[1:]]),
+                              scope=b.INACTIVE_PRODUCTION_SCOPE)
+
+    def test_legacy_manifest_version_requires_an_exact_integer(self):
+        entries = archive_entries(self.baseline_archive())
+        for version in (True, 1.0, "1", 2):
+            manifest = json.loads(entries[0][1]); manifest["formatVersion"] = version
+            with self.subTest(version=version):
+                self.rejected_restore(archive_bytes([(entries[0][0], json.dumps(manifest).encode()), *entries[1:]]))
+
+    def test_scope_argument_is_a_closed_set_for_both_python_entry_points(self):
+        for scope in ("production", "any", None, True, [b.INACTIVE_PRODUCTION_SCOPE]):
+            with self.subTest(scope=scope), self.assertRaisesRegex(b.ConfigurationError, "^CONFIG_BACKUP_SCOPE_REJECTED$"):
+                self.pack(scope=scope)
+            with self.subTest(scope=scope), self.assertRaisesRegex(b.ConfigurationError, "^CONFIG_BACKUP_SCOPE_REJECTED$"):
+                self.restore(scope=scope)
+        self.assertEqual(self.fake.calls, [])
+        self.assertFalse(self.output.exists())
+        self.assertFalse(self.destination.exists())
+
+    def test_inactive_scope_does_not_bypass_key_content_exclusions(self):
+        self.configure_inactive_production()
+        for data in (b"AGE-SECRET-KEY-SYNTHETIC-FORBIDDEN", b"-----BEGIN OPENSSH PRIVATE KEY-----",
+                     b"ROOT_ACCESS_KEY=forbidden"):
+            self.source.write_bytes(data)
+            with self.subTest(data=data), self.assertRaises(b.ConfigurationError):
+                self.pack(scope=b.INACTIVE_PRODUCTION_SCOPE)
+        self.assertEqual(self.fake.calls, [])
+        self.assertFalse(self.output.exists())
+
+    def test_inactive_scope_does_not_bypass_archive_name_and_path_exclusions(self):
+        self.configure_inactive_production()
+        for name in ("files/id_ed25519", "files/recovery-private-key.txt", "files/root-credentials.txt",
+                     "files/tls.pem", "files/../outside.txt", "files/CONIN$.txt", "files/COM¹.txt"):
+            self.settings["files"][0]["archivePath"] = name; self.save_config()
+            with self.subTest(name=name), self.assertRaises(b.ConfigurationError):
+                self.pack(scope=b.INACTIVE_PRODUCTION_SCOPE)
+        self.assertEqual(self.fake.calls, [])
+        self.assertFalse(self.output.exists())
+
+    def test_inactive_scope_still_rejects_forbidden_renamed_archive_content(self):
+        self.configure_inactive_production()
+        entries = archive_entries(self.baseline_archive(scope=b.INACTIVE_PRODUCTION_SCOPE))
+        data = b"-----BEGIN OPENSSH PRIVATE KEY-----"
+        manifest = json.loads(entries[0][1])
+        manifest["files"][0].update(size=len(data), sha256=b.digest(data))
+        modified = [(entries[0][0], json.dumps(manifest).encode()), (entries[1][0], data)]
+        self.rejected_restore(archive_bytes(modified), scope=b.INACTIVE_PRODUCTION_SCOPE)
+
+    def test_inactive_scope_keeps_existing_output_and_destination_intact(self):
+        self.configure_inactive_production()
+        self.pack(scope=b.INACTIVE_PRODUCTION_SCOPE)
+        ciphertext = self.output.read_bytes()
+        with self.assertRaises(b.ConfigurationError): self.pack(scope=b.INACTIVE_PRODUCTION_SCOPE)
+        self.assertEqual(self.output.read_bytes(), ciphertext)
+        self.destination.mkdir()
+        sentinel = self.destination / "existing.txt"
+        sentinel.write_bytes(b"existing-data")
+        with self.assertRaises(b.ConfigurationError): self.restore(scope=b.INACTIVE_PRODUCTION_SCOPE)
+        self.assertEqual(list(self.destination.iterdir()), [sentinel])
+        self.assertEqual(sentinel.read_bytes(), b"existing-data")
+
+    def test_cli_routes_explicit_scope_for_pack_and_restore_and_rejects_other_scopes(self):
+        operations = [
+            ("pack", ["--config", str(self.config), "--recipient", RECIPIENT, "--age", sys.executable,
+                      "--output", str(self.output)]),
+            ("restore", ["--cipher", str(self.output), "--identity", str(self.identity), "--age", sys.executable,
+                         "--destination", str(self.destination)]),
+        ]
+        for operation, arguments in operations:
+            argv = ["helper", operation, *arguments, "--scope", b.INACTIVE_PRODUCTION_SCOPE]
+            with patch.object(b.sys, "argv", argv), patch.object(b, operation, return_value={"passed": True}) as called, \
+                    patch.object(b.sys, "stdout", new_callable=io.StringIO):
+                self.assertEqual(b.main(), 0)
+                self.assertEqual(called.call_args.kwargs, {"scope": b.INACTIVE_PRODUCTION_SCOPE})
+            argv[-1] = "arbitrary-scope"
+            with patch.object(b.sys, "argv", argv), patch.object(b, operation) as called, \
+                    patch.object(b.sys, "stdout", new_callable=io.StringIO) as output:
+                self.assertEqual(b.main(), 1)
+                self.assertEqual(json.loads(output.getvalue()), {"passed": False, "error": "CONFIG_BACKUP_ARGUMENTS_REJECTED"})
+                called.assert_not_called()
 
     def test_source_metadata_type_depth_and_size_are_bounded(self):
         nested = {"leaf": False}

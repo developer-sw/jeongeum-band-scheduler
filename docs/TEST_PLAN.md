@@ -1,5 +1,11 @@
 # 테스트 및 운영 검증 계획
 
+## 2026-10-24 후속 — 비활성 운영 설정·scope 분리
+
+설정 복구 도구의 신규 `inactive-production-settings`는 pack·restore의 명시적 opt-in, v2·정확한 boolean/상태, 기본 v1 응답 호환과 키/경로 보호를 검사한다. fake age 회귀는 기존 27개에 14개를 더한 **41개 중 40개 통과·hardlink 1개 건너뜀**이다. workspace의 전용 TEMP/TMP를 사용했으며 실제 DB·Docker 엔진·AWS를 호출하지 않았다. 기존 hardlink skip을 통과로 합산하지 않는다.
+
+별도 실제 age v1.3.2 검증에서는 새 설정 **16파일**을 암호화하고 새 Windows 폴더에 인증 복원했다. 전체 SHA·원본 불변·native ACL, 원본과 복원 각각 **51개 정적 설정 검사**를 통과했다. 기본 pack/restore의 신규 범위 거부·변조·절단·다른 키·기존 destination 등 실제 실패 6종도 거부했다. Compose는 정적 config 렌더링만 했으며 컨테이너·DB·볼륨 생성이나 네트워크 공개는 없다. 초기 검사 하네스의 로컬 실행 파일 경로/JSON 숫자 표현 오류는 하네스만 고쳐 재확인했다. 실제 Linux 복원·새 원격 CI·운영 앱 검증은 미실행이다. [실행 결과와 제한](INACTIVE_PRODUCTION_SETTINGS.md)을 따른다.
+
 ## 2026-10-24 게시 준비 — 로컬 회귀·새 CI
 
 게시 전 독립 검토에서 DB 백업 **27개**, 기존 합성 PG readiness **21개**가 통과했다. 설정 복구는 Windows 예약 장치 별칭(`CONIN$`/`CONOUT$`)·위 첨자 COM/LPT의 대소문자/확장자/중첩 경로 거부를 보완하고 새 회귀를 추가해 **27개 실행 중 26개 통과·hardlink 1개 건너뜀**이었다. 새 회귀는 32개 인증된 fake archive에서 복원 폴더 생성·쓰기 전 거부를 확인한다. 건너뜀은 로컬 sandbox 파일 시스템의 hardlink 생성 제한이며 통과로 집계하지 않는다.

@@ -2,6 +2,8 @@
 
 ## 최신 결과 — 2026-10-24
 
+후속 준비: AWS Basic 재문의는 전송했고 사람의 답변은 대기 중이다. **새 비활성 운영 설정 16파일**의 실제 age 암호화·독립 Windows 복원과 원본/복원 각각 정적 검사 51항목을 완료했다. rc.3 이미지를 고정하고 worker/Push는 모두 OFF이며 서버 설치·DB 역할 생성·이전·공개는 하지 않았다. 상세 결과·설치 전 조건·새 쓰기 전후 복구 경계는 [INACTIVE_PRODUCTION_SETTINGS](INACTIVE_PRODUCTION_SETTINGS.md)를 따른다. 아래 새 운영 비밀 설정 미완료 표시는 이 후속 준비 전의 기록이다.
+
 승인된 AWS Basic 계정·결제 문의를 접수하고 실제 VM 재부팅 후 합성 PG·HTTPS 준비 화면의 자동 복구와 데이터/설정/자원 보존 16항목을 확인했다. 기존 QA `restart: no`를 바꾸지 않고 정확한 합성 PG만 시작하는 source unit·DB 준비 대기를 추가했다. **16:00:18 KST** 원래 hourly 발화, **16:00:24 KST** 새 S3 백업 검증, 부팅 metric의 새 CloudWatch datapoint와 경보 OK·Free Plan 유지를 확인했다. 새 3파일 설정의 보완 암호문은 기존 30파일 archive와 별도로 PC에 보관·실제 복원했다. [재부팅 검증](OPERATIONS_REBOOT_VALIDATION.md)을 최신 기준으로 삼는다.
 
 아래 두 문단은 재부팅 검증 전 합성 정기 백업 단계의 결과다.
