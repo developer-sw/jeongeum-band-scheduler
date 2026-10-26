@@ -1,0 +1,11 @@
+[Unit]
+Description=JEONGEUM operational snapshot age sampling
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+AccuracySec=15s
+Unit=jeongeum-operational-backup-metric.service
+
+[Install]
+WantedBy=timers.target

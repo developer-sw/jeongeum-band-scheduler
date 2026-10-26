@@ -1,0 +1,21 @@
+{
+  "AlarmName": "JEONGEUM-Production-Backup-Age",
+  "AlarmDescription": "Age of the snapshot of the most recent fully verified encrypted operational backup",
+  "Namespace": "JEONGEUM/OperationalBackups",
+  "MetricName": "RecoverableSnapshotAgeMinutes",
+  "Dimensions": [
+    {"Name": "Environment", "Value": "production"},
+    {"Name": "Instance", "Value": "jeongeum-prod-01"}
+  ],
+  "Statistic": "Maximum",
+  "Period": 300,
+  "EvaluationPeriods": 1,
+  "DatapointsToAlarm": 1,
+  "Threshold": 90,
+  "ComparisonOperator": "GreaterThanThreshold",
+  "TreatMissingData": "breaching",
+  "Unit": "None",
+  "ActionsEnabled": true,
+  "AlarmActions": ["REPLACE_REVIEWED_SNS_TOPIC_ARN"],
+  "OKActions": ["REPLACE_REVIEWED_SNS_TOPIC_ARN"]
+}

@@ -1,0 +1,21 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "OperationalCiphertextOnly",
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject", "s3:GetObjectVersion"],
+      "Resource": [
+        "arn:aws:s3:::REPLACE_APPROVED_BUCKET/production/hourly/*",
+        "arn:aws:s3:::REPLACE_APPROVED_BUCKET/production/weekly/*"
+      ]
+    },
+    {
+      "Sid": "OperationalBackupMetricOnly",
+      "Effect": "Allow",
+      "Action": "cloudwatch:PutMetricData",
+      "Resource": "*",
+      "Condition": {"StringEquals": {"cloudwatch:namespace": "JEONGEUM/OperationalBackups"}}
+    }
+  ]
+}
