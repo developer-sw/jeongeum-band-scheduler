@@ -1,0 +1,26 @@
+{
+  "schema_version": 2,
+  "mode": "qualification-restore",
+  "project": "jeongeum-ops-restore-REPLACE_12_HEX_SUFFIX",
+  "container_id": "REPLACE_NEW_RESTORE_ENGINE_64_HEX_ID",
+  "data_volume": "jeongeum-ops-restore-REPLACE_12_HEX_SUFFIX_postgres_data",
+  "database": "restore_REPLACE_12_HEX_SUFFIX",
+  "database_user": "postgres",
+  "application_owner": "restore_REPLACE_12_HEX_SUFFIX",
+  "postgres_image": "postgres:17.11-bookworm@sha256:3645570cccdfa447589da9f57dd740faa29b30938e861289a5574b6ca6b03826",
+  "docker_binary": "/usr/bin/docker",
+  "state_directory": "/var/lib/jeongeum-operational-restore",
+  "expected_source": {
+    "mode": "production",
+    "sourceProject": "jeongeum-production-v1",
+    "sourceDatabase": "jeongeum_prod",
+    "applicationOwner": "jeongeum_app",
+    "sourceSha": "a00a791b069f20943c5e956968e970bf138fa3dc",
+    "images": {
+      "BACKEND_IMAGE": "ghcr.io/developer-sw/jeongeum-band-scheduler/backend@sha256:7dd69db8f16bfb7282b4bed2a2ccf41b58f2e8f59a659e10f9a9ab82510e0a61",
+      "FRONTEND_IMAGE": "ghcr.io/developer-sw/jeongeum-band-scheduler/frontend@sha256:9957a66e491dfbba8d84a119015ab323c4fbaa95ced16381e42e7692732ca687",
+      "CADDY_IMAGE": "ghcr.io/developer-sw/jeongeum-band-scheduler/caddy@sha256:9876276ae2e2de72212e1028c5b3cba74a99ee32e7ce17dd7f0a7d4c2000cb5c",
+      "POSTGRES_IMAGE": "postgres:17.11-bookworm@sha256:3645570cccdfa447589da9f57dd740faa29b30938e861289a5574b6ca6b03826"
+    }
+  }
+}

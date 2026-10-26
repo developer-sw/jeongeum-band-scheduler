@@ -1,0 +1,12 @@
+[Unit]
+Description=JEONGEUM hourly operational database backup
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+AccuracySec=30s
+RandomizedDelaySec=20s
+Unit=jeongeum-operational-backup.service
+
+[Install]
+WantedBy=timers.target

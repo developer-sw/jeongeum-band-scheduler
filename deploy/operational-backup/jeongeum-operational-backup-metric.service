@@ -1,0 +1,34 @@
+[Unit]
+Description=JEONGEUM recoverable operational snapshot age metric
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/etc/jeongeum-operational-backup/config.json
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+UMask=0077
+ExecStart=/usr/bin/python3 -I -B /opt/jeongeum/operational-backup/operational-backup.py metric --config /etc/jeongeum-operational-backup/config.json
+TimeoutStartSec=4min
+TimeoutStopSec=15s
+KillMode=control-group
+StateDirectory=jeongeum-operational-backup
+StateDirectoryMode=0700
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/jeongeum-operational-backup
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+MemoryMax=256M
+TasksMax=32
+LimitNOFILE=512
+LimitFSIZE=1M
+StandardOutput=journal
+StandardError=journal

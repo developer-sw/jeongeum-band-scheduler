@@ -3,9 +3,9 @@ name: CI
 on:
   push:
     branches: [main, 'codex/**', 'chore/**', 'feature/**', 'fix/**']
-    paths: ['backend/**', 'frontend/**', 'deploy/**', 'scripts/Test-ProductionContainers.ps1', 'scripts/production-container-qa.mjs', 'scripts/production-qa-result-export.test.ps1', 'scripts/production-image-release.mjs', 'scripts/production-image-release.test.mjs', 'scripts/production-backup*.py', 'scripts/configuration-backup*.py', 'scripts/backup-source-readiness*.py', '.node-version', '.github/workflows/ci.yaml', '.github/workflows/release-images.yaml']
+    paths: ['backend/**', 'frontend/**', 'deploy/**', 'scripts/Test-ProductionContainers.ps1', 'scripts/production-container-qa.mjs', 'scripts/production-qa-result-export.test.ps1', 'scripts/production-image-release.mjs', 'scripts/production-image-release.test.mjs', 'scripts/production-backup*.py', 'scripts/configuration-backup*.py', 'scripts/backup-source-readiness*.py', 'scripts/runtime-secrets*.py', 'scripts/operational-backup*.py', 'scripts/operational-restore*.py', 'scripts/test-operational-backup.mjs', 'scripts/test-runtime-secrets.mjs', '.node-version', '.github/workflows/ci.yaml', '.github/workflows/release-images.yaml']
   pull_request:
-    paths: ['backend/**', 'frontend/**', 'deploy/**', 'scripts/Test-ProductionContainers.ps1', 'scripts/production-container-qa.mjs', 'scripts/production-qa-result-export.test.ps1', 'scripts/production-image-release.mjs', 'scripts/production-image-release.test.mjs', 'scripts/production-backup*.py', 'scripts/configuration-backup*.py', 'scripts/backup-source-readiness*.py', '.node-version', '.github/workflows/ci.yaml', '.github/workflows/release-images.yaml']
+    paths: ['backend/**', 'frontend/**', 'deploy/**', 'scripts/Test-ProductionContainers.ps1', 'scripts/production-container-qa.mjs', 'scripts/production-qa-result-export.test.ps1', 'scripts/production-image-release.mjs', 'scripts/production-image-release.test.mjs', 'scripts/production-backup*.py', 'scripts/configuration-backup*.py', 'scripts/backup-source-readiness*.py', 'scripts/runtime-secrets*.py', 'scripts/operational-backup*.py', 'scripts/operational-restore*.py', 'scripts/test-operational-backup.mjs', 'scripts/test-runtime-secrets.mjs', '.node-version', '.github/workflows/ci.yaml', '.github/workflows/release-images.yaml']
   workflow_dispatch:
 
 permissions:
@@ -30,6 +30,47 @@ jobs:
         run: python3 -I -B scripts/configuration-backup.test.py
       - name: Verify existing synthetic source start and readiness guards
         run: python3 -I -B scripts/backup-source-readiness.test.py
+      - name: Verify separate operational backup guards with fake transports
+        run: python3 -I -B scripts/operational-backup.test.py
+      - name: Verify authenticated independent restore boundaries with fake transports
+        run: python3 -I -B scripts/operational-restore.test.py
+
+  operational-database-backup:
+    name: Operational database backup qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - name: Verify pinned official Linux age asset
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .local/tools/age-linux-1.3.2
+          archive=.local/tools/age-linux-1.3.2/age-v1.3.2-linux-amd64.tar.gz
+          curl --fail --location --retry 3 --output "$archive" https://github.com/FiloSottile/age/releases/download/v1.3.2/age-v1.3.2-linux-amd64.tar.gz
+          printf '%s  %s\n' cbe24006683f8eb669266162894b9a522a1af52f2665fbc63a4bb032ed26ac10 "$archive" | sha256sum --check -
+          tar -xzf "$archive" -C .local/tools/age-linux-1.3.2 age/age age/age-keygen
+      - name: Qualify backup, independent engines, recovery and monitoring without AWS
+        run: node scripts/test-operational-backup.mjs
+
+  runtime-secret-permissions:
+    name: Runtime secret permissions with synthetic Linux files
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - name: Verify protected master files and consumer-specific runtime copies
+        run: node scripts/test-runtime-secrets.mjs
 
   backend:
     name: Backend test and build

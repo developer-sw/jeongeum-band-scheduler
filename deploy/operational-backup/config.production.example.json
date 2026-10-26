@@ -1,0 +1,30 @@
+{
+  "schema_version": 2,
+  "mode": "production",
+  "activation_approved": false,
+  "project": "jeongeum-production-v1",
+  "container_id": "REPLACE_APPROVED_EXACT_64_HEX_CONTAINER_ID",
+  "data_volume": "jeongeum-production-v1_postgres_data",
+  "database": "jeongeum_prod",
+  "database_user": "postgres",
+  "application_owner": "jeongeum_app",
+  "postgres_image": "postgres:17.11-bookworm@sha256:3645570cccdfa447589da9f57dd740faa29b30938e861289a5574b6ca6b03826",
+  "release_images": {
+    "BACKEND_IMAGE": "ghcr.io/developer-sw/jeongeum-band-scheduler/backend@sha256:7dd69db8f16bfb7282b4bed2a2ccf41b58f2e8f59a659e10f9a9ab82510e0a61",
+    "FRONTEND_IMAGE": "ghcr.io/developer-sw/jeongeum-band-scheduler/frontend@sha256:9957a66e491dfbba8d84a119015ab323c4fbaa95ced16381e42e7692732ca687",
+    "CADDY_IMAGE": "ghcr.io/developer-sw/jeongeum-band-scheduler/caddy@sha256:9876276ae2e2de72212e1028c5b3cba74a99ee32e7ce17dd7f0a7d4c2000cb5c",
+    "POSTGRES_IMAGE": "postgres:17.11-bookworm@sha256:3645570cccdfa447589da9f57dd740faa29b30938e861289a5574b6ca6b03826"
+  },
+  "source_sha": "a00a791b069f20943c5e956968e970bf138fa3dc",
+  "recipient": "REPLACE_EXISTING_PUBLIC_AGE_RECIPIENT_ONLY",
+  "bucket": "jeongeum-REPLACE_APPROVED_BUCKET",
+  "expected_account": "REPLACE_APPROVED_12_DIGIT_ACCOUNT",
+  "region": "ap-northeast-2",
+  "prefix": "production/",
+  "aws_credentials_file": "/etc/jeongeum-operational-backup/aws-credentials",
+  "state_directory": "/var/lib/jeongeum-operational-backup",
+  "docker_binary": "/usr/bin/docker",
+  "age_binary": "/opt/jeongeum/operational-backup/bin/age",
+  "aws_binary": "/usr/local/bin/aws",
+  "maximum_ciphertext_bytes": 134217728
+}
