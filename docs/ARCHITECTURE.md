@@ -1,8 +1,14 @@
 # 시스템 아키텍처
 
-갱신일: 2026-10-24 (Asia/Seoul)
+갱신일: 2026-10-26 (Asia/Seoul)
 
-2026-10-24 최신 후속: 승인된 Basic 계정·결제 문의를 접수하고 실제 VM 재부팅을 검증했다. 정확한 기존 합성 PG만 시작하는 source unit과 백업 전처리로 DB healthy 대기를 보완했으며, QA Compose·각 컨테이너의 기존 restart 정책은 유지했다. 재부팅 전후 16항목에서 DB·권한·Flyway·원본 설정·컨테이너/볼륨 보존을 확인했다. 16:00 원래 hourly 발화의 새 S3 백업과 부팅 후 metric·CloudWatch OK, HTTPS 준비 화면을 확인했다. 기존 30파일 설정 암호문에 새 3파일의 별도 보완 암호문을 더해 PC 실제 복원을 검증했다. [재부팅 검증](OPERATIONS_REBOOT_VALIDATION.md)의 완료 범위와 제한을 따른다. Free Plan 유지, 지원 답변 검토·실회원 이전·앱 공개는 아직 남아 있다.
+2026-10-26 후속: 기존 synthetic-only 백업과 분리한 [운영 DB 백업·독립 복원·감시](OPERATIONAL_DATABASE_BACKUPS.md)를 구현·로컬 합성 검증했다. 원본·설정·state·prefix·지표·unit을 분리하고 정확한 source/target 바인딩, snapshot 공유, 인증 후 새 빈 검증 DB 복원과 실패 시 이전 성공 보존을 검사한다. 사용자 승인으로 변경 검토·커밋·Push·main 대상 초안 PR·원격 CI 확인을 진행하며 최신 원격 결과는 해당 초안 PR의 동일 HEAD 검사를 따른다. 운영 config는 기본 비활성이며 실제 AWS/SNS·서버 systemd·운영 DB 연결은 후속이다. 기존 앱 구조·이미지·비밀값과 16/25파일 복구본·합성 백업을 보존하며 아래 미구현 설명은 당시 기록이다.
+
+2026-10-25 현재: 일반 **Paid Plan 전환 완료**, **Basic 지원·기존 적격 크레딧 유지**를 반영한다. 적격 요금은 크레딧으로 우선 상계하지만 초과·만료·제외분은 청구될 수 있고 예산은 과금 상한이 아니다. 서버 읽기 전용 사전 점검과 [운영 설정 적용 계획](PRODUCTION_INSTALL_PLAN.md) 정리 후, 소비자별 secret 권한 구현·합성 Linux 검증을 승인받아 완료했다. AWS 재문의의 사람 답변은 별도 검토하며 아래 Free Plan 기록은 당시 이력이다.
+
+새 [비활성 운영 설정 16파일](INACTIVE_PRODUCTION_SETTINGS.md)의 로컬 암호화·Windows 독립 복원은 완료했으나 서버에 설치하지 않았다. 관리용 원본의 root 전용 보관과 비root 런타임 secret 가독성은 구분한다. 공유 앱 DB secret의 PG init/Backend 소비자별 참조·권한은 [분리 구현과 합성 검증](RUNTIME_SECRET_PERMISSIONS.md)을 완료했다. 기존 준비 Caddy의 80/443과 합성 백업 source guard를 유지하고 rc.3 exact pins를 재사용한다. [새 25파일 암호화 복구본의 독립 복원](RUNTIME_SETTINGS_RECOVERY.md)은 완료했으며 현 synthetic-only 백업은 새 운영 DB를 보호하지 않는다. 운영 DB 백업·독립 복원·감시와 실제 설치/이전/공개는 별도 실행·승인 단계다.
+
+2026-10-24 검증 기록: 승인된 Basic 계정·결제 문의를 접수하고 실제 VM 재부팅을 검증했다. 정확한 기존 합성 PG만 시작하는 source unit과 백업 전처리로 DB healthy 대기를 보완했으며, QA Compose·각 컨테이너의 기존 restart 정책은 유지했다. 재부팅 전후 16항목에서 DB·권한·Flyway·원본 설정·컨테이너/볼륨 보존을 확인했다. 16:00 원래 hourly 발화의 새 S3 백업과 부팅 후 metric·CloudWatch OK, HTTPS 준비 화면을 확인했다. 기존 30파일 설정 암호문에 새 3파일의 별도 보완 암호문을 더해 PC 실제 복원을 검증했다. [재부팅 검증](OPERATIONS_REBOOT_VALIDATION.md)의 완료 범위와 제한을 따른다. 당시 Free Plan을 유지했으며 지원 답변 검토·실회원 이전·앱 공개는 남아 있었다.
 
 아래는 재부팅 검증 전 합성 정기 백업 구성 결과다. 사용자 승인으로 Free Plan을 유지하고 **서울 비공개 S3 Standard·최소 IAM·정기 age 백업·CloudWatch/SNS 경보**를 합성 DB에 구성·검증했다. 시간별 7일·주간별 28일·기본 Governance 7일을 적용하고 exact-version 재다운로드 SHA와 권한 거부, 서비스·타이머 재시작 및 축약 trigger, 실패/복구·stale ALARM/OK·양쪽 이메일 수신을 확인했다. S3 암호문의 PC 별도 PostgreSQL 복원은 10개·19.477초로 39개 테이블·29개 시퀀스·V1~V12·PG 재시작 보존을 확인했다. QA 원본 rc.2(`8b24285`)와 새 배포용 rc.3(`a00a791`)는 구분한다. 현재 공개된 것은 준비 화면이며 실제 회원 데이터 이전·예약 앱 공개는 아직 하지 않았다. 새 운영 비밀 설정 복구·전체 RPO/RTO 등 남은 경계와 추가 미수신 시험 결과는 [OPERATIONS_BACKUP_PLAN](OPERATIONS_BACKUP_PLAN.md)을 따른다.
 
@@ -10,17 +16,17 @@
 
 2026-10-18 기본 운영 환경: 기존 서울 VM에 고정 IPv4·공식 Docker29.9.1/Compose5.6.0·서비스 자동 시작·브라우저 SSH 전용 제한·TCP443 IPv4/IPv6를 적용/검증했다. 실제 도메인/Caddy HTTPS·앱/DB 배포·외부 백업 복구·OS 보안 패치는 후속 범위다. [AWS_LIGHTSAIL_DEPLOYMENT](AWS_LIGHTSAIL_DEPLOYMENT.md)의 최신 결과를 따른다.
 
-최신 배포 기준: 사용자가 생성한 서울 Lightsail Ubuntu 24.04·2 vCPU·4GB·80GB를 재사용하고 Free Plan 크레딧/추가 비용 최소화 조건을 반영한다. 운영 Compose 제한 합계는 2816MiB이며 실제 VM의 자원/지연 검증은 남아 있다. `v1.0.0-rc.2` 공개 이미지·최종 digest 발행은 완료됐고 도메인은 미등록이다. [AWS_LIGHTSAIL_DEPLOYMENT](AWS_LIGHTSAIL_DEPLOYMENT.md)가 최신 준비/요금/제약이며 아래 미발행·구매 미확정 설명은 과거 단계 기록이다.
+2026-10-18 당시 배포 기준: 사용자가 생성한 서울 Lightsail Ubuntu 24.04·2 vCPU·4GB·80GB를 재사용하고 Free Plan 크레딧/추가 비용 최소화 조건을 반영했다. 운영 Compose 제한 합계는 2816MiB이며 실제 VM의 자원/지연 검증은 남아 있었다. `v1.0.0-rc.2` 공개 이미지·최종 digest 발행은 완료됐고 도메인은 미등록이었다. 이후 Paid 전환·도메인/준비 화면·새 rc.3 기준은 위 현재 설명과 [AWS_LIGHTSAIL_DEPLOYMENT](AWS_LIGHTSAIL_DEPLOYMENT.md)를 따른다.
 
 이미지 공개 범위 후속: PR #24 병합 후 첫 실제 발행의 Public 상태를 확인하고 사용자가 공개 이미지 사용을 승인했다. 수동 workflow는 private/public을 명시적으로 선택하고 준비 candidate·실제 package·최종 digest 기록을 일치시킨다. 기본 private 검사는 유지하고 기존 package의 공개 범위는 자동 변경하지 않는다. [PRODUCTION_IMAGE_RELEASE](PRODUCTION_IMAGE_RELEASE.md)의 실행 기록과 제한을 따른다.
 
 운영 이미지 발행 준비: 검증한 Linux amd64 이미지 3개를 재빌드 없이 GHCR에 전달하는 수동 workflow와 출처/CI·SHA/version·최종 manifest digest 검증을 추가한다. 준비 job은 registry 쓰기 권한이 없고 발행 job만 명시적 입력으로 활성화한다. 실제 GHCR 발행·운영 배포는 미실행이며 [PRODUCTION_IMAGE_RELEASE](PRODUCTION_IMAGE_RELEASE.md)를 따른다.
 
-최신 후속: 운영 Docker·Compose·Caddy 자산과 `production` 프로필, secret 파일 주입·정확한 내부 프록시 신뢰·기본 worker OFF를 구현했다. 별도 합성 DB/HTTPS의 권한·예약·앱 종료/재시작·별도 DB 복원 등 57개 검사를 통과했다. 파일별 책임과 실제 결과는 [PRODUCTION_CONTAINERS](PRODUCTION_CONTAINERS.md)를 따른다. 이 로컬 격리 구현은 운영 VPS·공개 CA·외부 백업과 실서비스 성능 검증 완료를 뜻하지 않는다.
+운영 컨테이너 구현 당시: Docker·Compose·Caddy 자산과 `production` 프로필, secret 파일 주입·정확한 내부 프록시 신뢰·기본 worker OFF를 구현했다. 별도 합성 DB/HTTPS의 권한·예약·앱 종료/재시작·별도 DB 복원 등 57개 검사를 통과했다. 파일별 책임과 실제 결과는 [PRODUCTION_CONTAINERS](PRODUCTION_CONTAINERS.md)를 따른다. 이 로컬 격리 구현은 운영 VPS·공개 CA·외부 백업과 실서비스 성능 검증 완료를 뜻하지 않는다.
 
 ## 1. 문서 범위와 상태
 
-이 문서는 jeongeum-band-scheduler의 구현을 위한 설계 기준이다. 인증·명단/계정·팀/곡·예약·반복/날짜 개방·변경/교환·악기 고장·공지/알림함·Web Push/시작 알림·탈퇴/팀 해체와 가입 전/후 관리자 지정을 main에 반영했다. 개발 DB V12·기존 데이터 보존과 최신 Backend 368건/Frontend 334건 검증은 각 기능 문서와 README를 따른다. [MEMBER_TEAM_MANAGEMENT](MEMBER_TEAM_MANAGEMENT.md), [MEMBER_TEAM_LIFECYCLE](MEMBER_TEAM_LIFECYCLE.md), [WEB_PUSH_REMINDERS](WEB_PUSH_REMINDERS.md)에 구현·검증 경계를 기록했다. 합성 HTTPS 환경의 PC/iPhone 공지와 iPhone 시작 알림 수신·클릭은 확인했고 실제 운영 origin·Android·운영 외부 백업/복원은 후속 범위다.
+이 문서는 jeongeum-band-scheduler의 구현을 위한 설계 기준이다. 인증·명단/계정·팀/곡·예약·반복/날짜 개방·변경/교환·악기 고장·공지/알림함·Web Push/시작 알림·탈퇴/팀 해체와 가입 전/후 관리자 지정을 main에 반영했다. 개발 DB V12·기존 데이터 보존과 Backend 368건/Frontend 334건 검증 기록은 각 기능 문서와 README를 따른다. [MEMBER_TEAM_MANAGEMENT](MEMBER_TEAM_MANAGEMENT.md), [MEMBER_TEAM_LIFECYCLE](MEMBER_TEAM_LIFECYCLE.md), [WEB_PUSH_REMINDERS](WEB_PUSH_REMINDERS.md)에 구현·검증 경계를 기록했다. 합성 HTTPS 환경의 PC/iPhone 공지와 iPhone 시작 알림 수신·클릭은 확인했고 실제 운영 origin·Android·실제 운영 DB용 외부 백업/복원은 후속 범위다.
 
 2026-10-17 사용자는 운영 배포 사전 점검·구성안 작성과 한국 접속 지연·운영 여유 우선을 승인했다. 서울 4GB 단일 VPS는 기술 권고이며 구매 확정이 아니다. 현재 구조와 운영 자산의 차이·안전한 데이터/origin 전환·배포 전 통과 조건은 [DEPLOYMENT_PREFLIGHT](DEPLOYMENT_PREFLIGHT.md)를 따른다. 사전 점검 이후 운영 Docker/Compose/Caddy는 구현·합성 검증을 완료했으며, 이미지 registry 발행과 외부 백업 자동화는 후속 범위다.
 
@@ -260,3 +266,5 @@ Cache API는 HTTP 캐시 헤더를 자동 준수하지 않으므로 no-store만 
 최소 검증은 PostgreSQL 기반 동시 예약·묶음 부분 실패·한도 경합·변경·교환, CSRF·미인증·다른 팀 접근 거부, 진행 중 예약·취소 경계, 자동 취소와 알림 재계획, 재시작 후 작업 복구, 모바일/PWA·offline을 포함한다.
 
 로그인 식별자·초대 설정·90일 로그인 유지의 현재 계약은 [AUTHENTICATION](AUTHENTICATION.md)을 따른다. 아직 확인할 사항은 로그아웃 후 해당 기기 Push 수신 정책, polling 주기, 작업 재시도 한도, 배포 자원 실측이다. 새로운 사용자 운영 규칙과 기술 설정값을 구분하고, 구현 단계에서는 확정 정책을 변경하지 않고 필요한 설정을 검증한다.
+
+운영 적용은 [설치 계획](PRODUCTION_INSTALL_PLAN.md)의 소비자별 secret 권한·기존 edge 인계·운영 백업 선행 조건을 충족한 뒤 별도 승인 범위에서 수행한다. worker OFF를 DB 무변경이나 사용자 쓰기 차단으로 간주하지 않는다. 새 쓰기 허용 후에는 최신 운영 데이터를 보존한 복구 계획이 필요하다.

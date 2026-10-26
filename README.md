@@ -23,9 +23,10 @@
 - **사용 대상:** 정음 동아리의 전체 관리자, 팀장, 일반 회원
 - **개발 형태:** Spring Boot 백엔드와 Next.js 프론트엔드를 분리한 단일 Git 저장소
 - **UI 방향:** 동일한 코드베이스에서 모바일·데스크톱에 적합한 반응형 화면 제공
-- **현재 단계(2026-10-24):** 인증·회원·팀·곡·예약·반복 배정·날짜 개방·변경·교환·악기 고장·공지·알림함·Web Push·시작 1시간 전 알림·회원 탈퇴·팀 해체·가입 전후 관리자 지정과 다이어리 UI를 `main`에 반영. 개발 DB **Flyway V1~V12**와 기존 데이터를 보존했으며, 홈 화면 설치 이름 `정음`·따뜻한 로고를 포함한 **`v1.0.0-rc.3` 공개 이미지 3개 발행·검증**을 완료
+- **현재 단계(2026-10-26):** 인증·회원·팀·곡·예약·반복 배정·날짜 개방·변경·교환·악기 고장·공지·알림함·Web Push·시작 1시간 전 알림·회원 탈퇴·팀 해체·가입 전후 관리자 지정과 다이어리 UI를 `main`에 반영. 개발 DB **Flyway V1~V12**와 기존 데이터를 보존했으며, 홈 화면 설치 이름 `정음`·따뜻한 로고를 포함한 **`v1.0.0-rc.3` 공개 이미지 3개 발행·검증**을 완료
 - **현재 UI:** 다이어리 홈·달력·주간 시간표·모바일 예약 바텀시트·계정 인사말·예약 변경/교환·관리자 악기 고장·공지·개인 알림함·기기별 알림 설정/클릭 진단·회원 탈퇴/팀 해체 확인 화면. 회원 관리는 전체 관리자·팀장·일반 회원의 세 영역과 카드 내 지정·해제, 다이어리는 PC 소개 정렬·모바일 로고/더보기 크기·제목 아이콘·응원 문구 보완. PC·모바일에서 같은 API와 예약 정책 사용
 - **배포 상태:** 기존 서울 Lightsail·도메인/DNS·공개 HTTPS 준비 화면을 구성하고, 합성 DB의 **서버 밖 암호화 백업·PC 독립 복원·VM 재부팅 자동 복구**를 검증. 백업·자동 복구는 [PR #28](https://github.com/developer-sw/jeongeum-band-scheduler/pull/28), **새 비활성 운영 설정 16파일의 암호화·Windows 독립 복원 검증 기록과 도구 보완**은 [PR #29](https://github.com/developer-sw/jeongeum-band-scheduler/pull/29)로 `main`에 반영. 새 설정은 서버에 설치하지 않았으며 실제 회원 데이터 이전과 예약 앱 공개도 아직 진행하지 않음
+- **후속 구현·게시:** 소비자별 secret 권한과 새 25파일 암호화 복구본에 이어 [운영 DB 백업·독립 복원·감시](docs/OPERATIONAL_DATABASE_BACKUPS.md)를 구현·합성 검증. 사용자 승인으로 변경 검토·커밋·Push·main 대상 초안 PR·원격 CI 확인을 진행하며 실제 결과는 해당 초안 PR의 동일 HEAD 검사를 따름. 실제 운영 DB 보호·AWS/SNS 연결·서버 타이머 활성화는 후속이며 기존 합성 백업을 유지
 
 > **구현 상태 안내:** 기본 예약·취소는 [PR #6](https://github.com/developer-sw/jeongeum-band-scheduler/pull/6), 반복 고정 배정·날짜 개방·내 공연조 일정은 [PR #7](https://github.com/developer-sw/jeongeum-band-scheduler/pull/7), 다이어리 UI는 [PR #9](https://github.com/developer-sw/jeongeum-band-scheduler/pull/9), 단건 예약 변경은 [PR #10](https://github.com/developer-sw/jeongeum-band-scheduler/pull/10), 예약 교환은 [PR #12](https://github.com/developer-sw/jeongeum-band-scheduler/pull/12), 악기 고장 관리는 [PR #13](https://github.com/developer-sw/jeongeum-band-scheduler/pull/13), 전체 공지·개인 알림함은 [PR #15](https://github.com/developer-sw/jeongeum-band-scheduler/pull/15), Web Push·시작 1시간 전 알림·CSRF 보완은 [PR #17](https://github.com/developer-sw/jeongeum-band-scheduler/pull/17)로 `main`에 반영했습니다. [PR #18](https://github.com/developer-sw/jeongeum-band-scheduler/pull/18)은 당시 README 갱신이며, **회원 탈퇴·팀 해체·후속 관리자 UI·Push 클릭 복원 및 실기기 검증은 [PR #19](https://github.com/developer-sw/jeongeum-band-scheduler/pull/19), 병합 커밋 `0d660ae`로 반영했습니다.** **가입 전 관리자 지정·역할별 명단·카드 내 확인과 다이어리 UI 보완은 [PR #21](https://github.com/developer-sw/jeongeum-band-scheduler/pull/21), 홈 화면 이름·로고와 Next.js 보안 패치는 [PR #27](https://github.com/developer-sw/jeongeum-band-scheduler/pull/27)로 `main`에 반영했습니다.** 기존 앱 기능 검증은 Backend **368건**·Frontend **334건**, 총 **702건**이며 이번 백업 도구 검증과 구분합니다. 실제 예약 앱 전환·운영 origin Push·Android 실기기는 후속 검증 범위입니다.
 
@@ -57,6 +58,7 @@
 | 운영 이미지 | ✅ rc.3 발행·검증 | Linux amd64 Backend·Frontend·Caddy 공개 이미지, 홈 화면 이름·로고 포함, 출처/버전·SHA tag·digest 검증. 기존 rc.2 보존 |
 | 운영 서버 준비 | 🧪 HTTPS·합성 복구 확인 | 서울 Lightsail 고정 IP·Docker/Compose·제한 SSH·도메인/DNS·Caddy 공개 인증서·준비 화면. 실제 VM 재부팅 후 PG/HTTPS 자동 복구 확인 |
 | 암호화 백업·감시 | 🧪 합성 DB 구현·검증 | 서울 비공개 S3·최소 IAM·시간별/주간 보존·Governance, exact-version 검증, CloudWatch/SNS·PC 독립 복원·설정 복구 |
+| 운영 DB 백업 도구 | 🧪 로컬 구현·합성 검증 | 기존 합성 백업과 분리한 실행자·기본 비활성 설정·unit·IAM/경보 예시, 실제 PG dump·age·별도 엔진 복원. AWS/운영 서버 미적용 |
 | 비활성 운영 설정 | 🧪 로컬 생성·복구 검증 | 미사용 DB 비밀번호·VAPID를 포함한 새 설정 16파일의 실제 age 암호화·Windows 독립 복원·정적 검사 완료. 서버 설치·DB 역할 생성·활성화 없음 |
 | PWA·실서비스 전환 | 🧪 설치 설정·운영 준비 중 | iPhone·Android 설치 이름 `정음`·따뜻한 로고, 기존 iPhone 설치/Push 수신 확인. 실제 회원 데이터 이전·예약 앱 공개·운영 origin Push·Android 실기기는 후속 |
 
@@ -149,6 +151,7 @@ jeongeum-band-scheduler/
 │   ├── compose.qa.yaml                  # 격리 합성 검증 설정
 │   ├── .env.production.example          # 비밀값 없는 운영 설정 예시
 │   ├── backup/                          # 합성 DB 백업·감시·PG 준비 systemd unit/예시
+│   ├── operational-backup/              # 별도 운영 DB 백업·복원·감시 자산, 기본 비활성
 │   ├── caddy/                           # 이미지·HTTPS/내부 프록시 설정
 │   └── postgres/init-app.sh             # 앱 전용 DB 계정 초기화
 ├── scripts/                             # 로컬 실행·컨테이너/이미지·암호화 백업/복구 검증
@@ -161,7 +164,7 @@ jeongeum-band-scheduler/
 
 ## 운영 배포 준비
 
-**2026-10-24 기준, [bandjeongeum.studio](https://bandjeongeum.studio/)에는 HTTPS 준비 화면만 공개되어 있습니다.** 실제 회원 데이터 이전과 예약 앱 공개 전환은 별도 승인 단계입니다. 합성 백업·자동 복구는 [PR #28](https://github.com/developer-sw/jeongeum-band-scheduler/pull/28), 비활성 운영 설정의 암호화 복구와 도구 보완은 [PR #29](https://github.com/developer-sw/jeongeum-band-scheduler/pull/29), 병합 커밋 `51bbd69`로 `main`에 반영했습니다.
+**2026-10-25 기준, [bandjeongeum.studio](https://bandjeongeum.studio/)에는 HTTPS 준비 화면만 공개되어 있습니다.** 실제 회원 데이터 이전과 예약 앱 공개 전환은 별도 승인 단계입니다. 합성 백업·자동 복구는 [PR #28](https://github.com/developer-sw/jeongeum-band-scheduler/pull/28), 비활성 운영 설정의 암호화 복구와 도구 보완은 [PR #29](https://github.com/developer-sw/jeongeum-band-scheduler/pull/29), 병합 커밋 `51bbd69`로 `main`에 반영했습니다.
 
 | 구분 | 확인한 상태 |
 | --- | --- |
@@ -176,13 +179,16 @@ jeongeum-band-scheduler/
 | 독립 복원·설정 보관 | S3 암호문의 별도 PC PostgreSQL 복원 **10개·19.477초**. 원래 설정 **30파일 + 별도 추가 3파일**을 각각 암호화·PC 실제 복원. 복구키 PC 밖 보관·사본 확인은 사용자 확인으로 기록 |
 | 비활성 운영 설정 | 새 미사용 운영 설정 **16파일**의 실제 age 암호화·Windows 독립 복원, 원본·복원 사본 각각 **51항목** 정적 검사 통과. 기존 30+3파일과 별도 자료이며 DB 복원·서버 설치·활성화 없음 |
 | 재부팅·자동 복구 | 정확한 기존 합성 PG만 시작하는 source unit과 DB 준비 대기. 실제 VM 재부팅 후 **16항목** 보존, **16:00:18 KST** 원래 hourly 실행 → **16:00:24 KST** 새 S3 백업 검증, 부팅 metric·새 CloudWatch 지표·경보 OK 확인 |
-| 계정·남은 작업 | Free Plan·Basic 지원 유지. 운영 조건·크레딧을 AWS에 재문의한 뒤 **사람의 답변 대기**. 새 설정의 서버 설치·Linux 권한/네트워크 충돌 확인, 운영 백업 전환·실제 회원 데이터 이전·앱 공개와 운영 origin 로그인/Push 검증은 후속 |
+| 비밀파일 권한 | 소비자별 런타임 6파일과 Compose override를 로컬 구현. Linux helper 18개·통합 검사 18개 통과, 시험 자원 정리·기존 원본 보존. [실행 범위](docs/RUNTIME_SECRET_PERMISSIONS.md)의 mock Java·정적 Compose 제한을 따르며 승인된 GitHub 게시를 진행. 운영 서버에는 적용하지 않음 |
+| 권한 설정 복구본 | 새 25파일의 실제 age 암호화·독립 Windows 복원 114검사, 원본/복원 각각 정적 154검사·Linux 소비자 권한 재현 96검사 통과. 기존 16파일/암호문 보존, 임시 복원 평문 26파일 정리. [실행 범위와 제한](docs/RUNTIME_SETTINGS_RECOVERY.md)을 따르며 운영 서버 미적용 |
+| 운영 DB 백업 후속 | 별도 실행자와 기본 비활성 설정·unit·IAM/경보 예시 구현. 새 합성 PostgreSQL 원본·별도 복원 엔진에서 실제 snapshot/dump·age·내용 대조와 로컬 버전/지표 simulator 검증. [실행 결과와 한계](docs/OPERATIONAL_DATABASE_BACKUPS.md)를 따르며 실제 AWS/운영 DB·systemd 미적용 |
+| 계정·남은 작업 | 사용자 승인으로 **Paid Plan 전환 완료**, Basic 지원·기존 적격 크레딧 유지. 서버 설치·운영 DB 백업·실제 데이터 이전·앱 공개와 운영 origin 로그인/Push 검증은 후속 |
 
-현재 합성 백업 원본은 **rc.2 / `8b24285`**로 생성한 DB이고, 향후 새 앱 배포 기준은 **rc.3 / `a00a791`**입니다. QA 앱·worker는 중지 상태이며 DB만 합성 백업 대상으로 유지합니다. QA Compose의 `restart: no`를 바꾸거나 전체 Compose를 켜지 않고 기존 PG 하나의 ID·이미지·볼륨·미공개 포트를 확인한 뒤 자동 시작합니다. 점검 중 PG를 계속 정지해 둘 때의 타이머/source unit 중단 순서는 [재부팅 검증 기록](docs/OPERATIONS_REBOOT_VALIDATION.md)을 따릅니다.
+현재 서버의 합성 백업 원본은 **rc.2 / `8b24285`**로 생성한 DB이고, 향후 새 앱 배포 기준은 **rc.3 / `a00a791`**입니다. QA 앱·worker는 중지 상태이며 DB만 합성 백업 대상으로 유지합니다. QA Compose의 `restart: no`를 바꾸거나 전체 Compose를 켜지 않고 기존 PG 하나의 ID·이미지·볼륨·미공개 포트를 확인한 뒤 자동 시작합니다. 새 운영 DB 백업 도구는 이 서버 설정과 분리한 로컬 구현 단계이며 활성화하지 않았습니다. 점검 중 PG를 계속 정지해 둘 때의 타이머/source unit 중단 순서는 [재부팅 검증 기록](docs/OPERATIONS_REBOOT_VALIDATION.md)을 따릅니다.
 
 기존 준비 설정 복구는 **원래 30파일 암호문과 추가 3파일 암호문을 함께 사용하는 수동 복구**이며, 단일 33파일 백업·자동 설정 활성화·S3 설정 업로드가 아닙니다. 새 **비활성 운영 설정 16파일**은 별도 `inactive-production-settings` 범위를 명시한 v2 archive로 관리하며 기존 v1 범위와 구분합니다. 30+3+16을 하나의 전체 서비스 복구 결과로 합산하지 않습니다. 기존 설정에는 실제 서버 기술 자격증명이, 새 설정에는 아직 설치하지 않은 DB 비밀번호·VAPID가 포함되므로 모두 보호합니다. 복구 개인키·비밀값·덤프·계정별 정보는 Git이나 공개 로그에 넣지 않습니다. 주간 28일 보존이 28일 전체 WORM 잠금을 뜻하지 않으며 전체 RPO/RTO 달성도 아직 검증하지 않았습니다.
 
-Free Plan 종료와 개별 크레딧의 표시 만료일은 구분합니다. AWS에 재문의했고 사람의 답변을 기다리고 있으며, 실제 회원 데이터 처리 조건과 서비스별 크레딧 적용이 확정됐다고 표현하지 않습니다. 추가 유료 자원·플랜 전환·실제 데이터 이전/서비스 전환은 별도 확인 후 진행합니다. 일반 요금·계정 조건·승인 경계는 [Lightsail 배포 계획](docs/AWS_LIGHTSAIL_DEPLOYMENT.md)과 [백업 운영 계획](docs/OPERATIONS_BACKUP_PLAN.md)을 따릅니다.
+Paid Plan에서는 유효한 적격 크레딧을 먼저 적용하고 초과·만료·적용 제외 사용료는 청구될 수 있습니다. 기존 월 예산은 지출 상한이 아닙니다. 이전 Free Plan 기록은 당시 상태이며, Paid 전환이 추가 자원·실제 데이터 이전·서비스 공개의 승인을 포함하지 않습니다. AWS 재문의 답변 검토는 별도로 남겨 두며 일반 요금·계정 조건·승인 경계는 [Lightsail 배포 계획](docs/AWS_LIGHTSAIL_DEPLOYMENT.md)과 [백업 운영 계획](docs/OPERATIONS_BACKUP_PLAN.md)을 따릅니다.
 
 기존 개발 DB·관리자·회원·팀·예약·Docker 볼륨을 보존하고, 최종 백업·독립 복원·쓰기 동결·이전 후 대조·롤백 계획을 준비한 뒤 승인받습니다. 새 쓰기를 허용하기 전에는 준비 화면으로 돌아갈 수 있지만, **운영의 새 쓰기를 허용한 뒤에는 예전 로컬 dump를 덮어쓰지 않고 최신 운영 데이터를 보존한 별도 복구 계획이 필요**합니다. 검증한 이미지 digest와 [운영 Compose](deploy/compose.production.yaml)를 재사용하고 실제 운영 VM에서 다시 빌드하지 않습니다. 상세 실행 범위는 [운영 컨테이너](docs/PRODUCTION_CONTAINERS.md), [기존 설정 복구](docs/OPERATIONS_CONFIGURATION_RECOVERY.md), [새 비활성 설정·전환 조건](docs/INACTIVE_PRODUCTION_SETTINGS.md), [사전 점검](docs/DEPLOYMENT_PREFLIGHT.md)에 기록했습니다.
 
@@ -350,13 +356,14 @@ Spring Session JDBC를 사용하며 `HttpOnly`·`SameSite=Lax` 세션 쿠키와 
 
 ## 🧪 테스트 및 CI
 
-2026-10-24 갱신. 기존 앱 소스 `main` `8b24285`의 [CI](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/39024812366)에서 **Backend 368건·Frontend 334건, 총 702건**과 운영 합성 검사·발행 계약을 확인했고, 이후 PR #27의 홈 화면 이름·로고와 Next.js 보안 패치를 main에 반영했습니다. 아래 앱 수치는 기존 실행 기록이며 백업 도구 검사와 합산하거나 README 갱신 중 새 앱 테스트를 실행한 것으로 표시하지 않습니다. PR #29의 최종 HEAD `3bd6e2b`의 [CI](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/40094359615)에서 5개 job·오프라인 회귀 89개·합성 운영 검사 57개의 성공을 확인했으며 병합 소스의 main CI 결과는 별도로 확인합니다.
+2026-10-25 문서 갱신. 기존 앱 소스 `main` `8b24285`의 [CI](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/39024812366)에서 **Backend 368건·Frontend 334건, 총 702건**과 운영 합성 검사·발행 계약을 확인했고, 이후 PR #27의 홈 화면 이름·로고와 Next.js 보안 패치를 main에 반영했습니다. 아래 앱 수치는 기존 실행 기록이며 백업 도구 검사와 합산하거나 README 갱신 중 새 앱 테스트를 실행한 것으로 표시하지 않습니다. PR #29의 최종 HEAD `3bd6e2b`의 [CI](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/40094359615)에서 5개 job·오프라인 회귀 89개·합성 운영 검사 57개 성공, 병합 소스 `51bbd69`의 [main CI](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/40095489839)도 5개 job 성공을 확인했습니다. 후속 README PR #30의 병합 `e06a8fe`는 문서만 변경했고 CI 경로 필터로 새 실행이 없었습니다. 이번 설치 사전 점검에서는 앱 테스트를 재실행하지 않았습니다.
 
 - **Backend:** JUnit/PostgreSQL Testcontainers **20개 suite·368건 통과**, 실패·오류·skip 0, `compileJava`·`bootJar` 통과. 명단 통합 25건·가입 예정 권한 13건과 탈퇴/해체·인증·90일 세션·CSRF·예약·변경·교환·반복·고장·공지·알림·Push/worker 회귀 포함
 - **Frontend:** **23개 파일·334건 통과**, worker 35건·앱 클릭 복원 21건 포함. TypeScript·ESLint(경고 0)·Next.js production build 20개 route 확인. 로컬 격리 webpack 빌드와 원격 CI의 기본 Turbopack 빌드를 구분
 - **GitHub Actions:** PR #25 병합 소스 `8b24285`의 [main CI](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/39024812366)에서 기존 4개 job 성공을 확인한 기록을 보존. 현재는 Backend·Frontend·합성 운영 컨테이너·이미지 발행 계약에 **오프라인 백업 회귀**를 더한 5개 job으로 구성하며 [PR #29 최종 HEAD CI](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/40094359615)의 5개 job 성공을 확인. PR CI와 병합 후 main CI는 별도 결과로 구분
 - **운영 컨테이너·발행:** 격리 합성 HTTPS의 권한·예약·재시작·별도 DB 복원 **57개 검사**, 이미지 발행 Node 계약 **38건**·PowerShell export **15항목** 통과. rc.3을 새 배포 기준으로 사용하며 [이미지 발행 기록](docs/PRODUCTION_IMAGE_RELEASE.md)의 출처·최종 digest를 확인. 기존 [rc.2 발행](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/39025711724)과 rc.1 최초 실패 이력도 보존
 - **백업 도구 오프라인 회귀:** fake Docker/AWS/age/DB 기반 정기 백업 **27개**, 설정 백업 **41개**, 기존 합성 PG 준비 **21개**, 총 **89개**를 [PR #29](https://github.com/developer-sw/jeongeum-band-scheduler/pull/29)의 Linux CI에서 모두 통과(실패·건너뜀 0). Windows의 설정 백업 회귀는 **40개 통과·hardlink 1개 건너뜀**. 기존 v1 archive 호환·신규 범위의 명시적 opt-in·정확한 타입·키/경로 보호를 검사하며, PR #28의 이전 75개 및 실제 AWS·DB·age 검증과 구분
+- **운영 DB 백업 로컬 검증:** 새 실행자·복원기의 보호/실패 회귀와 별도 합성 PostgreSQL 엔진의 실제 snapshot·dump·age·내용 대조를 수행. fixture·Docker adapter·로컬 AWS simulator·짧은 주기 호출의 범위와 최종 검사 결과는 [운영 DB 백업 검증](docs/OPERATIONAL_DATABASE_BACKUPS.md)을 따르며 실제 AWS/SNS·systemd·원격 CI 결과와 구분
 - **서버 밖 DB 백업·독립 복원:** 실제 S3 exact-version Put/Head/Get·크기/SHA, 중복 업로드·삭제·보존 변경·범위 밖 요청 거부와 실패 시 이전 성공 보존 확인. S3 암호문을 별도 PC PostgreSQL에 복원해 **10개·19.477초**, 39테이블·29시퀀스·V1~V12·역할/소유권·PG 재시작 보존 확인. 앞선 수동 복원 **20개·약 83초**와 다른 실행이며 전체 서비스 RTO가 아님
 - **설정 암호화·복구:** 원래 명시적 30파일의 실제 Windows 복원·비공개 통합 **21개**, disk SHA·native ACL과 별도 Linux 파일 도구의 metadata 재현 확인. 추가 부팅 설정 3파일도 별도 암호문으로 Windows 인증 복원·SHA/ACL 확인. 두 archive는 수동으로 함께 사용하며 helper 자체 Linux restore·설정 활성화는 실행하지 않음
 - **비활성 운영 설정 복구:** 새 미사용 설정 **16파일**을 실제 age v1.3.2로 암호화·Windows 인증 복원하고 전체 SHA·원본 불변·현재 사용자/SYSTEM native ACL 확인. 원본·복원 사본 각각 **51항목** 정적 설정 검사와 실제 실패 거부 **6종**을 확인. Compose는 정적 렌더링만 실행했으며 실제 Linux 설치·앱 기동·DB 복원·Push 발송 없음. 기존 준비 설정 30+3파일 복원 및 Linux fake 회귀와 구분
@@ -380,7 +387,7 @@ Spring Session JDBC를 사용하며 `HttpOnly`·`SameSite=Lax` 세션 쿠키와 
 
 검증 범위와 재현 절차는 [명단·관리자 지정](docs/MEMBER_TEAM_MANAGEMENT.md), [다이어리](docs/DIARY_UI_REDESIGN.md), [예약 변경](docs/RESERVATION_CHANGES.md), [예약 교환](docs/RESERVATION_EXCHANGES.md), [악기 고장](docs/INSTRUMENT_FAULTS.md), [공지·알림함](docs/NOTICES_NOTIFICATIONS.md), [Web Push·시작 알림](docs/WEB_PUSH_REMINDERS.md), [회원 탈퇴·팀 해체](docs/MEMBER_TEAM_LIFECYCLE.md)에 기록했습니다.
 
-**미완료 범위:** AWS 사람의 답변에 따른 Free Plan의 실제 회원 운영 조건 검토, 새 비활성 설정의 서버 설치·Linux 권한/네트워크 충돌 확인, 운영 백업 전환·최종 쓰기 동결·실제 데이터 이전·예약 앱 공개, 자동 PC 복사·장시간 VM 장애/90분 경보 전달 지연·전체 RPO/RTO·실제 백업 비용 상계·VM 부하/실서비스 관측입니다. 새 설정의 로컬 생성·암호화 복원 완료가 이 운영 검증을 대신하지 않습니다. 운영 origin Push·Android 실기기 설치/수신/클릭과 실제 OS의 오프라인·가상 키보드·스크린리더·200% 확대 검증도 남아 있습니다. 기기별 로그아웃은 iPhone 중단→PC 유지 방향을 확인했으며 모든 OS/실행 상태를 검증한 것은 아닙니다. 이전 V7~V9 적용 전 백업 파일 자체의 복원은 미검증이며 V10/V11/V12 적용 전 로컬 복원·새 합성 S3 복원과 구분합니다.
+**미완료 범위:** AWS 재문의 답변 검토, 운영 서버 설치, 운영 DB 백업·최종 쓰기 동결·실제 데이터 이전·예약 앱 공개, 자동 PC 복사·장시간 VM 장애/90분 경보 전달 지연·전체 RPO/RTO·실제 백업 비용 상계·VM 부하/실서비스 관측입니다. Paid 전환·읽기 전용 점검과 새 설정의 로컬 생성·암호화 복원 완료가 이 운영 검증을 대신하지 않습니다. 운영 origin Push·Android 실기기 설치/수신/클릭과 실제 OS의 오프라인·가상 키보드·스크린리더·200% 확대 검증도 남아 있습니다. 기기별 로그아웃은 iPhone 중단→PC 유지 방향을 확인했으며 모든 OS/실행 상태를 검증한 것은 아닙니다. 이전 V7~V9 적용 전 백업 파일 자체의 복원은 미검증이며 V10/V11/V12 적용 전 로컬 복원·새 합성 S3 복원과 구분합니다.
 
 앞선 실기기 Push 시험의 계정·임시 HTTPS 환경은 종료했습니다. 현재 서버에서는 합성 PostgreSQL을 정기 백업 대상으로 유지하고 QA 앱·worker는 중지 상태입니다. 실제 개발 계정·예약·Docker 영속 볼륨을 보존하며 공개 시험 계정은 제공하지 않습니다. iPhone 클릭 문제의 재발과 후속 복원을 확인했지만 단말의 상세 native 이벤트 기록은 수집하지 않아 모든 iOS 상태의 해결을 보장하지 않습니다. 탈퇴 후 미수신은 사용자 관찰이며 이미 제공자가 수락한 이전 알림을 철회할 수 없습니다. 네트워크·OS 지연·발송 후 기록 전 중단의 외부 중복 가능성도 남습니다.
 
@@ -424,7 +431,7 @@ python -I -B scripts/backup-source-readiness.test.py
 - **기기 Push:** 사용자 버튼으로 권한/구독 연결, 로그아웃 시 해당 기기만 중단·다른 기기 유지. 회원 탈퇴 시 전체 기기/세션 종료·새 알림 수신 제외. 미설치·권한 거절·미지원이어도 알림함과 예약은 사용 가능
 - **탈퇴·팀 해체:** 전체 관리자가 처리. 탈퇴는 개인 예약·전체 기기/세션을 정리하고 존속 팀 예약 유지, 해체는 팀 예약·반복 배정 종료. 과거/완료 이력·최초 예약자·곡 보존, 마지막 활성 관리자 보호
 
-운영 후속 범위는 무료 플랜 운영 조건 확인·새 비활성 설정의 서버 설치와 운영 검증·운영 백업 전환·승인된 실제 데이터 이전과 예약 앱 공개·실서비스 관측·Android 등 추가 실기기 검증입니다. 고장 등록/복구 알림은 확정 필수 이벤트가 아닌 별도 제안입니다.
+운영 후속 범위는 서버 설치와 운영 검증·운영 DB 백업·승인된 실제 데이터 이전과 예약 앱 공개·실서비스 관측·Android 등 추가 실기기 검증입니다. 고장 등록/복구 알림은 확정 필수 이벤트가 아닌 별도 제안입니다.
 
 자세한 제약, 예외, 동시성 모델은 [예약 규칙](docs/RESERVATION_RULES.md)과 [데이터 모델](docs/ERD.md)에 정리했습니다.
 
@@ -457,12 +464,17 @@ python -I -B scripts/backup-source-readiness.test.py
 | [DEPLOYMENT_PREFLIGHT](docs/DEPLOYMENT_PREFLIGHT.md) | 소스 사전 점검·환경변수·배포 전 검증·기존 데이터 보존 |
 | [PRODUCTION_CONTAINERS](docs/PRODUCTION_CONTAINERS.md) | 운영 Docker·Compose·Caddy·secret/네트워크·합성 HTTPS/재시작/복원 57개 검사 |
 | [PRODUCTION_IMAGE_RELEASE](docs/PRODUCTION_IMAGE_RELEASE.md) | 공개 이미지 발행·출처/버전·digest·홈 화면 이름/로고·수동 발행과 권한 경계 |
-| [AWS_LIGHTSAIL_DEPLOYMENT](docs/AWS_LIGHTSAIL_DEPLOYMENT.md) | 서울 Lightsail·도메인/HTTPS 준비·실제 재부팅·Free Plan 조건·남은 배포 순서 |
+| [AWS_LIGHTSAIL_DEPLOYMENT](docs/AWS_LIGHTSAIL_DEPLOYMENT.md) | 서울 Lightsail·도메인/HTTPS 준비·실제 재부팅·Paid 전환·남은 배포 순서 |
 | [OPERATIONS_BACKUP_PLAN](docs/OPERATIONS_BACKUP_PLAN.md) | 합성 DB의 S3·최소 IAM·보존/잠금·정기 백업/감시·PC 독립 복원·비용/승인 경계 |
 | [OPERATIONS_CONFIGURATION_RECOVERY](docs/OPERATIONS_CONFIGURATION_RECOVERY.md) | 서버 준비 설정 30파일·추가 3파일의 별도 암호문·PC 인증 복원·키/권한·복구 한계 |
 | [INACTIVE_PRODUCTION_SETTINGS](docs/INACTIVE_PRODUCTION_SETTINGS.md) | 새 비활성 운영 설정 16파일·미사용 비밀값·명시적 v2 범위·실제 age 복원·51항목 정적 검사·활성화/이전 승인 조건 |
+| [PRODUCTION_INSTALL_PLAN](docs/PRODUCTION_INSTALL_PLAN.md) | Paid 전환 후 서버 점검·소비자별 secret 권한·80/443 전환·운영 백업·설치/공개 승인과 복구 조건 |
+| [RUNTIME_SECRET_PERMISSIONS](docs/RUNTIME_SECRET_PERMISSIONS.md) | 소비자별 0400 런타임 파일·Compose override·Linux 합성 권한/재시작 검증과 제한 |
+| [RUNTIME_SETTINGS_RECOVERY](docs/RUNTIME_SETTINGS_RECOVERY.md) | 권한 설정 포함 25파일·새 암호문·Windows 인증 복원·Linux 권한 재현·원본 보존 |
+| [OPERATIONAL_DATABASE_BACKUPS](docs/OPERATIONAL_DATABASE_BACKUPS.md) | 별도 운영 DB 백업·인증 후 새 빈 DB 복원·실패/지표 계약·로컬 합성 검증과 실제 적용 경계 |
 | [OPERATIONS_REBOOT_VALIDATION](docs/OPERATIONS_REBOOT_VALIDATION.md) | 실제 VM 재부팅 16항목·기존 PG 자동 시작·정규 hourly·감시/HTTPS 복구·유지보수 절차 |
 | [백업 실행 자산](deploy/backup/README.md) | 합성 DB 전용 실행기·systemd 서비스/타이머·예시 설정·운영 전제 |
+| [운영 DB 백업 자산](deploy/operational-backup/README.md) | 기본 비활성 운영 설정·독립 복원 예시·별도 unit·최소 IAM/경보·설치 전 조건 |
 | [AGENTS.md](AGENTS.md) | 개발 에이전트 작업 및 변경 보존 규칙 |
 
 ## 🔖 개발 이력

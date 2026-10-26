@@ -1,5 +1,23 @@
 # 테스트 및 운영 검증 계획
 
+## 2026-10-26 운영 DB 백업·독립 복원·감시
+
+기존 합성 전용 백업의 제한을 유지하고 별도 운영 실행자의 설정·원본/대상 보호·인증·재시도·이전 성공 보존·감시를 회귀 검사했다. 새 PostgreSQL 원본과 별도 PostgreSQL 복원 엔진·새 볼륨에서 실제 MVCC snapshot·`pg_dump`·age v1.3.2 암호화/인증·단일 트랜잭션 복원과 테이블/시퀀스/Flyway/소유권 대조를 수행했다. 최종 검사 수와 증빙·실패 보완은 [운영 DB 백업 검증](OPERATIONAL_DATABASE_BACKUPS.md)에 기록한다.
+
+fixture는 일반 합성 테이블과 수동 Flyway 이력으로 구성하며 실제 앱 migration·실제 회원 데이터를 사용하지 않는다. Docker 명령 전달은 대상 컨테이너에 한정한 adapter, S3 버전 저장/CloudWatch 전송은 로컬 simulator, 주기 호출은 짧게 제어한 scheduler다. 실제 AWS/SNS 이메일·운영 서버 systemd 타이머·다른 물리 호스트의 재난 복구·원격 CI를 통과한 결과로 확대하지 않는다. 기존 DB·Docker 자원·16/25파일 설정과 암호문 보존 및 시험 자원 정리를 확인한다.
+
+후속 사용자 승인으로 변경 검토·커밋·Push·main 대상 초안 PR·원격 CI 확인을 진행한다. 최신 원격 검증 결과는 해당 초안 PR의 동일 HEAD 검사를 따르며, 위 로컬 결과를 원격 CI 성공으로 대신하지 않는다. 실제 AWS/SNS·운영 서버 적용·데이터 이전·공개는 이 게시 승인에 포함하지 않는다.
+
+## 2026-10-25 권한 설정 암호화 복구본
+
+기존 실제 비활성 값을 유지한 새 25파일 묶음을 age v1.3.2로 암호화하고 독립 Windows 복원했다. **실제 암호화/복원·실패 거부 114검사**, **원본과 복원 사본 정적 참조 각각 154검사**, **격리 Linux 권한 재현 96검사**를 통과했다. 새 암호문은 13,012bytes이며 전체 내용·크기·SHA·Windows native ACL과 기존 원본/암호문 보존을 확인했다. 임시 복원 평문 26파일·시험 컨테이너는 정리했다.
+
+Windows archive의 uid/gid 기록은 운영 소비자 소유권 적용 결과가 아니다. Linux에서는 검토된 고정 소유권/모드를 재현하고 복원한 master로 runtime 사본을 재생성·대조했다. 범용 restore의 자동 chown, 실제 앱/DB 실행, 서버 적용·AWS 변경·원격 CI와 구분한다. [실행 결과와 제한](RUNTIME_SETTINGS_RECOVERY.md)을 따른다. 기존 백업 도구·앱 코드를 바꾸지 않았으므로 이번 단계에서 기존 회귀/앱 테스트를 재실행한 것으로 보고하지 않는다.
+
+## 2026-10-25 비밀파일 소비자 권한
+
+새 Linux root helper 회귀 **18개(건너뜀 0)**와 실제 Linux 파일 bind·Compose 참조·고정 PG 초기화/인증/재시작·rc.3 Backend entrypoint 권한/재로딩·정리의 통합 검사 **18개**를 통과했다. Windows portable 단독 실행은 2개 통과·POSIX 16개 skip이므로 Linux 결과와 구분한다. 이미지 발행 계약은 37개 통과·Windows 링크 권한 1개 skip, CI actionlint는 통과했다. 초기 두 하네스 실패와 보완, 정확한 실행 환경·기존 환경 보존·mock Java의 범위는 [RUNTIME_SECRET_PERMISSIONS](RUNTIME_SECRET_PERMISSIONS.md)를 따른다. 실제 개발 DB·운영 서버·Spring/Flyway·원격 CI는 실행하지 않았다.
+
 ## 2026-10-24 후속 — 비활성 운영 설정·scope 분리
 
 설정 복구 도구의 신규 `inactive-production-settings`는 pack·restore의 명시적 opt-in, v2·정확한 boolean/상태, 기본 v1 응답 호환과 키/경로 보호를 검사한다. fake age 회귀는 기존 27개에 14개를 더한 **41개 중 40개 통과·hardlink 1개 건너뜀**이다. workspace의 전용 TEMP/TMP를 사용했으며 실제 DB·Docker 엔진·AWS를 호출하지 않았다. 기존 hardlink skip을 통과로 합산하지 않는다.

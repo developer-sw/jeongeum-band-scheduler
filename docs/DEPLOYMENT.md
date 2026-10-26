@@ -1,6 +1,16 @@
 # 개발 준비·배포·운영 계획
 
-## 최신 결과 — 2026-10-24
+## 2026-10-26 후속 — 운영 DB 백업 구현·합성 검증
+
+기존 합성 백업과 분리한 [운영 DB 자동 백업·독립 복원·감시](OPERATIONAL_DATABASE_BACKUPS.md) 및 [배포 자산](../deploy/operational-backup/README.md)을 구현하고 새 합성 PostgreSQL 두 엔진으로 실제 dump·암호화·독립 복원을 검증했다. 운영 예시는 기본 비활성이며 S3/CloudWatch는 로컬 simulator로 검사했다. 기존 서버의 합성 정기 백업과 원본 16파일·25파일 복구본을 유지한다. 사용자 승인으로 변경 검토·커밋·Push·main 대상 초안 PR·원격 CI 확인을 진행하며 최신 원격 결과는 해당 초안 PR의 동일 HEAD 검사를 따른다. 실제 운영 DB 보호는 활성화하지 않았고 실제 대상 설치·단발 백업/복원·감시 수신·타이머 활성화는 별도 승인 단계다.
+
+## 현재 기준 — 2026-10-25
+
+일반 **Paid Plan 전환을 완료**했고 **Basic 지원과 기존 적격 크레딧을 유지**한다. 적격 요금에는 크레딧이 우선 적용되며 초과·만료·적용 제외분은 청구될 수 있다. 기존 예산은 알림 기준이며 지출 상한이 아니다. AWS 재문의 답변은 별도로 검토하고 계정별 금액·잔액·식별자는 비공개로 보관한다. 아래 날짜별 Free Plan 기록은 당시 상태다.
+
+운영 서버 읽기 전용 사전 점검과 [운영 설정 적용 계획](PRODUCTION_INSTALL_PLAN.md) 정리 후, 사용자가 승인한 **소비자별 secret 권한 구현·합성 Linux 검증**을 완료했다. [권한 검증 기록](RUNTIME_SECRET_PERMISSIONS.md)의 helper 18개·통합 검사 18개와 제한을 따른다. 기존 준비 Caddy의 80/443과 합성 백업 source guard, 비활성 원본 16파일/암호문을 유지하며 현재 synthetic-only 백업이 새 운영 DB를 보호한다고 가정하지 않는다. 새 25파일 암호화 복구본의 독립 복원은 [후속 기록](RUNTIME_SETTINGS_RECOVERY.md)처럼 완료했다. 실제 secret 설치·운영 DB 생성/백업·앱 기동·실제 데이터 이전·공개는 후속 단계다.
+
+## 2026-10-24 완료 기록
 
 후속 준비: AWS Basic 재문의는 전송했고 사람의 답변은 대기 중이다. **새 비활성 운영 설정 16파일**의 실제 age 암호화·독립 Windows 복원과 원본/복원 각각 정적 검사 51항목을 완료했다. rc.3 이미지를 고정하고 worker/Push는 모두 OFF이며 서버 설치·DB 역할 생성·이전·공개는 하지 않았다. 상세 결과·설치 전 조건·새 쓰기 전후 복구 경계는 [INACTIVE_PRODUCTION_SETTINGS](INACTIVE_PRODUCTION_SETTINGS.md)를 따른다. 아래 새 운영 비밀 설정 미완료 표시는 이 후속 준비 전의 기록이다.
 
@@ -12,7 +22,7 @@
 
 S3 자동 백업의 PC 독립 PG 복원은 **10개·19.477초**, 39개 테이블·29개 시퀀스·Flyway V1~V12와 실제 PG 재시작 후 보존을 확인했다. 오프라인 실행기 회귀는 **27개**다. QA 원본은 **rc.2 / `8b24285`**, 새 앱 전환용 검증 이미지는 **rc.3 / `a00a791`**이다. 기존 수동 복원 20개·약 83초와 새 복원 결과를 합치지 않는다.
 
-현재 공개 주소는 `bandjeongeum.studio`의 준비 화면이며 실제 예약 앱은 공개하지 않았다. 지원 문의는 접수 후 답변 대기이며 Paid 전환·실회원 이전은 하지 않았다. PC 밖 복구키 보관·사본 확인은 사용자 확인으로 기록했다. 자동 PC 복사·새 운영 비밀 설정 복구·실제 백업 요금의 크레딧 상계·전체 RPO/RTO는 후속이다. 기존 로컬 데이터/볼륨과 공개 edge를 보존했다.
+당시 공개 주소는 `bandjeongeum.studio`의 준비 화면이며 실제 예약 앱은 공개하지 않았다. 지원 문의는 접수 후 답변 대기였고 Paid 전환·실회원 이전은 하지 않았다. PC 밖 복구키 보관·사본 확인은 사용자 확인으로 기록했다. 자동 PC 복사·새 운영 비밀 설정 복구·실제 백업 요금의 크레딧 상계·전체 RPO/RTO는 그 시점의 후속 항목이었다. 이후 비활성 설정 복원과 Paid 전환은 위 현재 기준을 따른다. 기존 로컬 데이터/볼륨과 공개 edge를 보존했다.
 
 ## 이전 구성·견적·준비 기록
 
@@ -20,7 +30,7 @@ S3 자동 백업의 PC 독립 PG 복원은 **10개·19.477초**, 39개 테이블
 
 최초 작성: 2026-10-09 / 최신 사전 점검·주요 공개 가격 재확인: 2026-10-17 (Asia/Seoul)
 
-최신 운영 기준(2026-10-18): 사용자가 생성한 서울 Lightsail Ubuntu 24.04 LTS·2 vCPU·4GB·80GB·dual-stack 서버를 활용한다. 후속 승인으로 실제 고정IP 연결·Docker29.9.1/Compose5.6.0 설치/동작·브라우저 SSH 전용 제한/새 접속·TCP443 IPv4/IPv6 허용을 완료했다. AWS Free Plan 유지와 추가 비용 최소화 조건을 반영했으며 `bandjeongeum.cloud`는 미등록이다. [AWS_LIGHTSAIL_DEPLOYMENT](AWS_LIGHTSAIL_DEPLOYMENT.md)에 실제 결과·월 요금·플랜/승인 경계·다음 순서를 정리했다. 계정별 잔액/주소·명령·화면은 Git 제외 비공개 기록에 둔다. OS 보안 패치·공개 HTTPS·앱/DB 이전/배포·외부 백업 복구는 남아 있다.
+당시 운영 기준(2026-10-18): 사용자가 생성한 서울 Lightsail Ubuntu 24.04 LTS·2 vCPU·4GB·80GB·dual-stack 서버를 활용한다. 후속 승인으로 실제 고정IP 연결·Docker29.9.1/Compose5.6.0 설치/동작·브라우저 SSH 전용 제한/새 접속·TCP443 IPv4/IPv6 허용을 완료했다. AWS Free Plan 유지와 추가 비용 최소화 조건을 반영했으며 `bandjeongeum.cloud`는 미등록이다. [AWS_LIGHTSAIL_DEPLOYMENT](AWS_LIGHTSAIL_DEPLOYMENT.md)에 실제 결과·월 요금·플랜/승인 경계·다음 순서를 정리했다. 계정별 잔액/주소·명령·화면은 Git 제외 비공개 기록에 둔다. OS 보안 패치·공개 HTTPS·앱/DB 이전/배포·외부 백업 복구는 그 시점의 후속 항목이다.
 
 최신 실제 실행: PR #24·#25를 main `8b24285`까지 병합하고 [main CI 4개 job](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/39024812366)을 통과했다. [실제 공개 발행](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/39025711724)에서 `v1.0.0-rc.2` 이미지 3개와 최종 artifact·digest 대조를 완료했다. 이를 재사용하고 rc.1 최초 실패 이력과 태그는 보존한다. [PRODUCTION_IMAGE_RELEASE](PRODUCTION_IMAGE_RELEASE.md)를 따른다. 아래 준비/후속 문단과 사전 비교표는 당시 기록이며 서버를 새로 구매하거나 발행을 처음부터 시작할 계획이 아니다.
 
@@ -28,7 +38,7 @@ S3 자동 백업의 PC 독립 PG 복원은 **10개·19.477초**, 39개 테이블
 
 후속 완료: 운영 Docker·Compose·Caddy 구현과 합성 DB의 실제 HTTPS·권한/예약·재시작·별도 DB 복원 검증 57개를 통과했다. 새 실행 자산·QA 명령·최종 증빙과 남은 실제 운영 검증은 [PRODUCTION_CONTAINERS](PRODUCTION_CONTAINERS.md)를 따른다. 기존 개발 DB·실행 서버를 보존하고 QA 자원을 정리했다. 이후 승인된 GitHub 반영의 원격 CI 결과는 해당 초안 PR에서 확인한다. 구매·실배포는 하지 않았다. 아래 사전 점검 표의 자산 미구현·미실행 표시는 그 점검 시점의 상태다.
 
-## 1. 범위와 현재 상태
+## 1. 초기 사전 점검의 범위와 상태
 
 이 문서는 약 40명의 정음 동아리를 위한 개발환경·운영 구성 계획이다. 2026-10-17 현재 관리자 가입 전/후 지정·V12·후속 UI까지 PR #21로 main에 병합했고 PR #22로 README를 갱신했다. 기능 검증은 Backend 368건·Frontend 334건이며 기능 PR과 병합 main CI도 성공했다. 최신 소스 감사·환경변수 계약·기존 데이터/origin 이전·배포 전 통과 조건은 [DEPLOYMENT_PREFLIGHT](DEPLOYMENT_PREFLIGHT.md)를 따른다.
 
@@ -113,7 +123,7 @@ Cloudflare는 DNS와 선택적 Proxy에 활용하고 Caddy는 origin HTTPS와 �
 
 ## 6. 현재 비용 기준과 과거 비교 기록
 
-현재 기준은 **기존 Lightsail $24/월**이다. 외부 백업 후보 $1을 선택하면 $25/월, snapshot 20~80GB 보관 예시까지 포함하면 $26~29/월이며 도메인·세금·초과 사용량은 별도다. Free Plan 크레딧이 영구 무료 요금제를 의미하지 않고 6개월/소진 종료도 별도로 확인한다. 세부 조건과 승인 전 선택은 [최신 비용표](AWS_LIGHTSAIL_DEPLOYMENT.md#월-비용과-크레딧-적용)를 따른다.
+기본 서버의 공개 요금 기준은 **기존 Lightsail $24/월**이다. 외부 백업 후보 $1을 선택하면 $25/월, snapshot 20~80GB 보관 예시까지 포함하면 $26~29/월이라는 비교는 당시 사전 견적이며 도메인·세금·초과 사용량은 별도다. 현재는 Paid Plan으로 적격 크레딧을 우선 적용하되 초과·만료·제외 요금은 청구될 수 있다. 크레딧이나 예산 알림을 영구 무료·과금 상한으로 해석하지 않는다. 실제 선택한 합성 S3 구성과 운영 DB용 후속 비용·승인 경계는 [비용표와 현재 기준](AWS_LIGHTSAIL_DEPLOYMENT.md#월-비용과-크레딧-적용)을 따른다.
 
 이하 공급자·도메인 금액은 **사전 점검 당시 비교 기록**이다. 이미 생성한 서버를 재구매하거나 당시 도메인 할인액으로 결제하도록 권고하는 표가 아니다.
 
@@ -160,6 +170,8 @@ Railway는 배포 편의 후보로 남지만 메모리·CPU·volume 사용량 �
 ## 7. DB 백업과 복원
 
 현재 승인된 저장소는 **서울 비공개 S3 Standard**다. 실제 합성 백업/다운로드/독립 PG 복원과 경보 시험을 완료했으며, 설치 자산은 [deploy/backup](../deploy/backup/README.md), 정책·증거·남은 항목은 [OPERATIONS_BACKUP_PLAN](OPERATIONS_BACKUP_PLAN.md)을 따른다. 아래 R2·초기 보존안·미준비 표시는 사전 비교 기록이며 새 R2를 생성하거나 현재 S3 검증을 미실행으로 되돌리는 설명이 아니다.
+
+기존 실행기는 합성 DB만 허용한다. 새 [운영 DB 백업·정확한 원격 버전 검증·독립 복원·감시](OPERATIONAL_DATABASE_BACKUPS.md)는 별도 구현·로컬 합성 검증을 마쳤으며 실제 대상의 설치·권한·실행 승인과 공개 전 성공 확인이 필요하다. 기존 합성 config·IAM 경로·source guard를 새 DB로 조용히 바꾸지 않는다. secret 런타임 권한과 단계별 적용·중단 조건은 [운영 설정 적용 계획](PRODUCTION_INSTALL_PLAN.md)을 따른다.
 
 R2 Standard의 현재 월 무료 범위는 10 GB-month 저장, Class A 100만 작업, Class B 1,000만 작업이다. Internet egress는 무료이며 Infrequent Access에는 무료 저장 범위가 적용되지 않는다. 저장량만 아니라 작업 횟수도 확인한다. [Cloudflare R2 가격](https://developers.cloudflare.com/r2/pricing/)
 
@@ -217,14 +229,14 @@ CI의 기본 GITHUB_TOKEN은 repository contents 읽기 권한으로 두고 작�
 
 ## 11. 아직 확인할 항목
 
-- 기존 서울 Lightsail의 OS 보안 패치·실제 앱 부하/지연, 계정의 정확한 플랜 종료·실제 사용료/크레딧 상계. x86_64·고정 IP·Docker 설치·방화벽·브라우저 SSH 재접속은 확인 완료.
-- bandjeongeum.cloud의 구매 가능성·일반 가격 적용·갱신 설정.
+- 기존 서울 Lightsail의 현재 자원·네트워크·secret 소비자 권한과 실제 앱 부하/지연, Paid Plan의 실제 사용료·크레딧 상계·만료/제외 요금. 기존 x86_64·고정 IP·Docker 설치·방화벽·브라우저 SSH 재접속 기록은 보존한다.
+- 현재 운영 도메인의 갱신 설정과 공개 준비 화면을 보존하는 실제 앱 전환 절차.
 - 현재 공개 GitHub 저장소의 branch protection 범위·CI 사용량·운영 접근권. 로그인·저장소 연결은 완료했다.
 - 운영 서버의 PostgreSQL·앱·Caddy 구성. 원격 Docker/Compose 설치와 일회 컨테이너 실행은 완료했으며 실제 운영 DB는 아직 생성·복원하지 않았다.
-- 이미 고정한 rc.2와 PostgreSQL digest를 실제 서버 설정에 적용했는지 확인.
-- 외부 백업 저장소(R2/Lightsail Object Storage 등)의 비용 선택·승인·최소 권한·암호화 키 보관·실제 dump 크기·보존 설정·복원 결과.
+- 새 앱용 rc.3와 PostgreSQL exact digest, 5개 논리 secret의 소비자별 런타임 참조·권한을 실제 적용 전에 확인. 기존 rc.2 합성 원본과 구분한다.
+- 운영 DB용 백업의 비용·승인·최소 권한·암호화 키 보관·실제 dump 크기·보존 설정·독립 복원 결과. 기존 S3 합성 검증을 운영 DB 보호로 확대하지 않는다.
 - 선택한 서버 자원에서 memory·기동·예약·알림 작업·백업의 실측.
 - 새 V12 최종 백업·원본 보존과 새 운영 DB 복원, 이전 origin의 Push 구독·대기 작업 처리·새 도메인 로그인/재설치·재구독 절차.
-- 검증된 rc.2 이미지·Compose·Caddy·프로필/secret을 실제 VM에 적용한 결과, 외부 백업 자동화·복구/rollback과 실패 관측.
+- 검증된 rc.3 이미지·Compose·Caddy·프로필/secret을 실제 VM에 적용한 결과, 운영 백업 자동화·복구/rollback과 실패 관측. [적용 계획](PRODUCTION_INSTALL_PLAN.md)의 승인·중단 조건을 먼저 충족한다.
 
 이 확인 항목은 이미 정한 예약·권한 정책을 다시 질문하거나 변경하기 위한 목록이 아니다. 실제 구현·계정 연결·구매·배포를 시작할 때 해결할 준비 항목이다.
