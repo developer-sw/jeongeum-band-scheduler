@@ -1,5 +1,11 @@
 # 테스트 및 운영 검증 계획
 
+## 2026-10-27 실제 서버 백업·서버 밖 복원
+
+실회원 없는 새 운영 스키마의 실제 Flyway V1~V12·39테이블·29시퀀스, S3 exact-version 암호문을 PC의 새 PostgreSQL/볼륨으로 복원한 행·시퀀스·Flyway·소유권 대조, 실제 systemd backup/metric 성공과 ALARM/OK 이메일 양쪽 실수신을 확인했다. 운영 timer 활성화·실제 발화 범위와 선택 34파일 설정 복구본의 서버 대조·Windows 디스크 복원·ACL·임시 평문 정리 결과는 [실제 실행 기록](OPERATIONAL_SERVER_VALIDATION.md)을 따른다.
+
+Windows 인증/다운로드 bridge의 호환성 보완 후 관련 오프라인 회귀 **35개(17+18)**를 재검사했다. 기존 Backend·Frontend 전체 테스트를 이번 서버 적용에서 재실행한 것으로 보고하지 않는다. Linux 복원 CLI 전체 실행·전체 서비스 RPO/RTO·실회원 이전·공개 전환과 구분한다. 아래 날짜별 합성 검증과 미실행 설명은 당시 이력이다.
+
 ## 2026-10-26 운영 DB 백업·독립 복원·감시
 
 기존 합성 전용 백업의 제한을 유지하고 별도 운영 실행자의 설정·원본/대상 보호·인증·재시도·이전 성공 보존·감시를 회귀 검사했다. 새 PostgreSQL 원본과 별도 PostgreSQL 복원 엔진·새 볼륨에서 실제 MVCC snapshot·`pg_dump`·age v1.3.2 암호화/인증·단일 트랜잭션 복원과 테이블/시퀀스/Flyway/소유권 대조를 수행했다. 최종 검사 수와 증빙·실패 보완은 [운영 DB 백업 검증](OPERATIONAL_DATABASE_BACKUPS.md)에 기록한다.

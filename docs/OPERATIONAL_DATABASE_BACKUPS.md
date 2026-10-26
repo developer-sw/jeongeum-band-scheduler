@@ -1,6 +1,10 @@
 # 운영 DB 자동 백업·독립 복원·감시
 
-## 현재 범위
+## 2026-10-27 실제 적용 후속
+
+사용자 승인 후 기존 서버의 실회원 없는 새 운영 스키마에서 실제 암호화 S3 exact-version 백업·서버 밖 PC 독립 PostgreSQL 복원·systemd service·ALARM/OK 실수신을 확인하고 운영 timer를 활성화했다. 선택 34파일의 설정 복구본도 별도로 검증했다. [실제 서버 실행 기록](OPERATIONAL_SERVER_VALIDATION.md)의 빈 원본·Windows bridge·PC 재구성 archive와 자연 timer 관측 범위를 따른다. 아래 “미실행”은 구현·로컬 합성 검증 당시의 상태이며 실제 회원 데이터 이전·공개는 여전히 수행하지 않았다.
+
+## 2026-10-26 구현 당시 범위
 
 2026-10-26 사용자는 **운영 DB용 자동 백업·독립 복원·감시 구현**을 요청했다. 기존 synthetic-only 백업을 운영 DB로 재지정하지 않고 새 실행자·설정·상태·unit·prefix·지표를 분리한다. 코드와 로컬 합성 검증을 완료한 뒤 사용자가 변경 검토·커밋·Push·main 대상 초안 PR·원격 CI 확인을 승인했다. 게시 후 CI 판정은 해당 초안 PR의 최신 HEAD 검사로 확인한다. 정식 전환·main 병합은 별도 승인 대상이다. 실제 운영 DB 연결, 기존 회원·팀·예약 데이터 이전, AWS 권한/저장소/경보 변경, 운영 서버 설치·systemd 활성화는 진행하지 않았다.
 
@@ -87,7 +91,7 @@ S3 Put은 새 UTC timestamp/UUID 키와 `If-None-Match:*`를 사용한다. 반�
 
 초기 통합 실행의 health 대기·tmpfs 파일 전송·시험 도구 실행 문제는 하네스를 보완한 뒤 재검증했다. Windows fake 실행의 OS TEMP/디렉터리 fsync 제한은 workspace fixture와 해당 primitive의 fake로 분리했다. 중단 후 Docker 엔진 미실행은 기존 Desktop 시작 후 해결했으며 최종 통합은 통과했다. 기존 코드·synthetic-only 계약·준비 서버·원본 설정 16파일과 후속 25파일·각 암호문을 보존한다. 실제 운영·개발 DB 내용이나 실제 복구 개인키는 이번 시험에 사용하지 않았다.
 
-## 실제 적용 전 남은 단계
+## 2026-10-26 구현 당시 실제 적용 전 남은 단계
 
 기존 합성 정책의 시간별 **7일**·주간별 **28일**·기본 Governance **7일**은 출발점이다. 새 production prefix의 IAM·Lifecycle·Versioning/Object Lock·경보에 실제 적용됐다는 뜻이 아니며 운영 대상의 별도 검토·승인·적용 확인이 필요하다. 새 권한은 승인한 prefix의 Put/Get/GetVersion과 새 namespace의 PutMetricData로 제한하고 삭제·보존 우회·관리·SNS Publish 권한을 주지 않는다.
 
