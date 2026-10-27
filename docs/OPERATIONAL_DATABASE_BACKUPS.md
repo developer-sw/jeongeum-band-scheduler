@@ -1,5 +1,9 @@
 # 운영 DB 자동 백업·독립 복원·감시
 
+## 2026-10-27 후속 — 준비 대기 로컬 보완
+
+운영 백업 내부의 120초 monotonic 준비 대기와 Docker/SQL별 최대 10초 제한을 추가하고, 직접 CLI도 같은 guard를 적용한다. 시간 후퇴 3개를 포함한 최종 회귀 **Windows/Linux 각각 57개**와 native PG 지연·timeout·독립 복원 **외부 4·원본 37·복원 7항목**은 통과했다. 시간 창 helper **Windows/Linux 각각 7개**와 보완 뒤 격리 guest의 실제 systemd `Persistent` **18항목도 최종 통과**했다. [준비 대기 계약·현재 검증 범위](OPERATIONAL_READINESS.md)를 따른다. 실제 운영 서버는 기존 실행자를 유지하고 새 guard를 설치하지 않았다. 아래 실제 서버 적용 기록은 이전 버전의 실행 결과이며 이번 로컬 보완과 구분한다.
+
 ## 2026-10-27 실제 적용 후속
 
 사용자 승인 후 기존 서버의 실회원 없는 새 운영 스키마에서 실제 암호화 S3 exact-version 백업·서버 밖 PC 독립 PostgreSQL 복원·systemd service·ALARM/OK 실수신을 확인하고 운영 timer를 활성화했다. 선택 34파일의 설정 복구본도 별도로 검증했다. [실제 서버 실행 기록](OPERATIONAL_SERVER_VALIDATION.md)의 빈 원본·Windows bridge·PC 재구성 archive와 자연 timer 관측 범위를 따른다. 아래 “미실행”은 구현·로컬 합성 검증 당시의 상태이며 실제 회원 데이터 이전·공개는 여전히 수행하지 않았다.
@@ -31,11 +35,13 @@
 
 백업은 source의 컨테이너 ID·Compose project/service·고정 PostgreSQL 이미지·정확한 단일 PG 데이터 볼륨·미공개 포트·DB/역할/소유권·health를 확인한다. 예상한 읽기 전용 secret/init bind 이외의 mount를 거부하며 qualification의 `/qa` tmpfs만 시험 예외로 허용한다. 호출자가 주입한 Runner도 config 전체와 일치해야 한다.
 
-**DB 자동 시작·재생성·Compose 기동은 없다.** 기존 synthetic readiness/source unit도 호출하지 않는다. 정확한 원본이 healthy가 아니면 백업은 실패하고 이전 성공을 보존한다.
+**DB 자동 시작·재생성·Compose 기동은 없다.** 기존 synthetic readiness/source unit도 호출하지 않는다. 새 로컬 보완의 `backup`은 백업 lock 안에서 이전 성공 기록을 검증한 뒤 최대 120초 monotonic deadline으로 정확한 기존 PG를 기다린다. 매 poll은 target/ID·이미지·label·포트·mount·볼륨을 health보다 먼저 검사한다. 정확한 `created`·`exited`와 `running`의 `starting`·`unhealthy`는 관찰하되 paused·dead·restarting·대상 불일치·알 수 없는 상태/health는 거부한다. healthy 뒤 읽기 전용 DB/역할/소유권 guard를 같은 예산 안에서 마쳐야 AWS 계정 검사와 capture로 진행한다. capture에서도 원본을 재검사한다.
+
+개별 Docker/SQL은 10초와 남은 전체 시간 중 짧은 제한을 사용하며 최종 SQL까지 같은 deadline을 따른다. timeout child group 정리의 최대 5초 grace는 별도다. 직접 `backup`도 guard를 우회하지 않으며 `ready --wait-seconds 1..120`은 별도 진단에만 허용한다. 설정 schema 2·unit 전체 20분 제한은 유지하고 `ExecStartPre`를 추가하지 않는다. 실패하면 이전 성공·주간 기록·객체는 유지하며, 별도 감시 lock과 DB/Docker 무조회 계약도 유지한다. 실제 운영 서버의 이전 버전에는 이 새 대기를 아직 적용하지 않았다.
 
 ## 백업과 저장 계약
 
-하나의 exported read-only MVCC snapshot을 테이블 지문과 `pg_dump`가 공유한다. 현재 schema는 **39테이블·29시퀀스·성공한 Flyway V1~V12**로 고정한다. migration을 추가하기 전 백업/복원 schema 계약도 검토해야 하며 자동 schema 확대는 하지 않는다.
+하나의 exported read-only MVCC snapshot을 테이블 지문과 `pg_dump`가 공유한다. 준비 완료 후 capture 직전의 시각을 snapshot 시작 기준으로 사용하며 진입·준비 완료·capture 사이의 UTC 후퇴나 이전 성공보다 앞선 시각을 거부한다. 현재 schema는 **39테이블·29시퀀스·성공한 Flyway V1~V12**로 고정한다. migration을 추가하기 전 백업/복원 schema 계약도 검토해야 하며 자동 schema 확대는 하지 않는다.
 
 시퀀스는 MVCC snapshot 대상이 아니므로 dump 전후 값과 `is_called`가 바뀌면 실패한다. 허용한 일시 명령 실패·snapshot timeout·시퀀스 변경만 최대 **2회** 시도하며 재시도마다 새 snapshot과 object UUID를 사용한다. 권한·식별·schema·version/해시 불일치 등 규약 실패는 재시도하지 않는다. 쓰기가 계속되는 동안 항상 성공하는 백업으로 표현하지 않으며 실패 시 이전 성공 시각을 유지한다.
 

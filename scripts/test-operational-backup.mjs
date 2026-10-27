@@ -15,7 +15,7 @@ const ageDirectory=path.join(repository,".local/tools/age-linux-1.3.2/age");
 const ownedContainers=new Map(),ownedVolumes=new Set(),checks=[];
 let diagnosticNumber=0;
 const report={passed:false,checks,cleanupVerified:false,actualAwsAccessed:false,developmentDatabaseAccessed:false,actualRecoveryIdentityUsed:false,
-  scope:"Actual PostgreSQL tools/snapshots and age; self-container Docker shim and local versioned AWS simulator",automaticScheduleScope:"Bounded local periodic callbacks; production systemd activation not performed"};
+  scope:"Actual PostgreSQL tools/snapshots, delayed PG process readiness and age; self-container Docker shim and local versioned AWS simulator",automaticScheduleScope:"Bounded local periodic callbacks; production systemd activation not performed"};
 const fail=code=>{throw Object.assign(new Error(code),{qaCode:code});};
 const need=(condition,code)=>{if(!condition)fail(code);};
 const check=(code,condition=true)=>{need(condition,code);checks.push(code);};
@@ -61,7 +61,7 @@ async function ready(id){
   fail("QUALIFICATION_PG_TIMEOUT");
 }
 function inspection(id){
-  const row=guard(id);return {Id:row.Id,State:{Running:row.State.Running,Health:{Status:row.State.Health?.Status}},Config:{Image:row.Config.Image,Labels:row.Config.Labels},
+  const row=guard(id);return {Id:row.Id,State:{Status:row.State.Status,Running:row.State.Running,Paused:row.State.Paused,Dead:row.State.Dead,Restarting:row.State.Restarting,Health:{Status:row.State.Health?.Status}},Config:{Image:row.Config.Image,Labels:row.Config.Labels},
     HostConfig:{NetworkMode:row.HostConfig.NetworkMode,Privileged:row.HostConfig.Privileged,PortBindings:row.HostConfig.PortBindings,PublishAllPorts:row.HostConfig.PublishAllPorts},
     NetworkSettings:{Ports:row.NetworkSettings.Ports},Mounts:row.Mounts.map(m=>({Type:m.Type,Name:m.Name,Destination:m.Destination,RW:m.RW}))};
 }
@@ -103,7 +103,9 @@ try{
     stage=kind+"-engine-setup";
     const project=`jeongeum-ops-${kind==="source"?"qa":"restore"}-${suffix}`,database=`${kind==="source"?"opsqa":"restore"}_${suffix}`,owner=database;
     const dataVolume=volume(project+"_postgres_data"),password=randomBytes(24).toString("base64url");
-    const id=create(project+"-postgres",["--label",`com.docker.compose.project=${project}`,"--label","com.docker.compose.service=postgres","--memory","512m","--mount",`type=volume,source=${dataVolume},target=/var/lib/postgresql/data`,"--tmpfs","/qa:rw,exec,nosuid,size=128m,mode=0700","--env",`POSTGRES_DB=${database}`,"--env",`POSTGRES_PASSWORD=${password}`,"--env","POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256","--health-cmd",`pg_isready -q -h 127.0.0.1 -U postgres -d ${database}`,"--health-interval","1s","--health-retries","30"],pgImage);
+    // The source fixture stays alive while only its own PG child is restarted.
+    const sourceSupervisor="docker-entrypoint.sh postgres & child=$!; trap 'kill -TERM \"$child\" 2>/dev/null; wait \"$child\"' TERM INT; while :; do sleep 3600 & wait $!; done";
+    const id=create(project+"-postgres",["--label",`com.docker.compose.project=${project}`,"--label","com.docker.compose.service=postgres","--memory","512m","--mount",`type=volume,source=${dataVolume},target=/var/lib/postgresql/data`,"--tmpfs","/qa:rw,exec,nosuid,size=128m,mode=0700","--env",`POSTGRES_DB=${database}`,"--env",`POSTGRES_PASSWORD=${password}`,"--env","POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256","--health-cmd",`pg_isready -q -h 127.0.0.1 -U postgres -d ${database}`,"--health-interval","1s","--health-retries","30",...(kind==="source"?["--entrypoint","sh"]:[])],pgImage,kind==="source"?["-c",sourceSupervisor]:[]);
     text(["start",id]);await ready(id);
     stage=kind+"-extract-python-runtime";
     exec(id,["tar","-xf","-","-C","/usr/local"],runtime);

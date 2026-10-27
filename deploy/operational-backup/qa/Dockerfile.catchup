@@ -1,0 +1,17 @@
+# Official pinned PostgreSQL/Python userspace and official Debian packages. The container
+# needs no host mounts, devices, added capabilities, network at runtime or clock changes.
+FROM python:3.13-slim-bookworm@sha256:4cea12ab7d78a3312c85f8cab19b6971d4fe9704da25443986c0bc20a6678850 AS python-runtime
+FROM postgres:17.11-bookworm@sha256:3645570cccdfa447589da9f57dd740faa29b30938e861289a5574b6ca6b03826
+RUN apt-get update \
+ && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      python3 systemd systemd-sysv dbus qemu-system-x86 linux-image-amd64 \
+      initramfs-tools e2fsprogs \
+ && rm -rf /var/lib/apt/lists/* \
+ && mkdir -p /qa-payload /vmwork
+COPY --from=python-runtime /usr/local/ /usr/local/
+RUN ldconfig
+COPY operational-catchup-qa.py /opt/operational-catchup-qa.py
+ARG QA_OWNER
+LABEL jeongeum.operational-catchup-image=${QA_OWNER}
+ENTRYPOINT ["/usr/local/bin/python3.13", "-I", "-B", "/opt/operational-catchup-qa.py", "--host"]
+CMD []
