@@ -1,6 +1,6 @@
 # 운영 DB 백업·독립 복원 배포 자산
 
-이 자산은 [기존 합성 백업](../backup/README.md)과 분리한다. 새 운영 실행자·설정·state·prefix·unit·지표를 제공하며 기존 synthetic-only 제한이나 source unit을 바꾸지 않는다. 현재는 코드와 합성 검증 단계이며 실제 운영 DB·AWS·systemd 활성화는 수행하지 않는다. 실제 결과와 제한은 [운영 DB 백업 검증](../../docs/OPERATIONAL_DATABASE_BACKUPS.md)을 따른다.
+이 자산은 [기존 합성 백업](../backup/README.md)과 분리한다. 운영 실행자·설정·state·prefix·unit·지표를 제공하며 기존 synthetic-only 제한이나 source unit을 바꾸지 않는다. 이전 실행자의 실제 서버 설치·자동 백업 결과는 [서버 검증](../../docs/OPERATIONAL_SERVER_VALIDATION.md)과 [재부팅 검증](../../docs/OPERATIONAL_REBOOT_VALIDATION.md)을 따른다. **2026-10-27 준비 대기 보완의 로컬 구현·합성 검증은 완료했으며 실제 서버에는 적용하지 않았다.** 최신 검증 상태는 [준비 대기 계약](../../docs/OPERATIONAL_READINESS.md), 기존 백업 계약은 [운영 DB 백업 검증](../../docs/OPERATIONAL_DATABASE_BACKUPS.md)을 따른다.
 
 ## 설치와 승인 경계
 
@@ -8,8 +8,8 @@
 - 별도 `/opt/jeongeum/operational-backup` 아래 `operational-backup.py`와 이 실행자가 참조할 `production-backup.py`를 함께 둔다. 공통 모듈·실행 파일·부모 경로는 root 소유이고 그룹/타인에게 쓰기를 허용하지 않는다. 기존 합성 실행자의 설치 경로를 덮어쓰지 않는다.
 - `/etc/jeongeum-operational-backup`과 `/var/lib/jeongeum-operational-backup`은 root `0700`, 실제 config·credentials·state는 `0600`으로 보호한다. symlink·hardlink와 예상 밖 source/target을 거부한다.
 - [운영 config 예시](config.production.example.json)는 placeholder와 `activation_approved:false` 때문에 바로 실행할 설정이 아니다. 검토된 실제 컨테이너 ID·볼륨·DB·앱 역할·이미지·계정·버킷·공개 age 수신자로 채운다. 실제 연결·설치 승인 전에는 활성화 표시를 바꾸거나 unit을 설치/enable하지 않는다.
-- `validate`는 로컬 설정만 검사한다. 승인 표시가 없는 production `backup`/`metric`은 외부 명령을 시작하기 전에 거부한다. 이 boolean은 보호된 관리자 설정이며 자동으로 사용자 승인을 증명하는 token이 아니다.
-- 운영 백업 실행자는 DB를 시작하거나 재생성하지 않는다. 기존 합성 readiness/source unit도 호출하지 않는다. 정확히 바인딩된 PG가 healthy가 아니면 실패하고 이전 성공을 보존한다.
+- `validate`는 로컬 설정만 검사한다. 승인 표시가 없는 production `ready`/`backup`/`metric`은 외부 명령을 시작하기 전에 거부한다. 이 boolean은 보호된 관리자 설정이며 자동으로 사용자 승인을 증명하는 token이 아니다.
+- 운영 백업 실행자는 DB를 시작하거나 재생성하지 않는다. 기존 합성 readiness/source unit도 호출하지 않는다. 새 로컬 `backup`은 lock·이전 성공 검증 뒤 정확히 바인딩된 기존 PG의 준비를 최대 120초 기다린다. 매 poll의 ID·이미지·label·포트·mount·볼륨 검사가 health보다 먼저이며, healthy 뒤 읽기 전용 DB guard까지 통과해야 AWS 계정 검사·capture로 진행한다.
 
 ```sh
 sudo /usr/bin/python3 -I -B /opt/jeongeum/operational-backup/operational-backup.py validate \
@@ -17,6 +17,19 @@ sudo /usr/bin/python3 -I -B /opt/jeongeum/operational-backup/operational-backup.
 ```
 
 위는 승인 후 준비할 로컬 검증 명령 예시다. 설치·권한·실제 단발 백업/복원·감시를 검토한 뒤 별도 승인 범위에서 `systemd-analyze verify`와 service/timer 활성화를 진행한다. 자동 설치나 자동 enable 스크립트는 제공하지 않는다.
+
+## PostgreSQL 준비 대기
+
+정확한 기존 컨테이너의 `created`·`exited` 또는 `running`의 `starting`·`unhealthy`만 남은 시간 안에서 관찰한다. paused·dead·restarting·대상 변경·알 수 없는 상태/health는 즉시 거부한다. 각 Docker/SQL 명령은 10초와 남은 monotonic 시간 중 짧은 제한을 사용하며 최종 SQL도 전체 120초 예산을 공유한다. timeout child group 정리 최대 5초 grace와 service 전체 `TimeoutStartSec=20min`은 별도 한계다. 직접 CLI `backup`도 같은 guard를 사용하고 별도 `ExecStartPre`를 추가하지 않는다.
+
+`ready`는 준비 진단만 실행하며 AWS·snapshot·업로드·성공 기록을 바꾸지 않는다. 다음은 새 코드가 검토·승인 후 설치된 환경의 진단 예시이며 현재 운영 서버에서 실행했다는 뜻이 아니다.
+
+```sh
+sudo /usr/bin/python3 -I -B /opt/jeongeum/operational-backup/operational-backup.py ready \
+  --config /etc/jeongeum-operational-backup/config.json --wait-seconds 120
+```
+
+`--wait-seconds`는 `ready`에만 1~120을 허용하며 config schema 2에 새 필드를 추가하지 않는다. 준비 실패·timeout은 이전 성공·주간 슬롯·객체를 유지한다. 준비가 끝난 뒤 capture 직전 snapshot 시각을 정하고 원본을 다시 검사하며, 진입/준비/capture의 UTC 후퇴나 이전 성공보다 앞선 시각은 거부한다. 5분 감시는 별도 lock으로 이전 성공을 계속 평가하고 DB/Docker 조회를 하지 않는다. 시간 후퇴를 포함한 최종 회귀 Windows/Linux 각각 57개·시간 창 helper 각각 7개·native PG 통합/독립 복원·보완 뒤 격리 systemd catch-up 18항목을 모두 통과했다. 상세 범위와 재현 명령은 [준비 대기 검증](../../docs/OPERATIONAL_READINESS.md)을 따른다.
 
 ## 백업·감시 계약
 

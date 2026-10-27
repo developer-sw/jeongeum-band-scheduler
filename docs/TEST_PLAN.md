@@ -1,5 +1,11 @@
 # 테스트 및 운영 검증 계획
 
+## 2026-10-27 운영 PG 준비 대기·제한시간 보완
+
+최대 120초 monotonic 준비 예산·개별 Docker/SQL 최대 10초·최종 SQL 예산 공유, 매 poll의 정적 target 선검사, 자동 start 금지와 직접 `backup` guard를 검증했다. 시간 후퇴 3개를 포함한 최종 운영 백업 회귀 **Windows/Linux 각각 57개**, 복원 각각 28개, Linux 기존 합성 백업 27개·기존 준비 21개를 통과했다. 최종 native 통합 **외부 4항목·원본 37항목·독립 복원 7항목**은 실제 2초 PG 기동 지연과 2초 timeout의 이전 성공/주간/객체 보존·PG 없는 metric·복귀 후 백업·별도 PG 복원을 포함하며, 소유 시험 자원 정리와 기존 Docker 메타데이터 보존도 확인했다. UTC 후퇴 3개는 준비 대기 중 2개의 AWS 호출 전 거부, identity 조회 중 1개의 읽기 전용 STS 한 번 뒤 capture·dump·업로드 전 거부와 이전 성공 보존을 확인한다.
+
+보완 뒤 비특권 QEMU guest의 실제 PID 1 systemd `Persistent` **18항목을 최종 통과**했다. hourly 누락 실행·PG 지연 후 실제 dump/age·55초 동안 timer 재시작 중복 없음·기본 120초 준비 timeout·이전 성공/객체 및 원본 보존을 포함한다. timer 활성화→첫 백업 완료 **20.863초**, overlap lock 확인 뒤 timeout 관측 **117.961초**이며 전체 RTO나 120초 예산 변경을 뜻하지 않는다. systemd 252.39·Python 3.13.17·PG 17의 격리 환경이고 Docker/AWS는 shim이므로 실제 Ubuntu 24.04 운영 OS나 AWS와 동일한 시험으로 확대하지 않는다. 호스트·guest OS clock은 변경하지 않았다. 느린 부팅의 자연 정각 오판을 막는 시간 창 helper는 첫 timer 등록 직전 최대 241초 자연 대기로 보완했고 **Windows/Linux 각각 7개 회귀**를 통과했다. 최종 VM의 실제 대기는 0초이며 241초 경계는 fake clock으로 검증했다. 소유 시험 자원 정리·기존 Docker 메타데이터 불변도 확인했다. CI는 기존 운영 DB 백업 job의 QEMU step·30분 제한·관련 경로 필터와 별도 fake 전송 job의 helper 회귀를 연결했으며 원격 실행은 하지 않았다. [검증 상태와 제한](OPERATIONAL_READINESS.md)을 따른다. 실제 운영 서버는 이전 실행자를 유지하며 이번 서버 적용·AWS/실제 개발 DB·키/설정/암호문 변경·앱 전체 재시험·원격 CI·GitHub 게시를 수행하지 않았다. 기존 실제 재부팅 기록과 이번 로컬 guard 검증을 구분한다.
+
 ## 2026-10-27 실제 서버 백업·서버 밖 복원
 
 실회원 없는 새 운영 스키마의 실제 Flyway V1~V12·39테이블·29시퀀스, S3 exact-version 암호문을 PC의 새 PostgreSQL/볼륨으로 복원한 행·시퀀스·Flyway·소유권 대조, 실제 systemd backup/metric 성공과 ALARM/OK 이메일 양쪽 실수신을 확인했다. 운영 timer 활성화·실제 발화 범위와 선택 34파일 설정 복구본의 서버 대조·Windows 디스크 복원·ACL·임시 평문 정리 결과는 [실제 실행 기록](OPERATIONAL_SERVER_VALIDATION.md)을 따른다.

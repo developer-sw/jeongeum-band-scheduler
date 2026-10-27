@@ -25,6 +25,8 @@ METRIC = "RecoverableSnapshotAgeMinutes"
 STALE_MINUTES = 1_000_000.0
 MAX_CIPHER_BYTES = 128 * 1024 * 1024
 MAX_DUMP_BYTES = 128 * 1024 * 1024
+READY_WAIT_SECONDS = 120
+READY_COMMAND_SECONDS = 10
 _CORE = None
 
 
@@ -159,17 +161,18 @@ def sql(runner, statement):
     return core().sql(runner, statement)
 
 
-def inspect_source(runner):
+def inspect_container(runner):
     cfg = runner.cfg
     raw = runner.docker("inspect", cfg["container_id"])
     need(len(raw) <= 1024 * 1024, "OPERATIONAL_INSPECTION_LIMIT_REJECTED")
     info = json.loads(raw)
     need(isinstance(info, list) and len(info) == 1 and isinstance(info[0], dict), "OPERATIONAL_INSPECTION_REJECTED")
     item = info[0]
-    need(item.get("Id") == cfg["container_id"] and item.get("State", {}).get("Running") is True
-         and item.get("State", {}).get("Health", {}).get("Status") == "healthy", "OPERATIONAL_SOURCE_NOT_HEALTHY")
+    need(item.get("Id") == cfg["container_id"], "OPERATIONAL_SOURCE_BINDING_REJECTED")
     config, host, network = item.get("Config", {}), item.get("HostConfig", {}), item.get("NetworkSettings", {})
+    need(all(isinstance(value, dict) for value in (config, host, network)), "OPERATIONAL_INSPECTION_REJECTED")
     labels = config.get("Labels", {})
+    need(isinstance(labels, dict), "OPERATIONAL_INSPECTION_REJECTED")
     need(labels.get("com.docker.compose.project") == cfg["project"] and labels.get("com.docker.compose.service") == "postgres"
          and config.get("Image") == cfg["postgres_image"], "OPERATIONAL_SOURCE_BINDING_REJECTED")
     if cfg["mode"] == "qualification":
@@ -188,11 +191,64 @@ def inspect_source(runner):
     network_mode = host.get("NetworkMode")
     need(not host.get("PortBindings") and host.get("PublishAllPorts") is False and not any((network.get("Ports") or {}).values())
          and isinstance(network_mode, str) and network_mode and network_mode != "host" and not network_mode.startswith("container:"), "OPERATIONAL_SOURCE_PUBLIC_PORT_REJECTED")
+    state = item.get("State")
+    need(isinstance(state, dict) and all(state.get(flag) is False for flag in ("Paused", "Dead", "Restarting"))
+         and state.get("Status") in ("created", "exited", "running")
+         and state.get("Running") is (state.get("Status") == "running"), "OPERATIONAL_SOURCE_STATE_REJECTED")
+    return state
+
+
+def inspect_source(runner):
+    cfg = runner.cfg
+    state = inspect_container(runner)
+    need(state["Running"] and isinstance(state.get("Health"), dict)
+         and state["Health"].get("Status") == "healthy", "OPERATIONAL_SOURCE_NOT_HEALTHY")
     guard = ("BEGIN READ ONLY; SELECT current_database() || '|' || current_user; "
              "SELECT count(*) FROM pg_tables WHERE schemaname NOT IN ('public','pg_catalog','information_schema'); "
              f"SELECT bool_and(tableowner='{cfg['application_owner']}') FROM pg_tables WHERE schemaname='public'; "
              f"SELECT rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication FROM pg_roles WHERE rolname='{cfg['application_owner']}'; ROLLBACK;")
     need(sql(runner, guard).strip().splitlines() == [cfg["database"] + "|postgres", "0", "t", "f"], "OPERATIONAL_DATABASE_IDENTITY_REJECTED")
+
+
+class ReadinessDocker:
+    """Only observational Docker/SQL calls, sharing one monotonic readiness budget."""
+    def __init__(self, runner, deadline, clock):
+        self.runner, self.cfg, self.deadline, self.clock = runner, runner.cfg, deadline, clock
+
+    def remaining(self):
+        value = self.deadline - self.clock()
+        need(math.isfinite(value) and value > 0, "OPERATIONAL_SOURCE_READY_TIMEOUT")
+        return value
+
+    def docker(self, *arguments, **kwargs):
+        need(arguments and arguments[0] in ("inspect", "exec"), "OPERATIONAL_READINESS_COMMAND_REJECTED")
+        kwargs["timeout"] = min(kwargs.get("timeout", READY_COMMAND_SECONDS), READY_COMMAND_SECONDS, self.remaining())
+        try:
+            result = self.runner.docker(*arguments, **kwargs)
+        except core().BackupError:
+            self.remaining()
+            raise
+        self.remaining()
+        return result
+
+
+def wait_ready(cfg, runner=None, *, timeout_seconds=READY_WAIT_SECONDS, clock=time.monotonic, sleep=time.sleep):
+    enabled(cfg)
+    need(type(timeout_seconds) is int and 1 <= timeout_seconds <= READY_WAIT_SECONDS, "OPERATIONAL_READINESS_TIMEOUT_REJECTED")
+    runner = bound_runner(cfg, runner)
+    bounded = ReadinessDocker(runner, clock() + timeout_seconds, clock)
+    while True:
+        state = inspect_container(bounded)
+        if state["Running"]:
+            health = state.get("Health")
+            need(isinstance(health, dict) and health.get("Status") in ("starting", "unhealthy", "healthy"), "OPERATIONAL_SOURCE_HEALTHCHECK_REJECTED")
+            if health["Status"] == "healthy":
+                inspect_source(bounded)
+                bounded.remaining()
+                return {"ok": True, "status": "source-ready", "sourceStarted": False}
+        # Docker may still be restoring an existing created/exited container at boot.
+        # Observe that exact source only; never start it or use Compose as a fallback.
+        sleep(min(1.0, bounded.remaining()))
 
 
 def identity(runner):
@@ -288,12 +344,17 @@ def success_times(state, now):
 
 def backup(cfg, runner=None, now=None):
     enabled(cfg)
-    runner, now = bound_runner(cfg, runner), now or core().utc_now()
+    runner = bound_runner(cfg, runner)
+    invoked_at = now if now is not None else core().utc_now()
     state_dir = core().secure_path(cfg["state_directory"], directory=True)
     with core().locked(state_dir / "backup.lock") as acquired:
         if not acquired: return {"ok": True, "status": "locked", "successUpdated": False}
         previous = load_success(cfg)
-        if previous: success_times(previous, now)
+        if previous: success_times(previous, invoked_at)
+        wait_ready(cfg, runner)
+        ready_at = now if now is not None else core().utc_now()
+        need(ready_at >= invoked_at, "OPERATIONAL_CLOCK_MOVED_BACKWARDS")
+        if previous: success_times(previous, ready_at)
         identity(runner)
         temp_root = core().private_dir(state_dir / "temporary")
         retryable = {"BACKUP_COMMAND_TIMEOUT", "BACKUP_COMMAND_FAILED", "BACKUP_SNAPSHOT_TIMEOUT", "OPERATIONAL_SEQUENCE_CHANGED_DURING_SNAPSHOT"}
@@ -301,7 +362,9 @@ def backup(cfg, runner=None, now=None):
             try:
                 with tempfile.TemporaryDirectory(prefix=".operational-", dir=temp_root) as directory:
                     workspace = core().secure_path(directory, directory=True)
-                    started = now if attempt == 0 else core().utc_now()
+                    started = now if now is not None and attempt == 0 else core().utc_now()
+                    need(started >= ready_at, "OPERATIONAL_CLOCK_MOVED_BACKWARDS")
+                    if previous: success_times(previous, started)
                     capture(runner, workspace, started)
                     ciphertext = core().encrypt(runner, workspace)
                     hourly = upload_verified(runner, ciphertext, workspace, object_key(cfg, "hourly", started))
@@ -351,14 +414,21 @@ def main():
         def error(self, _message): raise BackupError("OPERATIONAL_ARGUMENTS_REJECTED")
     try:
         parser = Parser(description=__doc__)
-        parser.add_argument("action", choices=("validate", "backup", "metric"))
+        parser.add_argument("action", choices=("validate", "ready", "backup", "metric"))
         parser.add_argument("--config", default="/etc/jeongeum-operational-backup/config.json")
+        parser.add_argument("--wait-seconds", type=int)
         args = parser.parse_args()
+        need(args.wait_seconds is None or args.action == "ready", "OPERATIONAL_ARGUMENTS_REJECTED")
         need(sys.platform == "linux" and os.geteuid() == 0, "OPERATIONAL_LINUX_ROOT_REQUIRED")
         os.umask(0o077)
         signal.signal(signal.SIGTERM, lambda *_: (_ for _ in ()).throw(BackupError("OPERATIONAL_INTERRUPTED")))
         cfg = load_config(args.config)
-        result = {"ok": True, "status": "configuration-valid", "mode": cfg["mode"], "externalCommandsRun": False} if args.action == "validate" else (backup(cfg) if args.action == "backup" else metric(cfg))
+        if args.action == "validate":
+            result = {"ok": True, "status": "configuration-valid", "mode": cfg["mode"], "externalCommandsRun": False}
+        elif args.action == "ready":
+            result = wait_ready(cfg, timeout_seconds=READY_WAIT_SECONDS if args.wait_seconds is None else args.wait_seconds)
+        else:
+            result = backup(cfg) if args.action == "backup" else metric(cfg)
         print(json.dumps(result, separators=(",", ":")));return 0
     except SystemExit as error: return int(error.code or 0)
     except BaseException as error:

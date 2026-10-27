@@ -10,6 +10,8 @@ Type=oneshot
 User=root
 Group=root
 UMask=0077
+# The command waits up to 120s for the exact existing PG source before AWS/snapshot.
+# Readiness is included in this service's total TimeoutStartSec; direct CLI is guarded too.
 ExecStart=/usr/bin/python3 -I -B /opt/jeongeum/operational-backup/operational-backup.py backup --config /etc/jeongeum-operational-backup/config.json
 TimeoutStartSec=20min
 TimeoutStopSec=30s

@@ -46,12 +46,17 @@ def run(command,data=None):
     need(p.returncode==0,'qualification_process_success');return p.stdout
 
 DOCKER_SHIM=r'''#!/usr/local/bin/python3.13
-import json,os,sys,pathlib
+import json,os,sys,pathlib,subprocess
 try:
  a=sys.argv[1:]; b=json.loads(pathlib.Path('/qa/binding.json').read_text())
  if a and a[0]=='--host=unix:///var/run/docker.sock':a=a[1:]
  if a==['inspect',b['container_id']]:
-  pathlib.Path('/qa/docker-events').open('a').write('inspect\n');print(json.dumps([b['inspect']]));sys.exit(0)
+  pathlib.Path('/qa/docker-events').open('a').write('inspect\n')
+  # Identity is frozen by the outer harness; readiness observes the real PG child.
+  p=subprocess.run(['/usr/local/bin/gosu','postgres','/usr/lib/postgresql/17/bin/pg_isready','-q','-h','127.0.0.1','-U','postgres','-d',b['database'],'-t','1'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=2)
+  if p.returncode not in (0,1,2):raise ValueError()
+  row=b['inspect'];row['State']['Health']={'Status':'healthy' if p.returncode==0 else 'starting'}
+  print(json.dumps([row]));sys.exit(0)
  if not a or a.pop(0)!='exec':raise ValueError()
  if a and a[0]=='-i':a.pop(0)
  if a[:2]!=['--user','postgres']:raise ValueError()
@@ -132,7 +137,61 @@ def setup(binding):
     write(ROOT/'config.json',cfg)
     return op,cfg
 
-def source(op,cfg):
+def readiness_process_checks(op,cfg,binding):
+    """Stop/start only this new fixture's PG child; never control a Docker source."""
+    global STAGE
+    need(binding['kind']=='source' and binding['container_id']==cfg['container_id']
+         and binding['database']==cfg['database']
+         and binding['data_volume']==cfg['data_volume'],'readiness_process_bound_to_synthetic_source')
+    postgres=['/usr/local/bin/gosu','postgres','/usr/lib/postgresql/17/bin/pg_ctl','-D','/var/lib/postgresql/data']
+    manifest_sql='BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;\n'+op.core().MANIFEST_SQL+op.core().SEQUENCE_SQL+op.core().FLYWAY_SQL+'\nROLLBACK;\n'
+    runner=op.Runner(cfg)
+    manifest_before=op.sql(runner,manifest_sql)
+    STAGE='actual-pg-delayed-readiness'
+    run([*postgres,'stop','-m','fast','-w','-t','10'])
+    restart_stamp=ROOT/'readiness-restart-invoked.json'
+    restart_code=('import datetime,json,pathlib,subprocess,time;time.sleep(2);'
+                  'p=pathlib.Path('+repr(str(restart_stamp))+');'
+                  'p.write_text(json.dumps({"invokedAtUtc":datetime.datetime.now(datetime.timezone.utc).isoformat()}));p.chmod(0o600);'
+                  'r=subprocess.run('+repr([*postgres,'start','-w','-t','10','-l','/var/lib/postgresql/data/qualification-restart.log'])+',stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL);raise SystemExit(r.returncode)')
+    delayed=subprocess.Popen([sys.executable,'-I','-B','-c',restart_code],stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,start_new_session=True)
+    started=time.monotonic()
+    try:
+        result=op.backup(cfg)
+    finally:
+        try:restart_status=delayed.wait(timeout=20)
+        except subprocess.TimeoutExpired:
+            os.killpg(delayed.pid,9);delayed.wait(timeout=5);raise RuntimeError('synthetic_delayed_restart_timeout')
+    need(restart_status==0 and result['status']=='verified' and time.monotonic()-started>=1.5,'actual_pg_delay_waited_then_backup_verified')
+    restart_at=dt.datetime.fromisoformat(json.loads(restart_stamp.read_text())['invokedAtUtc']).replace(microsecond=0)
+    state=op.load_success(cfg)
+    need(dt.datetime.fromisoformat(state['snapshotStartedAtUtc'].replace('Z','+00:00'))>=restart_at,'snapshot_timestamp_follows_actual_readiness_delay')
+    need(op.sql(runner,manifest_sql)==manifest_before,'synthetic_rows_sequences_flyway_preserved_across_delayed_restart')
+    STAGE='actual-pg-permanent-readiness-timeout'
+    run([*postgres,'stop','-m','fast','-w','-t','10'])
+    before=(ROOT/'state/last-success.json').read_bytes()
+    cloud_before={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in (ROOT/'cloud').iterdir() if p.is_file()}
+    started=time.monotonic()
+    try:op.wait_ready(cfg,timeout_seconds=2)
+    except op.BackupError as error:need(str(error)=='OPERATIONAL_SOURCE_READY_TIMEOUT','actual_stopped_pg_readiness_timeout')
+    else:raise RuntimeError('stopped_synthetic_pg_accepted_as_ready')
+    elapsed=time.monotonic()-started
+    need(1.5<=elapsed<8,'actual_readiness_timeout_within_budget_and_cleanup_grace')
+    need((ROOT/'state/last-success.json').read_bytes()==before,'readiness_timeout_preserves_last_success_and_weekly')
+    need({p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in (ROOT/'cloud').iterdir() if p.is_file()}==cloud_before,'readiness_timeout_never_calls_aws_or_changes_objects')
+    events_before=(ROOT/'docker-events').read_bytes()
+    need(op.metric(cfg)['stale'] is False,'metric_continues_from_previous_success_while_pg_unready')
+    need((ROOT/'docker-events').read_bytes()==events_before and (ROOT/'state/last-success.json').read_bytes()==before,'unready_pg_metric_is_independent_and_preserves_state')
+    STAGE='actual-pg-readiness-recovery'
+    run([*postgres,'start','-w','-t','10','-l','/var/lib/postgresql/data/qualification-restart.log'])
+    ready=op.wait_ready(cfg,timeout_seconds=10)
+    need(ready['status']=='source-ready' and ready['sourceStarted'] is False,'readiness_guard_observes_existing_pg_without_starting_it')
+    recovered=op.backup(cfg)
+    need(recovered['status']=='verified' and op.load_success(cfg)['weekly']==json.loads(before)['weekly'],'actual_pg_recovery_backup_succeeds_with_previous_weekly_unchanged')
+    need(op.sql(runner,manifest_sql)==manifest_before,'synthetic_database_preserved_after_timeout_recovery')
+
+
+def source(op,cfg,binding):
     global STAGE
     STAGE='load-source-config'
     cfg=op.load_config('/qa/config.json')
@@ -160,6 +219,8 @@ def source(op,cfg):
     need(sum(e==['s3api','put-object'] for e in event())-calls==2,'permanent_failure_retry_bounded_to_two_attempts')
     (ROOT/'fail-put-count').unlink()
     need(not list((ROOT/'state/temporary').iterdir()),'temporary_plaintext_removed_after_success_and_failure')
+    readiness_process_checks(op,cfg,binding)
+    before=(ROOT/'state/last-success.json').read_bytes()
     STAGE='snapshot-age-and-invalid-success-monitoring'
     state=op.load_success(cfg)
     when=dt.datetime.fromisoformat(state['snapshotStartedAtUtc'].replace('Z','+00:00'))
@@ -224,8 +285,8 @@ def target(op,cfg):
 def main():
     os.umask(0o077)
     binding=json.loads((ROOT/'binding.json').read_text());op,cfg=setup(binding)
-    source(op,cfg) if binding['kind']=='source' else target(op,cfg)
-    result={'passed':True,'phase':binding['kind'],'checks':CHECKS,'checkCount':len(CHECKS),'cloudTransport':'local-versioned-simulator','dockerTransport':'self-container-gosu-shim','actualAwsAccessed':False,'developmentDatabaseAccessed':False,'actualRecoveryIdentityUsed':False,'fixtureSchema':'39 tables,29 sequences,manual Flyway V1-V12 history; not an application migration execution'}
+    source(op,cfg,binding) if binding['kind']=='source' else target(op,cfg)
+    result={'passed':True,'phase':binding['kind'],'checks':CHECKS,'checkCount':len(CHECKS),'cloudTransport':'local-versioned-simulator','dockerTransport':'self-container-gosu-shim','readinessScope':'Real fixture PG child stop/delayed start and bounded timeout; Docker identity is a self-container shim, not systemd','actualAwsAccessed':False,'developmentDatabaseAccessed':False,'actualRecoveryIdentityUsed':False,'fixtureSchema':'39 tables,29 sequences,manual Flyway V1-V12 history; not an application migration execution'}
     write(ROOT/'result.json',result);print(json.dumps({k:v for k,v in result.items() if k!='checks'}))
 
 if __name__=='__main__':
