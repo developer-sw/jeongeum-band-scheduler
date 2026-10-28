@@ -1,6 +1,8 @@
 # 운영 백업의 PostgreSQL 준비 대기와 제한시간
 
-기록일: **2026-10-27, Asia/Seoul**. [새 운영 구성 재부팅](OPERATIONAL_REBOOT_VALIDATION.md)에서 남긴 PostgreSQL 기동 순서의 보호 범위를 보완했다. 승인 범위인 준비 대기·제한시간의 로컬 구현과 합성 PostgreSQL 기동 지연·실제 systemd catch-up 검증을 완료했다. 실제 운영 서버는 기존 실행자를 유지하며 이번 새 guard를 적용하지 않았다. 로컬 검증에서는 AWS·운영 서버·실제 개발 DB·실제 키/설정/복구 암호문·GitHub 게시를 변경하지 않았으며, 후속 게시 승인은 아래 남은 단계와 구분한다.
+기록일: **2026-10-27, Asia/Seoul**. [새 운영 구성 재부팅](OPERATIONAL_REBOOT_VALIDATION.md)에서 남긴 PostgreSQL 기동 순서의 보호 범위를 보완했다. PR #33의 main `351bf69`·main CI 7개 job 성공 후 사용자 승인으로 **운영 실행자 한 파일의 교체와 실제 백업·감시·서버 밖 새 암호문 독립 복원까지 완료**했다. 기존 설정·키·DB·service·timer는 보존했으며 [실제 운영 적용 결과](OPERATIONAL_READINESS_SERVER_VALIDATION.md)의 범위와 제한을 따른다.
+
+10월 28일 재개 후에는 새 코드의 정규 hourly 10회 성공과 최근 신선한 metric·자원 보존·HTTPS 준비 화면을 읽기 전용으로 추가 확인했다. 이어 승인된 [최신 설정 암호문 갱신·독립 복원과 실제 재부팅](OPERATIONAL_SETTINGS_REFRESH_REBOOT.md)을 진행했으며 이 후속 기록의 관측 상태를 우선한다. 이하 준비 대기 계약과 로컬·격리 검증은 운영 적용 전 실행의 기록이다. 아래 서버 미적용·원격 CI 미실행·후속 승인 설명은 당시 이력이다. 실회원 이전·공개 전환은 별도 단계다.
 
 ## 준비 대기 계약
 

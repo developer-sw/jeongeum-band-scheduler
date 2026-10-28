@@ -1,6 +1,8 @@
 # 운영 DB 백업·독립 복원 배포 자산
 
-이 자산은 [기존 합성 백업](../backup/README.md)과 분리한다. 운영 실행자·설정·state·prefix·unit·지표를 제공하며 기존 synthetic-only 제한이나 source unit을 바꾸지 않는다. 이전 실행자의 실제 서버 설치·자동 백업 결과는 [서버 검증](../../docs/OPERATIONAL_SERVER_VALIDATION.md)과 [재부팅 검증](../../docs/OPERATIONAL_REBOOT_VALIDATION.md)을 따른다. **2026-10-27 준비 대기 보완의 로컬 구현·합성 검증은 완료했으며 실제 서버에는 적용하지 않았다.** 최신 검증 상태는 [준비 대기 계약](../../docs/OPERATIONAL_READINESS.md), 기존 백업 계약은 [운영 DB 백업 검증](../../docs/OPERATIONAL_DATABASE_BACKUPS.md)을 따른다.
+10월 28일 후속: 새 실행자를 포함한 선택 34파일의 암호문 갱신·독립 Windows 복원·서버 내용/Linux 메타데이터 대조와 실제 재부팅을 진행했다. [최신 복구·재부팅 기록](../../docs/OPERATIONAL_SETTINGS_REFRESH_REBOOT.md)의 완료 범위·자동 실행 관측·기본 bridge ID 예외와 남은 경계를 우선한다. 아래 적용·복구본 갱신 미완료 문구는 각 단계 당시의 이력이다.
+
+이 자산은 [기존 합성 백업](../backup/README.md)과 분리한다. 운영 실행자·설정·state·prefix·unit·지표를 제공하며 기존 synthetic-only 제한이나 source unit을 바꾸지 않는다. 이전 실행자의 실제 서버 설치·자동 백업 결과는 [서버 검증](../../docs/OPERATIONAL_SERVER_VALIDATION.md)과 [재부팅 검증](../../docs/OPERATIONAL_REBOOT_VALIDATION.md)을 따른다. **2026-10-27 준비 대기 보완을 실제 서버에 적용하고 단발 systemd 백업·감시·새 암호문의 서버 밖 독립 복원까지 검증했다.** [이번 실제 적용 결과](../../docs/OPERATIONAL_READINESS_SERVER_VALIDATION.md)의 범위를 따르며 최신 설정 암호문 갱신·새 코드의 재부팅 검증은 남아 있다. 준비 대기 계약은 [준비 대기 문서](../../docs/OPERATIONAL_READINESS.md), 기존 백업 계약은 [운영 DB 백업 검증](../../docs/OPERATIONAL_DATABASE_BACKUPS.md)을 따른다.
 
 ## 설치와 승인 경계
 
@@ -22,7 +24,7 @@ sudo /usr/bin/python3 -I -B /opt/jeongeum/operational-backup/operational-backup.
 
 정확한 기존 컨테이너의 `created`·`exited` 또는 `running`의 `starting`·`unhealthy`만 남은 시간 안에서 관찰한다. paused·dead·restarting·대상 변경·알 수 없는 상태/health는 즉시 거부한다. 각 Docker/SQL 명령은 10초와 남은 monotonic 시간 중 짧은 제한을 사용하며 최종 SQL도 전체 120초 예산을 공유한다. timeout child group 정리 최대 5초 grace와 service 전체 `TimeoutStartSec=20min`은 별도 한계다. 직접 CLI `backup`도 같은 guard를 사용하고 별도 `ExecStartPre`를 추가하지 않는다.
 
-`ready`는 준비 진단만 실행하며 AWS·snapshot·업로드·성공 기록을 바꾸지 않는다. 다음은 새 코드가 검토·승인 후 설치된 환경의 진단 예시이며 현재 운영 서버에서 실행했다는 뜻이 아니다.
+`ready`는 준비 진단만 실행하며 AWS·snapshot·업로드·성공 기록을 바꾸지 않는다. 다음은 검토·승인 후 설치한 환경의 진단 예시다. 이번 실제 서버의 정상 준비 진단은 통과했으며, 실제 서버 강제 지연·timeout 시험과는 구분한다.
 
 ```sh
 sudo /usr/bin/python3 -I -B /opt/jeongeum/operational-backup/operational-backup.py ready \

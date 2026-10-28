@@ -1,6 +1,10 @@
 # 시스템 아키텍처
 
-갱신일: 2026-10-27 (Asia/Seoul)
+갱신일: 2026-10-28 (Asia/Seoul)
+
+2026-10-28 후속: 새 백업 실행자를 반영한 선택 34파일 암호문의 독립 Windows 복원과 실제 서버 내용·Linux 메타데이터 일치를 확인했다. 실제 VM 재부팅의 DB·설정 보존과 기본 bridge 런타임 ID 한 건의 분리 대조, 정규 자동 실행의 최신 관측은 [복구본 갱신·재부팅 기록](OPERATIONAL_SETTINGS_REFRESH_REBOOT.md)을 따른다. 앱 구조·rc.3·중지한 Backend/worker·준비 화면은 유지하고 실회원 이전·공개는 수행하지 않았다. 새 암호문의 PC 밖 사본은 후속이며 아래 미실행 문구는 날짜별 이력이다.
+
+2026-10-27 최신: 준비 대기 실행자 한 파일을 기존 서버에서 교체하고 실제 백업·감시·새 hourly 암호문의 PC 독립 복원을 검증했다. DB·앱 이미지·설정·키·service·timer와 HTTPS 준비 화면은 유지한다. [이번 실제 적용 결과](OPERATIONAL_READINESS_SERVER_VALIDATION.md)를 우선하며, 아래 34파일 복구본의 일치 검증은 이전 코드 기준이다. 최신 설정 암호문 갱신·새 구성 재부팅·실회원 이전·공개 전환은 남아 있다.
 
 2026-10-27 실제 적용 후속: 기존 서버와 rc.3 고정 이미지를 재사용해 실회원 없는 새 운영 스키마의 Flyway V1~V12·39테이블·29시퀀스를 확인했다. 실제 S3 exact-version 암호화 백업·서버 밖 PC의 별도 PostgreSQL 복원·ALARM/OK 이메일 양쪽 실수신을 검증하고 운영 백업·감시 timer를 활성화해 자연 hourly 발화와 반복 감시를 관측했다. DB 복원은 Windows age 인증 메모리 bridge이며 원본 Linux 복원 CLI 전체 실행과 구분한다. 선택 34파일 설정 복구본은 PC 원본으로 재구성한 암호문으로, 실제 서버의 내용·Linux 권한 대조와 Windows 디스크 복원·ACL 검사를 통과했으며 서버 전체 capture가 아니다. [실제 서버 검증과 한계](OPERATIONAL_SERVER_VALIDATION.md)를 따른다.
 

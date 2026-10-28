@@ -1,5 +1,19 @@
 # 테스트 및 운영 검증 계획
 
+## 2026-10-28 최신 설정 복구본·새 코드 재부팅
+
+34파일 새 암호문의 별도 Windows age 인증·새 폴더 디스크 복원·내용/ACL 대조와 임시 평문 0개, 실제 서버 내용/uid/gid/mode 일치를 확인했다. 실제 재부팅 후 두 DB의 각 39테이블·29시퀀스·Flyway V1~V12·데이터/인증/권한, 컨테이너 7개·볼륨 6개·설정·4개 timer를 대조했다. 기본 bridge ID 한 건은 모든 정의와 사용자 정의 네트워크 ID 불변을 확인한 한정 예외로 기록한다. 두 백업의 18시 정규 자동 실행·후속 지표와 새 운영 암호문의 PC exact-version 다운로드 대조, 독립 CloudWatch의 snapshot 나이 초기화·경보 OK를 확인했다. 재개 후 저장된 설정 암호문 SHA·age 인증·내부 34파일 재검사와 같은 부팅 상태의 전체 보존 감사도 통과했다. 상세 시각과 경계는 [실행 기록](OPERATIONAL_SETTINGS_REFRESH_REBOOT.md)을 따른다. 이 결과는 정각 누락 catch-up·강제 PG 지연/timeout의 실제 서버 시험, Linux 소유권 복원 재현·전체 재난 복구·실회원 이전·앱 공개를 뜻하지 않는다.
+
+## 2026-10-28 재개 후 정규 실행 관측
+
+수동 재실행 없이 systemd journal·성공 상태·timer trigger를 읽어 새 코드의 **00시~09시 hourly 10회 성공**과 최근 **09:00:28 snapshot·09:00:31 원격 검증**, **09:37:22 신선한 metric**을 확인했다. 09:38:16 보존 감사와 HTTPS 준비 페이지 TLS/200 재검사도 통과했다. 아래 10월 27일 단발 실행의 관측 한계를 이 후속 결과와 구분하며, 새 코드의 재부팅/catch-up·강제 지연/timeout은 실제 서버에서 검증하지 않았다. [실제 결과](OPERATIONAL_READINESS_SERVER_VALIDATION.md)를 따른다.
+
+## 2026-10-27 준비 대기 코드 실제 운영 적용·새 암호문 복원
+
+main `351bf69`·main CI 7개 job 성공 후 운영 실행자 한 파일만 기존 lock 아래 교체했다. 로컬 fake filesystem 21개·격리 Linux 실제 POSIX 6개, 실제 서버 `validate`·자동 start 없는 `ready`·systemd backup/metric을 통과했다. **23:20:56 KST** 새 snapshot·**23:20:59 KST** hourly exact-version 원격 검증과 기존 weekly 보존, CloudWatch 5분 bucket의 새 snapshot 나이 반영·기존 경보 OK를 확인했다. **23:34:13 KST** 보존 재검사에서 7컨테이너·6볼륨·두 DB 각 39테이블/29시퀀스·Flyway/데이터/권한, 선택 34파일 중 변경 대상 외 33파일·기존 별도 33파일·4개 timer를 보존했다.
+
+이번 새 hourly 암호문 21,600bytes의 VersionId/SHA 대조 후 PC의 새 network none PostgreSQL 17.11/새 볼륨에 Windows age 메모리 bridge로 실제 복원해 schema·행/시퀀스/Flyway 지문·최소 권한 소유권과 기존 Docker 메타데이터 보존을 확인했다. 복구키 서버/컨테이너 전달·평문 archive 디스크 저장·기존 DB 복원은 없다. 수동 단발 service 실행이며 새 코드의 자연 hourly/재부팅 catch-up·강제 지연/timeout 또는 Linux 복원 CLI 전체 실행으로 확대하지 않는다. 서버 재부팅·시간 조작·실제 개발 DB 접속·실회원 이전·공개 전환·추가 GitHub 게시와 최신 설정 암호문 갱신은 수행하지 않았다. [실제 실행 결과와 다음 경계](OPERATIONAL_READINESS_SERVER_VALIDATION.md)를 따른다. 아래 로컬 검증 당시 미적용 설명은 해당 실행의 이력이다.
+
 ## 2026-10-27 운영 PG 준비 대기·제한시간 보완
 
 최대 120초 monotonic 준비 예산·개별 Docker/SQL 최대 10초·최종 SQL 예산 공유, 매 poll의 정적 target 선검사, 자동 start 금지와 직접 `backup` guard를 검증했다. 시간 후퇴 3개를 포함한 최종 운영 백업 회귀 **Windows/Linux 각각 57개**, 복원 각각 28개, Linux 기존 합성 백업 27개·기존 준비 21개를 통과했다. 최종 native 통합 **외부 4항목·원본 37항목·독립 복원 7항목**은 실제 2초 PG 기동 지연과 2초 timeout의 이전 성공/주간/객체 보존·PG 없는 metric·복귀 후 백업·별도 PG 복원을 포함하며, 소유 시험 자원 정리와 기존 Docker 메타데이터 보존도 확인했다. UTC 후퇴 3개는 준비 대기 중 2개의 AWS 호출 전 거부, identity 조회 중 1개의 읽기 전용 STS 한 번 뒤 capture·dump·업로드 전 거부와 이전 성공 보존을 확인한다.
