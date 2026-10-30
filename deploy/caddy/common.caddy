@@ -17,16 +17,16 @@ request_header -X-Real-IP
 
 @api path /api/v1 /api/v1/*
 handle @api {
-	header Cache-Control no-store
+	header >Cache-Control no-store
 	reverse_proxy backend:8080
 }
 
 handle /_next/static/* {
-	header Cache-Control "public, max-age=31536000, immutable"
+	header >Cache-Control "public, max-age=31536000, immutable"
 	reverse_proxy frontend:3000
 }
 
 handle {
-	header Cache-Control no-store
+	header >Cache-Control no-store
 	reverse_proxy frontend:3000
 }

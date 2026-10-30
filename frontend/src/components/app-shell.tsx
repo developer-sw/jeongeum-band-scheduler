@@ -61,6 +61,23 @@ export function AppShell({ children, wide = false }: { children: React.ReactNode
             <span className="app-brand-subtitle">따뜻한 합주실 예약 공간</span>
           </span>
         </Link>
+        <div className="app-mobile-brand">
+          <Link href="/" aria-label="정음 홈" className="app-mobile-logo-link">
+            <Image className="app-mobile-logo" src="/jeongeum-warm-logo.svg" alt="" width={58} height={58} priority />
+          </Link>
+          <div className="app-mobile-brand-copy">
+            <Link href="/" aria-label="정음 합주실 다이어리 홈" className="app-mobile-brand-heading">
+              <span className="app-brand-title">정음 합주실 다이어리</span>
+              <span className="app-brand-badge">STUDIO NOTE</span>
+            </Link>
+            <div className="app-mobile-brand-bottom">
+              <span className="app-brand-subtitle">따뜻한 합주실 예약 공간</span>
+              {member && <nav aria-label="빠른 메뉴" className="app-compact-actions">
+                {navigationLink("/account", "계정")}
+              </nav>}
+            </div>
+          </div>
+        </div>
         <nav aria-label="주요 메뉴" className="desktop-navigation">
           {member ? <>
             {mainLinks.map(({ href, label }) => navigationLink(href, label))}
@@ -75,9 +92,6 @@ export function AppShell({ children, wide = false }: { children: React.ReactNode
             {navigationLink("/more", "더보기")}
             {navigationLink("/account", "내 계정", "app-account-link")}
           </> : <>{navigationLink("/login", "로그인")}{navigationLink("/join", "초대 가입", "app-account-link")}</>}
-        </nav>
-        <nav aria-label="빠른 메뉴" className="app-compact-actions">
-          {member ? <>{navigationLink("/account", "계정")}{navigationLink("/more", "더보기", "app-account-link")}</> : <>{navigationLink("/login", "로그인")}{navigationLink("/join", "가입", "app-account-link")}</>}
         </nav>
       </div>
     </header>
