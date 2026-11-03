@@ -26,9 +26,9 @@ const member: Member = { id: "501", loginId: "synthetic.diary.member", displayNa
 const today = "2026-10-12";
 const instrumentCodes: InstrumentCode[] = ["VOCAL", "KEYBOARD", "ELECTRIC_GUITAR", "BASS", "DRUMS", "ACOUSTIC_GUITAR"];
 const snapshot: ScheduleSnapshot = {
-  today, bookableThrough: addDate(today, 14), serverTime: `${today}T11:00:00+09:00`, timeZone: "Asia/Seoul", receivedAtMillis: 0,
+  today, bookableThrough: addDate(today, 30), serverTime: `${today}T11:00:00+09:00`, timeZone: "Asia/Seoul", receivedAtMillis: 0,
   instruments: instrumentCodes.map((code) => ({ code, name: code, status: "NORMAL", version: 0 })),
-  days: Array.from({ length: 15 }, (_, index) => {
+  days: Array.from({ length: 31 }, (_, index) => {
     const date = addDate(today, index);
     return {
       date, openingStatus: "OPEN", personalQuota: { usedMinutes: 0, remainingMinutes: 120 }, teamQuotas: [],
@@ -80,6 +80,19 @@ function highlightedOptions(markup: string) {
 }
 
 describe("diary routes preserve session, membership and role boundaries", () => {
+  it("shows the server's complete 31-day window and retains a shorter window while rollout is pending", () => {
+    const client = seededClient(member);
+    const extended = render(client, Home);
+    expect(extended).toContain("11월 11일");
+    expect(extended).toContain("서울 기준 오늘부터 30일 뒤까지 (오늘 포함 31일)");
+    expect(extended).not.toContain("14일 뒤까지");
+    client.setQueryData(scheduleQuery(directoryScope(member)).queryKey, {
+      ...snapshot, bookableThrough: addDate(today, 14), days: snapshot.days.slice(0, 15),
+    });
+    const original = render(client, Home);
+    expect(original).toContain("서울 기준 오늘부터 14일 뒤까지 (오늘 포함 15일)");
+    expect(original).not.toContain("30일 뒤까지");
+  });
   it("renders the public welcome for anonymous/inactive accounts and protects account/more content", () => {
     for (const current of [null, { ...member, status: "INACTIVE" } as unknown as Member]) {
       const client = seededClient(current, [booking(regular, "901")]);

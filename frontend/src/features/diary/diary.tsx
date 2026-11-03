@@ -6,7 +6,7 @@ import { FormError, inputClass, secondaryButton } from "@/components/auth-ui";
 import type { Member } from "@/features/auth/types";
 import { BookingForm } from "@/features/reservations/booking-form";
 import { reservationErrorMessage } from "@/features/reservations/errors";
-import { dateLabel, phaseAt } from "@/features/reservations/time";
+import { bookingWindowLabel, dateLabel, phaseAt } from "@/features/reservations/time";
 import type { CreateReservationInput, ScheduleBlock } from "@/features/reservations/types";
 import { useBookingWorkspace } from "@/features/reservations/use-booking-workspace";
 import { subjectLabel } from "@/features/reservations/view";
@@ -100,7 +100,7 @@ export function Diary({ member, scope }: { member: Member; scope: string }) {
     {schedule && now && <>
       <p className="diary-range">예약 가능 {dateLabel(today)} ~ {dateLabel(schedule.bookableThrough)} <span>서울 기준 · 20초마다 갱신</span></p>
       {!days.length ? <div className="diary-card diary-info" role="status">새 날짜의 시간표를 확인하고 있어요. 잠시 후 다시 불러와 주세요.<button className={secondaryButton} type="button" onClick={() => void workspace.refresh()}>시간표 갱신</button></div> : <div className="diary-layout">
-        <CalendarSidebar selected={selectedDate} today={today} through={schedule.bookableThrough} days={days} disabled={busy} onSelect={selectDate} onUnavailable={() => setCalendarNotice("예약은 서울 기준 오늘부터 14일 뒤까지 가능해요. 과거 기록은 예약·이력에서 확인해 주세요.")} />
+        <CalendarSidebar selected={selectedDate} today={today} through={schedule.bookableThrough} days={days} disabled={busy} onSelect={selectDate} onUnavailable={() => setCalendarNotice(`예약은 ${bookingWindowLabel(today, schedule.bookableThrough)} 가능해요. 과거 기록은 예약·이력에서 확인해 주세요.`)} />
         <section className="diary-timetable diary-card" aria-labelledby="diary-timetable-title">
           <div className="diary-timetable-heading"><div><p className="diary-eyebrow">WEEKLY STUDIO NOTE</p><h2 id="diary-timetable-title">합주실 시간표</h2></div><div className="diary-week-controls"><button type="button" aria-label="이전 주" disabled={busy || !previousWeek} onClick={() => previousWeek && selectDate(previousWeek)}>‹</button><button type="button" disabled={busy} onClick={() => selectDate(today)}>오늘</button><button type="button" aria-label="다음 주" disabled={busy || !nextWeek} onClick={() => nextWeek && selectDate(nextWeek)}>›</button><button type="button" aria-label="시간표 새로 확인" disabled={query.isFetching} onClick={() => void workspace.refresh()}>↻</button></div></div>
           <div className="diary-week-range"><span>{dateLabel(week[0])} ~ {dateLabel(week[6])}</span><CalendarPopup selected={selectedDate} today={today} through={schedule.bookableThrough} days={days} disabled={busy} onSelect={selectDate} onUnavailable={() => setCalendarNotice("예약 가능 기간 밖이에요. 과거 기록은 예약·이력에서 확인해 주세요.")} /></div>
@@ -130,6 +130,6 @@ export function Diary({ member, scope }: { member: Member; scope: string }) {
       </div>}
     </>}
     {!selectedBlock && (action.error || action.uncertain) && <div className="diary-action-feedback">{actionFeedback}</div>}
-    <details className="diary-rules diary-card"><summary>예약 전에 알아두기 <span>연습 시간과 한도 안내</span></summary><div><p>서울 기준 오늘부터 14일 뒤까지, 매일 12:00~24:00에 연습할 수 있어요. 고정 배정 반영 중인 날짜는 준비가 끝난 뒤 열려요.</p><p>60분 예약은 개인과 각 팀마다 하루 120분까지이며 90분은 합산하지 않아요. 진행 중인 60분은 남은 시간만 이용해도 한 칸을 사용해요. 원래 관리자 고정 60분만 면제예요.</p><p>2시간은 60분 예약 두 건을 각각 확정해 주세요. 예약 취소·이력은 예약 화면, 고정 배정은 관리자 화면에서 확인해요.</p><Link href="/reservations">예약·취소·이력 보기 →</Link></div></details>
+    <details className="diary-rules diary-card"><summary>예약 전에 알아두기 <span>연습 시간과 한도 안내</span></summary><div><p>{schedule && today ? `${bookingWindowLabel(today, schedule.bookableThrough)} 예약할 수 있어요.` : "예약 가능한 기간은 시간표에서 확인해 주세요."} 매일 12:00~24:00에 연습할 수 있어요. 고정 배정 반영 중인 날짜는 준비가 끝난 뒤 열려요.</p><p>60분 예약은 개인과 각 팀마다 하루 120분까지이며 90분은 합산하지 않아요. 진행 중인 60분은 남은 시간만 이용해도 한 칸을 사용해요. 원래 관리자 고정 60분만 면제예요.</p><p>2시간은 60분 예약 두 건을 각각 확정해 주세요. 예약 취소·이력은 예약 화면, 고정 배정은 관리자 화면에서 확인해요.</p><Link href="/reservations">예약·취소·이력 보기 →</Link></div></details>
   </div>;
 }

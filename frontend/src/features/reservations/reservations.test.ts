@@ -182,14 +182,14 @@ describe("reservation views and cache permissions", () => {
     expect(cancellationNotice({ ...reservation, quotaExempt: true }, now)).toContain("한도 면제");
     expect(cancellationNotice(reservation, Date.parse(block.endsAt))).toContain("취소할 수 없어요");
   });
-  it("aligns all week rows with the actual remaining dates at the 15-day horizon", () => {
-    const lastDate = addDate(snapshot.today, 14);
+  it("aligns all week rows with the actual remaining dates at the 31-day horizon", () => {
+    const lastDate = addDate(snapshot.today, 30);
     for (const count of [1, 6, 7]) {
       const days = Array.from({ length: count }, (_, index) => ({ ...day, date: addDate(lastDate, index - count + 1) }));
       const markup = renderToStaticMarkup(createElement(DesktopSchedule, { days, now, selectedDate: lastDate, onSelect: vi.fn() }));
       expect(markup).toContain(`grid-template-columns:5rem repeat(${count}, minmax(0, 1fr))`);
       expect(markup.match(/<button /g)).toHaveLength(count * day.blocks.length);
-      expect(markup).toContain("10월 26일");
+      expect(markup).toContain("11월 11일");
     }
   });
   it("hides schedule UI from anonymous accounts and removes previous-authority reservation caches", async () => {

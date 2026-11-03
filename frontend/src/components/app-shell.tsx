@@ -74,6 +74,7 @@ export function AppShell({ children, wide = false }: { children: React.ReactNode
               <span className="app-brand-subtitle">따뜻한 합주실 예약 공간</span>
               {member && <nav aria-label="빠른 메뉴" className="app-compact-actions">
                 {navigationLink("/account", "계정")}
+                {navigationLink("/more", "더보기")}
               </nav>}
             </div>
           </div>

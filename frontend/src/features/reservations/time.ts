@@ -11,6 +11,10 @@ export function addDate(date: string, days: number): string {
   const timestamp = Date.parse(`${date}T00:00:00Z`);
   return new Date(timestamp + days * 86_400_000).toISOString().slice(0, 10);
 }
+export function bookingWindowLabel(today: string, through: string): string {
+  const daysAhead = Math.round((Date.parse(`${through}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
+  return `서울 기준 오늘부터 ${daysAhead}일 뒤까지 (오늘 포함 ${daysAhead + 1}일)`;
+}
 export function dateLabel(date: string): string { return new Intl.DateTimeFormat("ko-KR", { timeZone: "UTC", month: "long", day: "numeric", weekday: "short" }).format(new Date(`${date}T00:00:00Z`)); }
 export function timeLabel(value: string): string { return new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(value)); }
 export function blockLabel(block: Pick<ScheduleBlock, "startsAt" | "endsAt">): string {

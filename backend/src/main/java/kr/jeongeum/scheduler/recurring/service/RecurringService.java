@@ -16,6 +16,7 @@ import kr.jeongeum.scheduler.recurring.api.RecurringResponse;
 import kr.jeongeum.scheduler.recurring.domain.RecurringAssignment;
 import kr.jeongeum.scheduler.recurring.domain.RecurringRevision;
 import kr.jeongeum.scheduler.recurring.repository.RecurringRepository;
+import kr.jeongeum.scheduler.reservation.domain.BookingWindow;
 import kr.jeongeum.scheduler.reservation.domain.TimeBlock;
 import kr.jeongeum.scheduler.reservation.repository.ReservationRepository;
 import kr.jeongeum.scheduler.team.domain.Team;
@@ -53,7 +54,7 @@ public class RecurringService {
         access.administrator(actorId);
         LocalDate today = today(now());
         LocalDate from = fromInput == null ? today : RecurringInputs.date(fromInput);
-        LocalDate to = toInput == null ? today.plusDays(14) : RecurringInputs.date(toInput);
+        LocalDate to = toInput == null ? BookingWindow.through(today) : RecurringInputs.date(toInput);
         if (to.isBefore(from) || ChronoUnit.DAYS.between(from, to) >= 31) { throw ApiException.invalidInput(); }
         return recurring.assignments().stream().map(assignment -> detail(assignment, from, to)).toList();
     }
@@ -144,7 +145,7 @@ public class RecurringService {
         recurring.patternChanged();
         int responseStatus = existing == null ? 201 : 200;
         recurring.record(actorId, digest, fingerprint, method, route, responseStatus, stored.id(), operationId, now);
-        return new Result(detail(recurring.find(stored.id()).orElseThrow(), today(now), today(now).plusDays(14)), responseStatus);
+        return new Result(detail(recurring.find(stored.id()).orElseThrow(), today(now), BookingWindow.through(today(now))), responseStatus);
     }
     public Result end(long actorId, long assignmentId, String key, RecurringRequests.End input) {
         String digest = RecurringInputs.key(key);
@@ -184,7 +185,7 @@ public class RecurringService {
             materializer.apply(candidate, actions, instruments, actorId, operationId, now);
             recurring.patternChanged();
             recurring.record(actorId, digest, fingerprint, "POST", route, 200, assignmentId, operationId, now);
-            return new Result(detail(recurring.find(assignmentId).orElseThrow(), today(now), today(now).plusDays(14)), 200);
+            return new Result(detail(recurring.find(assignmentId).orElseThrow(), today(now), BookingWindow.through(today(now))), 200);
         });
     }
     private RecurringPlanning.Series proposed(RecurringAssignment existing, Pattern pattern, long actorId, Instant now) {
@@ -199,7 +200,7 @@ public class RecurringService {
             throw new ApiException(409, "IDEMPOTENCY_KEY_REUSED", "같은 재시도 키를 다른 요청에 사용할 수 없습니다.");
         }
         LocalDate today = today(now());
-        return new Result(detail(recurring.find(replay.assignmentId()).orElseThrow(DirectoryInputs::notFound), today, today.plusDays(14)), replay.status());
+        return new Result(detail(recurring.find(replay.assignmentId()).orElseThrow(DirectoryInputs::notFound), today, BookingWindow.through(today)), replay.status());
     }
     private RecurringResponse detail(RecurringAssignment assignment, LocalDate from, LocalDate to) {
         Team team = teams.findById(assignment.teamId()).orElseThrow(DirectoryInputs::notFound);

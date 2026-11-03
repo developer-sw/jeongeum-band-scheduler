@@ -34,6 +34,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import kr.jeongeum.scheduler.member.domain.Member;
 import kr.jeongeum.scheduler.member.repository.MemberRepository;
 import kr.jeongeum.scheduler.recurring.service.RecurringOpeningService;
+import kr.jeongeum.scheduler.recurring.service.RecurringOpeningWorker;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -122,7 +123,7 @@ class RecurringAssignmentIntegrationTest {
         assertError(leader.client().write("POST", assignmentPath(created) + "/end",
                 Map.of("expectedVersion", created.get("version").asLong(), "endDate", TODAY.toString()), key()), 403, "FORBIDDEN");
         assertEquals(1, count("recurring_assignments"));
-        assertEquals(3, fixedCount(group));
+        assertEquals(5, fixedCount(group));
     }
 
     @Test
@@ -146,8 +147,8 @@ class RecurringAssignmentIntegrationTest {
         assertEquals(0, sixty.get("quotaMinutes").asInt());
         assertEquals(6, claims(id(sixty)));
         assertEquals(0, quota(regular, TODAY));
-        assertEquals(3, regularAssignment.get("occurrences").size());
-        assertEquals(6, jdbc.queryForObject(
+        assertEquals(5, regularAssignment.get("occurrences").size());
+        assertEquals(10, jdbc.queryForObject(
                 "SELECT count(*) FROM reservation_operations WHERE kind = 'FIXED_GENERATE' AND actor_kind = 'SYSTEM' AND actor_user_id IS NULL", Long.class));
         Person outsider = person("MEMBER");
         assertError(createReservation(outsider.client(), personal(TODAY, "B01", "DRUMS")), 409, "RESERVATION_CONFLICT");
@@ -203,9 +204,9 @@ class RecurringAssignmentIntegrationTest {
         assertError(administrator.client().write("POST", assignmentPath(first) + "/end",
                 Map.of("expectedVersion", 0, "endDate", TODAY.toString()), requestKey), 409, "IDEMPOTENCY_KEY_REUSED");
         assertEquals(1, count("recurring_assignments"));
-        assertEquals(3, fixedCount(group));
-        assertEquals(3, count("recurring_occurrences"));
-        assertEquals(18, activeClaims());
+        assertEquals(5, fixedCount(group));
+        assertEquals(5, count("recurring_occurrences"));
+        assertEquals(30, activeClaims());
     }
 
     @Test
@@ -237,15 +238,45 @@ class RecurringAssignmentIntegrationTest {
     }
 
     @Test
+    void fullThirtyOneDateOpeningCoversLastDayAndRemainsIdempotentAcrossYearRollover() throws Exception {
+        LocalDate yearEnd = LocalDate.of(2026, 12, 31);
+        clock.set(yearEnd + "T11:00:00+09:00");
+        long group = team("REGULAR");
+        var worker = new RecurringOpeningWorker(opening);
+        LocalDate nextDate = yearEnd.plusDays(31); // January 31, a Sunday.
+        success(createAssignment(assignment(group, 7, "B01", nextDate)), 201);
+        worker.startup();
+        assertEquals(31, jdbc.queryForObject(
+                "SELECT count(*) FROM booking_days WHERE reservation_date BETWEEN ? AND ? AND status='OPEN' AND recurring_prepared",
+                Integer.class, yearEnd, yearEnd.plusDays(30)));
+        assertEquals(0, fixedCount(group));
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM booking_days WHERE reservation_date=?", Integer.class, nextDate));
+        opening.prepareDate(nextDate);
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM booking_days WHERE reservation_date=?", Integer.class, nextDate));
+        clock.set("2027-01-01T00:00:00+09:00");
+        worker.midnight();
+        assertEquals(1, activeAt(group, nextDate, "B01"));
+        assertEquals(31, jdbc.queryForObject(
+                "SELECT count(*) FROM booking_days WHERE reservation_date BETWEEN ? AND ? AND status='OPEN' AND recurring_prepared",
+                Integer.class, yearEnd.plusDays(1), nextDate));
+        Map<String, String> before = snapshots("booking_days", "recurring_occurrences", "reservations", "reservation_assets", "reservation_operations");
+        worker.catchUp();
+        assertEquals(before, snapshots(before.keySet().toArray(String[]::new)));
+        assertEquals(6, activeClaims());
+        assertEquals(1, success(administrator.client().get("/api/v1/recurring-assignments?from=2027-01-01&to=2027-01-31"), 200).size());
+        assertError(administrator.client().get("/api/v1/recurring-assignments?from=2027-01-01&to=2027-02-01"), 400, "INVALID_INPUT");
+    }
+
+    @Test
     void duplicateWorkersGenerateEachOccurrenceOnlyOnceAndRecoverMissingDateAfterRestart() throws Exception {
         long group = team("REGULAR");
-        success(createAssignment(assignment(group, 6, "B01", TODAY.plusDays(15))), 201);
+        success(createAssignment(assignment(group, 1, "B01", TODAY.plusDays(31))), 201);
         assertEquals(0, fixedCount(group));
         jdbc.update("INSERT INTO booking_days(reservation_date,status,created_at) VALUES (?,'PREPARING',?)",
-                TODAY.plusDays(15), Timestamp.from(clock.instant()));
+                TODAY.plusDays(31), Timestamp.from(clock.instant()));
         clock.set(TODAY.plusDays(1) + "T00:00:00+09:00");
         CountDownLatch start = new CountDownLatch(1);
-        try (Connection connection = lock("SELECT reservation_date FROM booking_days WHERE reservation_date='2026-11-14' FOR UPDATE");
+        try (Connection connection = lock("SELECT reservation_date FROM booking_days WHERE reservation_date='2026-11-30' FOR UPDATE");
                 ExecutorService executor = Executors.newFixedThreadPool(2)) {
             var first = executor.submit(() -> { start.await(); opening.openBookableWindow(); return null; });
             var second = executor.submit(() -> { start.await(); opening.openBookableWindow(); return null; });
@@ -262,17 +293,17 @@ class RecurringAssignmentIntegrationTest {
         assertEquals(6, activeClaims());
         assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM reservation_operations WHERE kind = 'FIXED_GENERATE'", Long.class));
         assertEquals("OPEN", jdbc.queryForObject(
-                "SELECT status FROM booking_days WHERE reservation_date = ?", String.class, TODAY.plusDays(15)));
+                "SELECT status FROM booking_days WHERE reservation_date = ?", String.class, TODAY.plusDays(31)));
         assertTrue(jdbc.queryForObject(
-                "SELECT recurring_prepared FROM booking_days WHERE reservation_date = ?", Boolean.class, TODAY.plusDays(15)));
+                "SELECT recurring_prepared FROM booking_days WHERE reservation_date = ?", Boolean.class, TODAY.plusDays(31)));
     }
 
     @Test
     void actualTenSecondClaimLockTimeoutRollsBackFixedOpeningContinuesNextDateAndRecoversOnce() throws Exception {
         long group = team("REGULAR");
-        LocalDate blockedDate = TODAY.plusDays(15);
+        LocalDate blockedDate = TODAY.plusDays(31);
         LocalDate followingDate = blockedDate.plusDays(1);
-        success(createAssignment(assignment(group, 6, "B01", blockedDate)), 201);
+        success(createAssignment(assignment(group, 1, "B01", blockedDate)), 201);
         jdbc.update("INSERT INTO booking_days(reservation_date,status,created_at) VALUES (?,'PREPARING',?)",
                 blockedDate, Timestamp.from(clock.instant()));
         clock.set(TODAY.plusDays(2) + "T00:00:00+09:00");
@@ -337,8 +368,8 @@ class RecurringAssignmentIntegrationTest {
     void koreanMidnightExpandsExactlyOneDateAndFixedClaimsPrecedeNewFreeReservation() throws Exception {
         long group = team("ADDITIONAL");
         Person individual = person("MEMBER");
-        LocalDate newDate = TODAY.plusDays(15);
-        success(createAssignment(assignment(group, 6, "B10", newDate)), 201);
+        LocalDate newDate = TODAY.plusDays(31);
+        success(createAssignment(assignment(group, 1, "B10", newDate)), 201);
         clock.set(TODAY + "T23:59:59+09:00");
         assertError(createReservation(individual.client(), personal(newDate, "B10", "DRUMS")), 409, "DATE_NOT_OPEN");
         assertEquals(0, fixedCount(group));
@@ -350,7 +381,7 @@ class RecurringAssignmentIntegrationTest {
         JsonNode schedule = success(individual.client().get("/api/v1/schedule"), 200);
         assertEquals(TODAY.plusDays(1).toString(), schedule.get("today").asString());
         assertEquals(newDate.toString(), schedule.get("bookableThrough").asString());
-        JsonNode day = schedule.get("days").get(14);
+        JsonNode day = schedule.get("days").get(30);
         assertEquals("OPEN", day.get("openingStatus").asString());
         assertFalse(block(day, "B10").get("canReservePersonal").asBoolean());
         assertEquals(0, block(day, "B10").get("availableInstrumentCodes").size());
@@ -363,13 +394,13 @@ class RecurringAssignmentIntegrationTest {
     void dayLockDelaysOpeningAndFreeCreationCannotPassAWorkerPreparingFixedOccupancy() throws Exception {
         long group = team("REGULAR");
         Person individual = person("MEMBER");
-        LocalDate newDate = TODAY.plusDays(15);
-        success(createAssignment(assignment(group, 6, "B01", newDate)), 201);
+        LocalDate newDate = TODAY.plusDays(31);
+        success(createAssignment(assignment(group, 1, "B01", newDate)), 201);
         jdbc.update("INSERT INTO booking_days(reservation_date, status, created_at) VALUES (?, 'PREPARING', ?)",
                 newDate, Timestamp.from(clock.instant()));
         clock.set(TODAY.plusDays(1) + "T00:00:00+09:00");
         JsonNode csrf = individual.client().csrf();
-        try (Connection connection = lock("SELECT reservation_date FROM booking_days WHERE reservation_date = '2026-11-14' FOR UPDATE");
+        try (Connection connection = lock("SELECT reservation_date FROM booking_days WHERE reservation_date = '2026-11-30' FOR UPDATE");
                 ExecutorService executor = Executors.newFixedThreadPool(2)) {
             var worker = executor.submit(() -> { opening.openBookableWindow(); return null; });
             awaitWaiter("booking_days");
@@ -427,7 +458,7 @@ class RecurringAssignmentIntegrationTest {
         assertEquals(id(original), id(fixed(group, monday.plusDays(2), "B01")));
         assertEquals(0, activeAt(group, monday.plusDays(4), "B02"));
         assertEquals(1, activeAt(group, monday.plusDays(11), "B02"));
-        assertEquals(2, assignmentById(id(series)).get("occurrences").size());
+        assertEquals(5, assignmentById(id(series)).get("occurrences").size());
     }
 
     @Test
@@ -443,7 +474,7 @@ class RecurringAssignmentIntegrationTest {
         assertEquals(id(original), id(fixed(group, monday.plusDays(4), "B01")));
         assertEquals(0, activeAt(group, monday.plusDays(2), "B02"));
         assertEquals(1, activeAt(group, monday.plusDays(9), "B02"));
-        assertEquals(2, assignmentById(id(series)).get("occurrences").size());
+        assertEquals(5, assignmentById(id(series)).get("occurrences").size());
     }
 
     @Test
@@ -513,7 +544,7 @@ class RecurringAssignmentIntegrationTest {
         long group = team("REGULAR");
         Person individual = person("MEMBER");
         JsonNode series = success(createAssignment(assignment(group, 5, "B07", TODAY)), 201);
-        LocalDate effectiveMonday = LocalDate.of(2026, 11, 23);
+        LocalDate effectiveMonday = LocalDate.of(2026, 12, 7);
         success(administrator.client().write("PATCH", assignmentPath(series),
                 revision(series, 3, "B07", effectiveMonday), key()), 200);
         assertEquals(0, jdbc.queryForObject(
@@ -537,19 +568,19 @@ class RecurringAssignmentIntegrationTest {
     @Test
     void workerAndPatternRevisionSerializeThenOutOfWindowMoveStaysPlannedUntilItsDateOpens() throws Exception {
         long group = team("REGULAR");
-        LocalDate lastBookable = TODAY.plusDays(15); // Opens after midnight on October 31.
+        LocalDate lastBookable = TODAY.plusDays(31); // Opens after midnight on October 31.
         LocalDate deferred = lastBookable.plusDays(1);
-        JsonNode series = success(createAssignment(assignment(group, 6, "B01", lastBookable)), 201);
+        JsonNode series = success(createAssignment(assignment(group, 1, "B01", lastBookable)), 201);
         jdbc.update("INSERT INTO booking_days(reservation_date,status,created_at) VALUES (?,'PREPARING',?)",
                 lastBookable, Timestamp.from(clock.instant()));
         clock.set(TODAY.plusDays(1) + "T00:00:00+09:00");
         JsonNode csrf = administrator.client().csrf();
-        try (Connection connection = lock("SELECT reservation_date FROM booking_days WHERE reservation_date='2026-11-14' FOR UPDATE");
+        try (Connection connection = lock("SELECT reservation_date FROM booking_days WHERE reservation_date='2026-11-30' FOR UPDATE");
                 ExecutorService executor = Executors.newFixedThreadPool(2)) {
             var worker = executor.submit(() -> { opening.openBookableWindow(); return null; });
             awaitWaiter("booking_days");
             var update = executor.submit(() -> administrator.client().send("PATCH", assignmentPath(series),
-                    revision(series, 7, "B02", lastBookable), csrf, key()));
+                    revision(series, 2, "B02", lastBookable), csrf, key()));
             awaitWaiter("directory_mutation_guard");
             connection.commit();
             worker.get(30, TimeUnit.SECONDS);
@@ -601,7 +632,7 @@ class RecurringAssignmentIntegrationTest {
         assertEquals("ENDED", occurrence(expiredSeries, TODAY).get("state").asString());
         assertEquals(0, activeAt(ended, TODAY, "B01"));
         opening.openBookableWindow();
-        assertEquals(2, fixedCount(ended));
+        assertEquals(4, fixedCount(ended));
         assertEquals("ENDED", occurrence(assignmentById(id(expiredSeries)), TODAY).get("state").asString());
     }
 
@@ -729,7 +760,7 @@ class RecurringAssignmentIntegrationTest {
         assertEquals("ENDED", occurrence(ended, TODAY.plusDays(14)).get("state").asString());
         assertEquals(0, activeAt(group, TODAY.plusDays(14), "B01"));
         opening.openBookableWindow();
-        assertEquals(3, count("recurring_occurrences"));
+        assertEquals(5, count("recurring_occurrences"));
         assertEquals(1, activeAt(group, TODAY, "B01"));
         assertEquals(6, activeClaims());
         assertEquals(0, quota(group, TODAY));
@@ -738,7 +769,7 @@ class RecurringAssignmentIntegrationTest {
     @Test
     void futureEndDateStillGeneratesItsIncludedOccurrenceWhenThatDateBecomesBookable() throws Exception {
         long group = team("ADDITIONAL");
-        LocalDate future = TODAY.plusDays(21);
+        LocalDate future = TODAY.plusDays(35);
         JsonNode series = success(createAssignment(assignment(group, 5, "B01", future)), 201);
         success(administrator.client().write("POST", assignmentPath(series) + "/end",
                 Map.of("expectedVersion", series.get("version").asLong(), "endDate", future.toString()), key()), 200);
@@ -788,7 +819,7 @@ class RecurringAssignmentIntegrationTest {
         stale.put("expectedVersion", series.get("version").asLong() + 1);
         assertError(administrator.client().write("PATCH", assignmentPath(series), stale, key()), 409, "VERSION_CONFLICT");
         assertEquals(1, count("recurring_assignment_revisions"));
-        assertEquals(3, fixedCount(group));
+        assertEquals(5, fixedCount(group));
         assertEquals(1, activeAt(group, TODAY, "B01"));
     }
 
@@ -832,8 +863,8 @@ class RecurringAssignmentIntegrationTest {
             assertSqlState(connection, "23514",
                     "UPDATE recurring_occurrences SET original_scheduled_date=original_scheduled_date+7 WHERE id=?", firstOccurrence);
         }
-        assertEquals(6, count("recurring_occurrences"));
-        assertEquals(36, activeClaims());
+        assertEquals(10, count("recurring_occurrences"));
+        assertEquals(60, activeClaims());
     }
 
     @Test

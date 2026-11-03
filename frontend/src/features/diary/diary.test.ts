@@ -3,7 +3,9 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import type { Member } from "@/features/auth/types";
 import type { ReservationSummary, ScheduleBlock, ScheduleDay } from "@/features/reservations/types";
+import { addDate, bookingWindowLabel } from "@/features/reservations/time";
 import { inBookingRange, monthCells, moveMonth, visibleDays, weekDates, weekTarget } from "./calendar";
+import { CalendarSidebar, DateStrip } from "./calendar-view";
 import { slotView } from "./slot";
 import { Timetable } from "./timetable";
 
@@ -14,6 +16,36 @@ const personal: ReservationSummary = { id: "51", version: 0, subjectType: "PERSO
 const now = Date.parse("2026-10-12T13:00:00+09:00");
 
 describe("diary calendar uses canonical server dates", () => {
+  it.each(["2026-12-15", "2027-01-31", "2028-02-01"])("keeps all 31 server dates across month/year boundaries from %s", (today) => {
+    const through = addDate(today, 30);
+    const offered = Array.from({ length: 31 }, (_, index) => ({ ...day, date: addDate(today, index) }));
+    const staleAndFuture = [{ ...day, date: addDate(today, -1) }, ...offered.toReversed(), { ...day, date: addDate(through, 1) }];
+    const actual = visibleDays(staleAndFuture, today, through);
+    expect(actual.map((item) => item.date)).toEqual(offered.map((item) => item.date));
+    expect(inBookingRange(through, today, through)).toBe(true);
+    expect(inBookingRange(addDate(through, 1), today, through)).toBe(false);
+    expect(bookingWindowLabel(today, through)).toBe("서울 기준 오늘부터 30일 뒤까지 (오늘 포함 31일)");
+    let selected = today;
+    while (weekTarget(selected, 1, actual)) selected = weekTarget(selected, 1, actual)!;
+    expect(weekDates(selected)).toContain(through);
+    expect(weekTarget(selected, 1, actual)).toBeUndefined();
+    expect(weekTarget(today, -1, actual)).toBeUndefined();
+    const strip = renderToStaticMarkup(createElement(DateStrip, { days: actual, selected: through, today, disabled: false, onSelect: () => {} }));
+    expect(strip.match(/<button /g)).toHaveLength(31);
+    expect(strip.match(/aria-pressed="true"/g)).toHaveLength(1);
+    expect(strip).not.toContain("예약 기간 밖");
+  });
+  it("marks the last bookable date selected and the next date unavailable in the next-year calendar", () => {
+    const today = "2026-12-15", through = "2027-01-14";
+    const days = Array.from({ length: 31 }, (_, index) => ({ ...day, date: addDate(today, index) }));
+    const markup = renderToStaticMarkup(createElement(CalendarSidebar, { selected: through, today, through, days, disabled: false, onSelect: () => {}, onUnavailable: () => {} }));
+    expect(markup).toContain("2027년 1월");
+    expect(markup).toContain('aria-label="1월 14일 (목) · 예약 가능 날짜"');
+    expect(markup).toContain('aria-label="1월 15일 (금) · 예약 기간 밖"');
+    expect(markup).toContain("서울 기준 오늘부터 30일 뒤까지 (오늘 포함 31일)");
+    expect(markup).not.toContain("14일 뒤까지");
+    expect(markup.match(/aria-pressed="true"/g)).toHaveLength(1);
+  });
   it("starts Monday and includes Sunday across month/year boundaries", () => {
     expect(weekDates("2026-11-01")).toEqual(["2026-10-26", "2026-10-27", "2026-10-28", "2026-10-29", "2026-10-30", "2026-10-31", "2026-11-01"]);
     expect(weekDates("2027-01-01")[0]).toBe("2026-12-28");

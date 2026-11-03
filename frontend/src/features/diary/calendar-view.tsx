@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { dateLabel } from "@/features/reservations/time";
+import { bookingWindowLabel, dateLabel } from "@/features/reservations/time";
 import type { ScheduleDay } from "@/features/reservations/types";
 import { inBookingRange, monthCells, monthLabel, moveMonth, weekdays, weekDates } from "./calendar";
 
@@ -31,7 +31,7 @@ function MonthCalendar({ selected, today, through, days, disabled, onSelect, onU
     })}</div>
     <button type="button" className="diary-calendar-today" disabled={disabled} onClick={() => { setMonth(today.slice(0, 7)); onSelect(today); }}>오늘로 돌아가기</button>
     <div className="diary-calendar-key"><span>● 오늘</span><span>골드: 선택 날짜</span><span>옅은 골드: 선택 주</span><span>밑줄: 예약 기간</span></div>
-    <p className="diary-small">서울 기준 오늘부터 14일 뒤까지.<br />이전 기록은 예약·이력에서 확인해요.</p>
+    <p className="diary-small">{bookingWindowLabel(today, through)}.<br />이전 기록은 예약·이력에서 확인해요.</p>
   </div>;
 }
 

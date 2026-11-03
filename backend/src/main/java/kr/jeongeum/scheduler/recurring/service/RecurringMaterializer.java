@@ -15,6 +15,7 @@ import kr.jeongeum.scheduler.notification.service.NotificationPublisher;
 import kr.jeongeum.scheduler.recurring.api.RecurringResponse;
 import kr.jeongeum.scheduler.recurring.domain.RecurringOccurrence;
 import kr.jeongeum.scheduler.recurring.repository.RecurringRepository;
+import kr.jeongeum.scheduler.reservation.domain.BookingWindow;
 import kr.jeongeum.scheduler.reservation.domain.Instrument;
 import kr.jeongeum.scheduler.reservation.domain.Reservation;
 import kr.jeongeum.scheduler.reservation.domain.TimeBlock;
@@ -49,7 +50,7 @@ public class RecurringMaterializer {
         guard.lock();
         Instant now = now();
         LocalDate today = LocalDate.ofInstant(now, TimeBlock.SEOUL);
-        if (date.isBefore(today) || date.isAfter(today.plusDays(14))) { return; }
+        if (date.isBefore(today) || date.isAfter(BookingWindow.through(today))) { return; }
         List<RecurringPlanning.Series> all = planning.all();
         List<Instrument> instruments = locks.subjects(all, null, null);
         recurring.lockPattern(false);
@@ -57,7 +58,7 @@ public class RecurringMaterializer {
         if (reservations.prepared(date)) { return; }
         now = now();
         today = LocalDate.ofInstant(now, TimeBlock.SEOUL);
-        if (date.isBefore(today) || date.isAfter(today.plusDays(14))) { return; }
+        if (date.isBefore(today) || date.isAfter(BookingWindow.through(today))) { return; }
         List<RecurringPlanning.Series> selected = all.stream().filter(series -> planning.activeTeam(series.assignment().teamId())).toList();
         for (var series : selected) {
             RecurringPlanning.Plan plan = planning.plan(series, RecurringPlanning.week(date), now);
@@ -78,7 +79,7 @@ public class RecurringMaterializer {
     public List<Action> actions(RecurringPlanning.Series series, Instant now) {
         LocalDate today = LocalDate.ofInstant(now, TimeBlock.SEOUL);
         TreeSet<LocalDate> weeks = new TreeSet<>();
-        for (LocalDate week = RecurringPlanning.week(today); !week.isAfter(RecurringPlanning.week(today.plusDays(14))); week = week.plusWeeks(1)) {
+        for (LocalDate week = RecurringPlanning.week(today); !week.isAfter(RecurringPlanning.week(BookingWindow.through(today))); week = week.plusWeeks(1)) {
             weeks.add(week);
         }
         for (RecurringOccurrence occurrence : series.occurrences()) {
@@ -93,7 +94,7 @@ public class RecurringMaterializer {
             RecurringPlanning.Plan plan = planning.plan(series, week, now);
             if (plan == null && occurrence == null) { continue; }
             if (plan != null && plan.date().isBefore(today) && occurrence == null) { continue; }
-            if (plan != null && plan.date().isAfter(today.plusDays(14)) && occurrence == null) { continue; }
+            if (plan != null && plan.date().isAfter(BookingWindow.through(today)) && occurrence == null) { continue; }
             result.add(new Action(occurrence, plan, planning.preserved(occurrence, now)));
         }
         return result;
@@ -175,7 +176,7 @@ public class RecurringMaterializer {
                     && RecurringPlanning.sameLocation(plan, reservation));
             if (unchanged) { continue; }
             if (!now.isBefore(plan.block().endsAt(plan.date()))) { saveOccurrence(series, occurrence, plan, "ENDED", now); }
-            else if (plan.date().isBefore(today) || plan.date().isAfter(today.plusDays(14))) {
+            else if (plan.date().isBefore(today) || plan.date().isAfter(BookingWindow.through(today))) {
                 saveOccurrence(series, occurrence, plan, "PLANNED", now);
             } else { materialize(series, occurrence, plan, instruments, now); }
         }

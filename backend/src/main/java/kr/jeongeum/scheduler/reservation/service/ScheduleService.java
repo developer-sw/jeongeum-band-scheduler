@@ -15,6 +15,7 @@ import kr.jeongeum.scheduler.common.concurrency.DirectoryMutationGuard;
 import kr.jeongeum.scheduler.recurring.service.RecurringOpeningService;
 import kr.jeongeum.scheduler.reservation.api.InstrumentResponse;
 import kr.jeongeum.scheduler.reservation.api.ScheduleResponse;
+import kr.jeongeum.scheduler.reservation.domain.BookingWindow;
 import kr.jeongeum.scheduler.reservation.domain.Instrument;
 import kr.jeongeum.scheduler.reservation.domain.Reservation;
 import kr.jeongeum.scheduler.reservation.domain.TimeBlock;
@@ -42,7 +43,7 @@ public class ScheduleService {
         views.context(actorId);
         LocalDate today = LocalDate.ofInstant(now(), TimeBlock.SEOUL);
         LocalDate from = fromInput == null ? today : ReservationInputs.date(fromInput);
-        LocalDate to = toInput == null ? today.plusDays(14) : ReservationInputs.date(toInput);
+        LocalDate to = toInput == null ? BookingWindow.through(today) : ReservationInputs.date(toInput);
         requireRange(from, to, today);
         opening.prepareRange(from, to);
         return writes.execute(status -> scheduleTransactional(actorId, fromInput, toInput));
@@ -53,7 +54,7 @@ public class ScheduleService {
         Instant initialNow = now();
         LocalDate initialToday = LocalDate.ofInstant(initialNow, TimeBlock.SEOUL);
         LocalDate from = fromInput == null ? initialToday : ReservationInputs.date(fromInput);
-        LocalDate to = toInput == null ? initialToday.plusDays(14) : ReservationInputs.date(toInput);
+        LocalDate to = toInput == null ? BookingWindow.through(initialToday) : ReservationInputs.date(toInput);
         requireRange(from, to, initialToday);
         List<Instrument> instruments = reservations.lockInstruments();
         context = new ReservationViews.Context(context.actor(), context.memberships(), context.roles(), instruments);
@@ -73,7 +74,7 @@ public class ScheduleService {
         for (LocalDate date = from; !date.isAfter(to); date = date.plusDays(1)) {
             days.add(day(context, date, statuses.get(date), byDay.getOrDefault(date, List.of()), codes, quotas, now));
         }
-        return new ScheduleResponse(today, today.plusDays(14), now, TimeBlock.SEOUL.getId(),
+        return new ScheduleResponse(today, BookingWindow.through(today), now, TimeBlock.SEOUL.getId(),
                 instruments.stream().map(InstrumentResponse::from).toList(), days);
     }
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
@@ -109,7 +110,7 @@ public class ScheduleService {
         return new ScheduleResponse.Day(date, status, new ScheduleResponse.Quota(personalUsed, Math.max(0, 120 - personalUsed)), teamQuotas, blocks);
     }
     private static void requireRange(LocalDate from, LocalDate to, LocalDate today) {
-        if (to.isBefore(from) || ChronoUnit.DAYS.between(from, to) >= 15 || from.isBefore(today) || to.isAfter(today.plusDays(14))) {
+        if (to.isBefore(from) || ChronoUnit.DAYS.between(from, to) >= BookingWindow.DATE_COUNT || from.isBefore(today) || to.isAfter(BookingWindow.through(today))) {
             throw ApiException.invalidInput();
         }
     }

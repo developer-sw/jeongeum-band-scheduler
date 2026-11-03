@@ -340,7 +340,7 @@ V8의 관리자 고장·복구·재시도 모델은 [INSTRUMENT_FAULTS](INSTRUME
 - `reservation_date`를 PK로 하는 작은 날짜 mutex 테이블이다.
 - 상태는 `PREPARING/OPEN`, 고정 반영 완료 시각, 생성 시각, version을 둔다.
 - 운영일은 서울 `LocalDate`이며 24:00 종료가 다음 날짜 mutex에 속하는 것으로 해석하지 않는다.
-- 과거 날짜 행을 유지한다. `OPEN` 상태여도 현재 `오늘..오늘+14일` 범위 밖의 생성 요청은 거절한다.
+- 과거 날짜 행을 유지한다. `OPEN` 상태여도 현재 서울 `오늘..오늘+30일`(포함 31일) 범위 밖의 생성 요청은 거절한다. 2026-11-03 기간 확장은 기존 날짜·회차·예약 모델을 재사용하며 새로운 테이블·컬럼이나 과거 행의 초기화를 요구하지 않는다.
 - 없는 날짜는 선행 `directory_mutation_guard`를 보유한 업무 트랜잭션에서 `INSERT ... ON CONFLICT DO NOTHING`으로 생성한 뒤 날짜 오름차순으로 `FOR UPDATE`한다. 없는 행에 `FOR UPDATE`만 호출해서는 잠금이 생기지 않는다.
 - V5는 `recurring_prepared` 완료 표식을 추가한다. V4의 기존 날짜는 데이터를 유지하고 표식을 false로 시작한다. 실제 고정 회차 반영과 OPEN 전환을 같은 트랜잭션에서 수행한 뒤에만 일정에서 공개한다. 저장된 OPEN이어도 표식이 false인 날짜는 PREPARING으로 취급한다. 상세 구현 모델은 [RECURRING_ASSIGNMENTS](RECURRING_ASSIGNMENTS.md)를 따른다.
 

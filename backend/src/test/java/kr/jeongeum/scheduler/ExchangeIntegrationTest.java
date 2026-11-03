@@ -818,10 +818,32 @@ class ExchangeIntegrationTest {
     }
 
     @Test
+    void exchangeAllowsLastBookableDateButRejectsExistingSourceOutsideCurrentWindow() throws Exception {
+        Person requester = person("MEMBER"), counterpart = person("MEMBER");
+        JsonNode left = personal(requester, TODAY, "B07", "DRUMS");
+        JsonNode last = personal(counterpart, TODAY.plusDays(30), "B07", "VOCAL");
+        JsonNode candidates = success(requester.client().get("/api/v1/exchange-candidates"), 200);
+        assertTrue(strings(candidates.get("reservations"), "id").contains(last.get("id").asString()));
+        approve(counterpart.client(), request(requester.client(), List.of(left), List.of(last)));
+        assertSuccessor(left, successor(left), TODAY.plusDays(30), "B07", Set.of("DRUMS"));
+        assertSuccessor(last, successor(last), TODAY, "B07", Set.of("VOCAL"));
+
+        // A future fixture can exist after a controlled clock rollback; exchange must
+        // validate the current server window rather than trusting a prepared DB day.
+        clock.set(TODAY.plusDays(1) + "T11:00:00+09:00");
+        JsonNode outside = personal(counterpart, TODAY.plusDays(31), "B08", "BASS");
+        clock.set(TODAY + "T11:00:00+09:00");
+        JsonNode valid = personal(requester, TODAY, "B08", "KEYBOARD");
+        Map<String, String> before = allSnapshots();
+        assertError(createExchange(requester.client(), List.of(valid), List.of(outside), key()), 409, "DATE_NOT_OPEN");
+        assertEquals(before, allSnapshots());
+    }
+
+    @Test
     void candidateReadUsesOpaqueBundleKeysWithoutExposingOtherOwnerCreatorLoginOrHistoricalDetails() throws Exception {
         Person a = person("MEMBER"), b = person("MEMBER"), reader = person("MEMBER");
         JsonNode first = personal(a, TODAY, "B01", "DRUMS"), second = personal(a, TODAY, "B02", "VOCAL"), target = personal(b, TODAY, "B07", "BASS");
-        JsonNode values = success(reader.client().get("/api/v1/exchange-candidates?from=" + TODAY + "&to=" + TODAY.plusDays(14)), 200);
+        JsonNode values = success(reader.client().get("/api/v1/exchange-candidates?from=" + TODAY + "&to=" + TODAY.plusDays(30)), 200);
         assertTrue(values.has("serverTime")); assertEquals(3, values.get("reservations").size());
         Map<String, JsonNode> byId = new HashMap<>(); for (JsonNode candidate : values.get("reservations")) { byId.put(candidate.get("id").asString(), candidate); }
         JsonNode one = byId.get(first.get("id").asString()), two = byId.get(second.get("id").asString()), other = byId.get(target.get("id").asString());
@@ -832,7 +854,7 @@ class ExchangeIntegrationTest {
         }
         success(cancel(a.client(), first), 200); clock.set(TODAY + "T13:00:00+09:00");
         assertEquals(Set.of(target.get("id").asString()), strings(success(reader.client().get("/api/v1/exchange-candidates"), 200).get("reservations"), "id"));
-        assertError(reader.client().get("/api/v1/exchange-candidates?from=" + TODAY + "&to=" + TODAY.plusDays(15)), 400, "INVALID_INPUT");
+        assertError(reader.client().get("/api/v1/exchange-candidates?from=" + TODAY + "&to=" + TODAY.plusDays(31)), 400, "INVALID_INPUT");
     }
     @FunctionalInterface private interface Request { HttpResponse<String> run() throws Exception; }
     private List<HttpResponse<String>> race(Request first, Request second) throws Exception {
