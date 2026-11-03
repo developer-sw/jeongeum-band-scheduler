@@ -21,6 +21,7 @@ import kr.jeongeum.scheduler.exchange.repository.ExchangeRepository;
 import kr.jeongeum.scheduler.member.domain.Member;
 import kr.jeongeum.scheduler.member.repository.MemberRepository;
 import kr.jeongeum.scheduler.reservation.api.ReservationResponse;
+import kr.jeongeum.scheduler.reservation.domain.BookingWindow;
 import kr.jeongeum.scheduler.reservation.domain.Instrument;
 import kr.jeongeum.scheduler.reservation.domain.Reservation;
 import kr.jeongeum.scheduler.reservation.domain.TimeBlock;
@@ -116,8 +117,8 @@ public class ExchangeService {
     public ExchangeCandidatesResponse candidates(long actorId,String fromInput,String toInput) {
         return writes.execute(status -> {
             ReservationViews.Context context=views.context(actorId);Instant now=now();LocalDate today=LocalDate.ofInstant(now,TimeBlock.SEOUL);
-            LocalDate from=fromInput==null?today:date(fromInput),to=toInput==null?today.plusDays(14):date(toInput);
-            if (from.isBefore(today) || to.isAfter(today.plusDays(14)) || to.isBefore(from)) { throw ApiException.invalidInput(); }
+            LocalDate from=fromInput==null?today:date(fromInput),to=toInput==null?BookingWindow.through(today):date(toInput);
+            if (from.isBefore(today) || to.isAfter(BookingWindow.through(today)) || to.isBefore(from)) { throw ApiException.invalidInput(); }
             List<ExchangeCandidate> result=new ArrayList<>();
             for (Reservation source:reservations.between(from,to)) {
                 if (!"CONFIRMED".equals(source.status()) || !now.isBefore(source.startsAt()) || !reservations.prepared(source.date()) || !subjectActive(source)) { continue; }
@@ -334,7 +335,7 @@ public class ExchangeService {
     }
     private void requireOpenDays(List<Reservation> sources,Instant now) {
         LocalDate today=LocalDate.ofInstant(now,TimeBlock.SEOUL);
-        for (Reservation source:sources) { if (source.date().isBefore(today) || source.date().isAfter(today.plusDays(14)) || !reservations.prepared(source.date())) {
+        for (Reservation source:sources) { if (source.date().isBefore(today) || source.date().isAfter(BookingWindow.through(today)) || !reservations.prepared(source.date())) {
             throw conflict("DATE_NOT_OPEN","교환 대상 날짜가 아직 개방되지 않았습니다.");
         } }
     }

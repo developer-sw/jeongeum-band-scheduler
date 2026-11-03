@@ -24,8 +24,8 @@ const member: Member = { id: "9007199254740993", loginId: "fixture.schedule", di
   { teamId: "19", teamName: "가상 추가조", kind: "ADDITIONAL", role: "MEMBER" },
 ] };
 const today = "2026-10-12";
-const snapshot: ScheduleSnapshot = { today, bookableThrough: "2026-10-26", serverTime: "2026-10-12T14:10:00+09:00", timeZone: "Asia/Seoul", receivedAtMillis: 0, instruments: [],
-  days: Array.from({ length: 15 }, (_, index) => ({ date: addDate(today, index), openingStatus: "OPEN", personalQuota: { usedMinutes: 0, remainingMinutes: 120 }, teamQuotas: [], blocks: [] })),
+const snapshot: ScheduleSnapshot = { today, bookableThrough: "2026-11-11", serverTime: "2026-10-12T14:10:00+09:00", timeZone: "Asia/Seoul", receivedAtMillis: 0, instruments: [],
+  days: Array.from({ length: 31 }, (_, index) => ({ date: addDate(today, index), openingStatus: "OPEN", personalQuota: { usedMinutes: 0, remainingMinutes: 120 }, teamQuotas: [], blocks: [] })),
 };
 const now = Date.parse(snapshot.serverTime);
 const base: ReservationDetail = { id: "71", version: 0, subjectType: "TEAM", purpose: "REGULAR", teamId: "17", teamName: "가상 정규조 하나", instrumentCodes: ["DRUMS"], status: "CONFIRMED", phase: "FUTURE", isMine: true, canCancel: true, canChange: true, ownerUserId: null, creatorUserId: member.id, date: today, blockCode: "B03", startsAt: `${today}T14:00:00+09:00`, endsAt: `${today}T15:00:00+09:00`, usableFrom: `${today}T14:00:00+09:00`, quotaMinutes: 60, quotaExempt: false, originKind: "MANUAL", teamFaultWarnings: [], canceledAt: null, cancelReason: null, successorIds: [], dualAssetException: false };
@@ -51,11 +51,11 @@ describe("current membership team schedule", () => {
     expect(myTeamSchedule(member, snapshot, records).flatMap((day) => day.reservations.map((reservation) => reservation.id))).toEqual(["71", "72", "73"]);
     expect(myTeamSchedule({ ...member, globalRole: "GLOBAL_ADMIN" }, snapshot, records).flatMap((day) => day.reservations.map((reservation) => reservation.id))).toEqual(["71", "72", "73"]);
   });
-  it("uses only open materialized dates, includes today+14 and sorts by date then start without mutating the source", () => {
+  it("uses only open materialized dates, includes today+30 and sorts by date then start without mutating the source", () => {
     const preparing = { ...snapshot, days: snapshot.days.map((day) => day.date === "2026-10-13" ? { ...day, openingStatus: "PREPARING" as const } : day) };
-    const records = [booking("last", { date: snapshot.bookableThrough, startsAt: "2026-10-26T18:00:00+09:00", endsAt: "2026-10-26T19:30:00+09:00" }),
+    const records = [booking("last", { date: snapshot.bookableThrough, startsAt: "2026-11-11T18:00:00+09:00", endsAt: "2026-11-11T19:30:00+09:00" }),
       base, booking("earlier", { startsAt: `${today}T12:00:00+09:00`, endsAt: `${today}T13:00:00+09:00` }),
-      booking("preparing", { date: "2026-10-13" }), booking("yesterday", { date: "2026-10-11" }), booking("outside", { date: "2026-10-27" })];
+      booking("preparing", { date: "2026-10-13" }), booking("yesterday", { date: "2026-10-11" }), booking("outside", { date: "2026-11-12" })];
     const original = structuredClone(records);
     const result = myTeamSchedule(member, preparing, records);
     expect(result.map((day) => day.date)).toEqual([today, snapshot.bookableThrough]);
@@ -104,7 +104,7 @@ describe("team schedule views and authorized entry", () => {
     navigation.date = snapshot.bookableThrough;
     expect(renderPage(member, [], ReservationsPage)).toContain(`id="reservation-date"`);
     expect(renderPage(member, [], ReservationsPage).match(/<input id="reservation-date"[^>]*>/)?.[0]).toContain(`value="${snapshot.bookableThrough}"`);
-    navigation.date = "2026-10-27";
+    navigation.date = "2026-11-12";
     expect(renderPage(member, [], ReservationsPage).match(/<input id="reservation-date"[^>]*>/)?.[0]).toContain(`value="${today}"`);
   });
 });
@@ -115,7 +115,7 @@ describe("existing API and scoped query reuse", () => {
     vi.stubGlobal("fetch", fetchMock);
     expect(await getMyReservations(today, snapshot.bookableThrough)).toEqual([base]);
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(fetchMock.mock.calls[0][0]).toBe("/api/v1/reservations?scope=mine&from=2026-10-12&to=2026-10-26");
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/v1/reservations?scope=mine&from=2026-10-12&to=2026-11-11");
     expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: "GET", credentials: "same-origin", cache: "no-store" });
   });
   it("shares mutation refresh and removes the old window cache after membership changes", async () => {

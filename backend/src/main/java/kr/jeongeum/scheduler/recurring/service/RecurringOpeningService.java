@@ -3,6 +3,7 @@ package kr.jeongeum.scheduler.recurring.service;
 import java.time.Clock;
 import java.time.LocalDate;
 import kr.jeongeum.scheduler.common.api.ApiException;
+import kr.jeongeum.scheduler.reservation.domain.BookingWindow;
 import kr.jeongeum.scheduler.reservation.domain.TimeBlock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,13 +22,13 @@ public class RecurringOpeningService {
     }
     public void openBookableWindow() {
         LocalDate today = LocalDate.ofInstant(clock.instant(), TimeBlock.SEOUL);
-        prepareRange(today, today.plusDays(14));
+        prepareRange(today, BookingWindow.through(today));
     }
     public void openDate(LocalDate date) { prepareDate(date); }
     public void prepareRange(LocalDate from, LocalDate to) {
         LocalDate today = LocalDate.ofInstant(clock.instant(), TimeBlock.SEOUL);
         LocalDate first = from.isBefore(today) ? today : from;
-        LocalDate last = to.isAfter(today.plusDays(14)) ? today.plusDays(14) : to;
+        LocalDate last = to.isAfter(BookingWindow.through(today)) ? BookingWindow.through(today) : to;
         for (LocalDate date = first; !date.isAfter(last); date = date.plusDays(1)) { prepareDate(date); }
     }
     public boolean prepareDate(LocalDate date) {

@@ -348,14 +348,14 @@ class NotificationEventIntegrationTest {
         String seriesKey = key();
         var input = new RecurringRequests.Create(Long.toString(team), 5, "B07", TODAY.toString());
         var assignment = recurring.create(administrator.id(), seriesKey, input).assignment();
-        assertEquals(3, count("reservations"));
-        assertEquals(6, eventCount("RESERVATION_CREATED"));
+        assertEquals(5, count("reservations"));
+        assertEquals(10, eventCount("RESERVATION_CREATED"));
         assertRecipients("RESERVATION_CREATED", Set.of(member.id(), teammate.id()));
         recurring.create(administrator.id(), seriesKey, input); opening.openBookableWindow(); opening.prepareRange(TODAY, TODAY.plusDays(14));
-        assertEquals(6, eventCount("RESERVATION_CREATED"));
+        assertEquals(10, eventCount("RESERVATION_CREATED"));
         recurring.end(administrator.id(), Long.parseLong(assignment.id()), key(), new RecurringRequests.End(assignment.version(), TODAY.toString()));
-        assertEquals(4, eventCount("RESERVATION_CANCELED"));
-        assertEquals(2, jdbc.queryForObject("SELECT count(DISTINCT event_key) FROM notifications WHERE event_type='RESERVATION_CANCELED'", Integer.class));
+        assertEquals(8, eventCount("RESERVATION_CANCELED"));
+        assertEquals(4, jdbc.queryForObject("SELECT count(DISTINCT event_key) FROM notifications WHERE event_type='RESERVATION_CANCELED'", Integer.class));
         assertEquals(0, notificationsFor(administrator.id()));
     }
 

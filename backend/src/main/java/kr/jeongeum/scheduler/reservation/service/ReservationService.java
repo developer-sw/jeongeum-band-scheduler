@@ -17,6 +17,7 @@ import kr.jeongeum.scheduler.recurring.service.RecurringOpeningService;
 import kr.jeongeum.scheduler.reservation.api.ReservationRequests;
 import kr.jeongeum.scheduler.reservation.api.ReservationChangeResponse;
 import kr.jeongeum.scheduler.reservation.api.ReservationResponse;
+import kr.jeongeum.scheduler.reservation.domain.BookingWindow;
 import kr.jeongeum.scheduler.reservation.domain.Instrument;
 import kr.jeongeum.scheduler.reservation.domain.Reservation;
 import kr.jeongeum.scheduler.reservation.domain.TimeBlock;
@@ -301,7 +302,7 @@ public class ReservationService {
         Instant now = now();
         LocalDate today = LocalDate.ofInstant(now, TimeBlock.SEOUL);
         LocalDate from = fromInput == null ? today : ReservationInputs.date(fromInput);
-        LocalDate to = toInput == null ? today.plusDays(14) : ReservationInputs.date(toInput);
+        LocalDate to = toInput == null ? BookingWindow.through(today) : ReservationInputs.date(toInput);
         if (to.isBefore(from) || ChronoUnit.DAYS.between(from, to) >= 31) { throw ApiException.invalidInput(); }
         var instruments = reservations.instrumentsBetween(from, to);
         return reservations.between(from, to).stream().filter(reservation -> views.mine(context, reservation))

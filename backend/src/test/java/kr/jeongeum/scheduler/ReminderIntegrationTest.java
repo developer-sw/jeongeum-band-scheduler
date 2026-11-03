@@ -188,9 +188,9 @@ class ReminderIntegrationTest {
     @Test void recurringGenerationAndEndPlanOnlyRealOccurrencesWithoutRecreation() {
         Person member=person("MEMBER"); long team=team(); join(team,member);
         var series=recurring.create(admin.id(),key(),new RecurringRequests.Create(Long.toString(team),5,"B07",TODAY.toString())).assignment();
-        assertEquals(3,plans("PENDING")); opening.openBookableWindow(); assertEquals(3,jobs());
+        assertEquals(5,plans("PENDING")); opening.openBookableWindow(); assertEquals(5,jobs());
         recurring.end(admin.id(),Long.parseLong(series.id()),key(),new RecurringRequests.End(series.version(),TODAY.toString()));
-        assertEquals(1,plans("PENDING")); assertEquals(2,plans("CANCELED"));
+        assertEquals(1,plans("PENDING")); assertEquals(4,plans("CANCELED"));
     }
     @Test void bundledExchangePreservesSortedRootSetsAndDoesNotEmitSuccessorCreatedEvents() {
         Person owner=person("MEMBER"), other=person("MEMBER"); var first=personal(owner,"B01","DRUMS");

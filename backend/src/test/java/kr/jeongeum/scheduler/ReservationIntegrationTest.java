@@ -108,7 +108,7 @@ class ReservationIntegrationTest {
         JsonNode booking = success(create(owner.client(), personal(TODAY, "B07", "DRUMS")), 201);
         JsonNode schedule = success(observer.client().get("/api/v1/schedule?from=" + TODAY + "&to=" + TODAY.plusDays(1)), 200);
         assertEquals(TODAY.toString(), schedule.get("today").asString());
-        assertEquals(TODAY.plusDays(14).toString(), schedule.get("bookableThrough").asString());
+        assertEquals(TODAY.plusDays(30).toString(), schedule.get("bookableThrough").asString());
         assertEquals("Asia/Seoul", schedule.get("timeZone").asString());
         assertEquals(clock.instant(), Instant.parse(schedule.get("serverTime").asString()));
         assertEquals(INSTRUMENTS, strings(schedule.get("instruments"), "code"));
@@ -161,12 +161,12 @@ class ReservationIntegrationTest {
 
         JsonNode firstWeek = success(create(creator.client(), teamBody(TODAY, "B07", regular)), 201);
         JsonNode secondWeek = success(create(creator.client(), teamBody(TODAY.plusDays(7), "B07", regular)), 201);
-        JsonNode lastDate = success(create(creator.client(), teamBody(TODAY.plusDays(14), "B08", additional)), 201);
+        JsonNode lastDate = success(create(creator.client(), teamBody(TODAY.plusDays(30), "B08", additional)), 201);
         JsonNode ownPersonal = success(create(viewer.client(), personal(TODAY.plusDays(1), "B01", "DRUMS")), 201);
         JsonNode adminPersonal = success(create(administrator.client(), personal(TODAY.plusDays(2), "B09", "VOCAL")), 201);
         JsonNode unrelatedBooking = success(create(outsider.client(), teamBody(TODAY.plusDays(3), "B10", unrelated)), 201);
         JsonNode otherPersonal = success(create(outsider.client(), personal(TODAY.plusDays(4), "B09", "KEYBOARD")), 201);
-        String window = "/api/v1/reservations?scope=mine&from=" + TODAY + "&to=" + TODAY.plusDays(14);
+        String window = "/api/v1/reservations?scope=mine&from=" + TODAY + "&to=" + TODAY.plusDays(30);
 
         JsonNode mine = success(viewer.client().get(window), 200);
         assertEquals(Set.of(firstWeek.get("id").asString(), secondWeek.get("id").asString(),
@@ -197,35 +197,43 @@ class ReservationIntegrationTest {
 
     @Test
     void mineRequiresAuthenticationAndLimitsItsInclusiveRangeToThirtyOneDays() throws Exception {
-        assertError(new Client().get("/api/v1/reservations?scope=mine&from=" + TODAY + "&to=" + TODAY.plusDays(14)),
+        assertError(new Client().get("/api/v1/reservations?scope=mine&from=" + TODAY + "&to=" + TODAY.plusDays(30)),
                 401, "AUTHENTICATION_REQUIRED");
         Person viewer = person("MEMBER");
-        JsonNode booking = success(create(viewer.client(), personal(TODAY.plusDays(14), "B07", "DRUMS")), 201);
+        JsonNode booking = success(create(viewer.client(), personal(TODAY.plusDays(30), "B07", "DRUMS")), 201);
         assertEquals(Set.of(booking.get("id").asString()), strings(success(viewer.client().get(
-                "/api/v1/reservations?scope=mine&from=" + TODAY.minusDays(16) + "&to=" + TODAY.plusDays(14)), 200), "id"));
-        for (String query : List.of("scope=mine&from=" + TODAY.minusDays(17) + "&to=" + TODAY.plusDays(14),
+                "/api/v1/reservations?scope=mine&from=" + TODAY + "&to=" + TODAY.plusDays(30)), 200), "id"));
+        for (String query : List.of("scope=mine&from=" + TODAY.minusDays(1) + "&to=" + TODAY.plusDays(30),
                 "scope=mine&from=" + TODAY.plusDays(1) + "&to=" + TODAY,
-                "scope=all&from=" + TODAY + "&to=" + TODAY.plusDays(14))) {
+                "scope=all&from=" + TODAY + "&to=" + TODAY.plusDays(30))) {
             assertError(viewer.client().get("/api/v1/reservations?" + query), 400, "INVALID_INPUT");
         }
         assertEquals(1, count("reservations"));
     }
 
     @Test
-    void opensExactlyFifteenKoreanDatesAndAdvancesAtKoreanMidnight() throws Exception {
+    void opensExactlyThirtyOneKoreanDatesAndAdvancesAtKoreanMidnight() throws Exception {
         Person owner = person("MEMBER");
+        JsonNode initial = success(owner.client().get("/api/v1/schedule?from=" + TODAY + "&to=" + TODAY.plusDays(30)), 200);
+        assertEquals(31, initial.get("days").size());
+        assertEquals(310, initial.get("days").valueStream().mapToInt(day -> day.get("blocks").size()).sum());
+        assertEquals(TODAY.toString(), initial.get("days").get(0).get("date").asString());
+        assertEquals(TODAY.plusDays(30).toString(), initial.get("days").get(30).get("date").asString());
         success(create(owner.client(), personal(TODAY, "B10", "VOCAL")), 201);
-        success(create(owner.client(), personal(TODAY.plusDays(14), "B10", "VOCAL")), 201);
+        success(create(owner.client(), personal(TODAY.plusDays(30), "B10", "VOCAL")), 201);
         assertError(create(owner.client(), personal(TODAY.minusDays(1), "B07", "VOCAL")), 409, "DATE_NOT_OPEN");
-        assertError(create(owner.client(), personal(TODAY.plusDays(15), "B07", "VOCAL")), 409, "DATE_NOT_OPEN");
-        assertEquals(400, owner.client().get("/api/v1/schedule?from=" + TODAY + "&to=" + TODAY.plusDays(15)).statusCode());
+        assertError(create(owner.client(), personal(TODAY.plusDays(31), "B07", "VOCAL")), 409, "DATE_NOT_OPEN");
+        assertEquals(400, owner.client().get("/api/v1/schedule?from=" + TODAY + "&to=" + TODAY.plusDays(31)).statusCode());
         clock.set(TODAY + "T23:59:59+09:00");
-        assertError(create(owner.client(), personal(TODAY.plusDays(15), "B07", "VOCAL")), 409, "DATE_NOT_OPEN");
+        assertError(create(owner.client(), personal(TODAY.plusDays(31), "B07", "VOCAL")), 409, "DATE_NOT_OPEN");
         clock.set(TODAY.plusDays(1) + "T00:00:00+09:00");
-        JsonNode opened = success(create(owner.client(), personal(TODAY.plusDays(15), "B07", "VOCAL")), 201);
-        assertEquals(TODAY.plusDays(15).toString(), opened.get("date").asString());
+        JsonNode opened = success(create(owner.client(), personal(TODAY.plusDays(31), "B07", "VOCAL")), 201);
+        assertEquals(TODAY.plusDays(31).toString(), opened.get("date").asString());
         assertError(create(owner.client(), personal(TODAY, "B09", "KEYBOARD")), 409, "DATE_NOT_OPEN");
-        assertEquals(TODAY.plusDays(1).toString(), success(owner.client().get("/api/v1/schedule"), 200).get("today").asString());
+        JsonNode nextWindow = success(owner.client().get("/api/v1/schedule"), 200);
+        assertEquals(TODAY.plusDays(1).toString(), nextWindow.get("today").asString());
+        assertEquals(31, nextWindow.get("days").size());
+        assertEquals(TODAY.plusDays(31).toString(), nextWindow.get("days").get(30).get("date").asString());
     }
 
     @Test

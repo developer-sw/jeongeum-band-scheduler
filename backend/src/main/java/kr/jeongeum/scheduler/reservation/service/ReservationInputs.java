@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import kr.jeongeum.scheduler.common.api.ApiException;
+import kr.jeongeum.scheduler.reservation.domain.BookingWindow;
 
 final class ReservationInputs {
     private ReservationInputs() {}
@@ -38,8 +39,8 @@ final class ReservationInputs {
         return List.copyOf(canonical);
     }
     static void openDate(LocalDate date, LocalDate today) {
-        if (date.isBefore(today) || date.isAfter(today.plusDays(14))) {
-            throw new ApiException(409, "DATE_NOT_OPEN", "오늘부터 14일 뒤까지 예약할 수 있습니다.");
+        if (date.isBefore(today) || date.isAfter(BookingWindow.through(today))) {
+            throw new ApiException(409, "DATE_NOT_OPEN", "오늘부터 " + BookingWindow.ADVANCE_DAYS + "일 뒤까지 예약할 수 있습니다.");
         }
     }
 }

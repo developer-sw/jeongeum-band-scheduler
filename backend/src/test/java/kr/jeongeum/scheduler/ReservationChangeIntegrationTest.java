@@ -432,14 +432,14 @@ class ReservationChangeIntegrationTest {
     }
 
     @Test
-    void inclusiveWindowAllowsLastDateAndRejectsPastAndFifteenthDateWithoutPartialReplacement() throws Exception {
+    void inclusiveWindowAllowsLastDateAndRejectsPastAndThirtyFirstDayAheadWithoutPartialReplacement() throws Exception {
         Person owner = person("MEMBER");
         JsonNode source = success(create(owner.client(), personal(TODAY, "B07", "DRUMS")), 201);
         assertUnchangedFailure(owner.client(), source, changeBody(source, TODAY.minusDays(1), "B01", List.of("DRUMS")), 409, "DATE_NOT_OPEN");
-        assertUnchangedFailure(owner.client(), source, changeBody(source, TODAY.plusDays(15), "B01", List.of("DRUMS")), 409, "DATE_NOT_OPEN");
-        JsonNode last = changed(owner.client(), source, TODAY.plusDays(14), "B10", List.of("DRUMS"));
-        assertEquals(TODAY.plusDays(14).toString(), last.get("date").asString());
-        assertEquals(TODAY.plusDays(15).atStartOfDay(ZoneId.of("Asia/Seoul")).toInstant(), Instant.parse(last.get("endsAt").asString()));
+        assertUnchangedFailure(owner.client(), source, changeBody(source, TODAY.plusDays(31), "B01", List.of("DRUMS")), 409, "DATE_NOT_OPEN");
+        JsonNode last = changed(owner.client(), source, TODAY.plusDays(30), "B10", List.of("DRUMS"));
+        assertEquals(TODAY.plusDays(30).toString(), last.get("date").asString());
+        assertEquals(TODAY.plusDays(31).atStartOfDay(ZoneId.of("Asia/Seoul")).toInstant(), Instant.parse(last.get("endsAt").asString()));
     }
 
     @Test

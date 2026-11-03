@@ -9,7 +9,7 @@ const messages: Record<string, string> = {
   PERSONAL_OVERLAP: "이미 같은 시간에 개인 예약이 있어요. 한 사람이 악기 두 개를 각각 예약할 수 없어요.",
   DAILY_LIMIT_EXCEEDED: "이 개인 또는 팀의 하루 60분 블록 한도를 모두 사용했어요. 90분 블록은 별도로 예약할 수 있어요.",
   ASSET_FAULTY: "선택한 악기가 고장 상태예요. 최신 상태를 확인하고 다른 악기를 선택해 주세요.",
-  DATE_NOT_OPEN: "지금 예약할 수 없는 날짜예요. 한국 날짜 기준 오늘부터 14일 뒤까지 선택해 주세요.",
+  DATE_NOT_OPEN: "지금 예약할 수 없는 날짜예요. 시간표에 표시된 예약 가능 기간 안에서 선택해 주세요.",
   RESERVATION_STARTED: "이미 시작한 예약이에요. 현재 상태를 다시 확인해 주세요.",
   RESERVATION_FINISHED: "이미 종료된 시간이에요. 새 예약이나 취소를 처리할 수 없으며 이용 이력은 보존돼요.",
   RESERVATION_TEMPORARILY_UNAVAILABLE: "예약 확인이 지연되고 있어요. 같은 요청 결과 다시 확인으로 처리 여부를 확인해 주세요.",

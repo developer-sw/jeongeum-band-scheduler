@@ -416,7 +416,7 @@ class LifecycleIntegrationTest {
         JsonNode moved = changed(administrator.client(), fixed, TODAY.plusDays(1), "B07", null);
         JsonNode result = success(disband(administrator.client(), group, body(0), key()), 200);
         assertEquals(2, result.get("endedAssignments").asInt());
-        assertEquals(6, result.get("canceledReservations").asInt());
+        assertEquals(10, result.get("canceledReservations").asInt());
         assertEquals("CANCELED", reservationStatus(moved));
         for (JsonNode current : List.of(series, another)) {
             assertEquals("ENDED", jdbc.queryForObject("SELECT status FROM recurring_assignments WHERE id=?", String.class, id(current)));

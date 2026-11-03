@@ -15,6 +15,7 @@ import { myReservationsQuery, refreshReservations, reservationQuery, scheduleQue
 import { ReservationRequestState } from "./request-state";
 import type { ChangeReservationResult, InstrumentCode, ReservationDetail, ReservationIntent, ScheduleBlock, ScheduleDay, ScheduleSnapshot } from "./types";
 import { ReservationCard } from "./view";
+import { addDate } from "./time";
 
 const date = "2026-10-12";
 const meta = { serverTime: `${date}T11:00:00+09:00`, timeZone: "Asia/Seoul" };
@@ -87,6 +88,20 @@ describe("change permissions and destination validation", () => {
     expect(changeInput(member, laterSource, available, date, "B01", ["KEYBOARD"], Date.parse(block.endsAt))).toContain("종료되지 않은");
     expect(changeInput(member, source, { ...schedule, days: [{ ...day, openingStatus: "PREPARING" }] }, date, "B02", ["KEYBOARD"], now)).toContain("개방된 예약 날짜");
     expect(typeof changeInput(member, source, schedule, "2026-10-27", "B02", ["KEYBOARD"], now)).toBe("string");
+  });
+
+  it("permits the server's 30th-day destination and rejects the following day even if a stale row is present", () => {
+    const through = addDate(date, 30);
+    const days: ScheduleDay[] = Array.from({ length: 32 }, (_, index) => {
+      const destination = addDate(date, index);
+      return { ...day, date: destination, personalQuota: { usedMinutes: 0, remainingMinutes: 120 }, blocks: [{ ...block, startsAt: `${destination}T12:00:00+09:00`, endsAt: `${destination}T13:00:00+09:00` }] };
+    });
+    const extended: ScheduleSnapshot = { ...schedule, bookableThrough: through, days };
+    expect(through).toBe("2026-11-11");
+    expect(changeInput(member, source, extended, through, "B01", ["DRUMS"], now)).toEqual({ expectedVersion: source.version, date: through, blockCode: "B01", instrumentCodes: ["DRUMS"] });
+    expect(changeInput(member, source, extended, addDate(through, 1), "B01", ["DRUMS"], now)).toContain("개방된 예약 날짜");
+    const markup = renderToStaticMarkup(createElement(ChangeForm, { member, reservation: source, schedule: extended, now, disabled: false, onChange: vi.fn() }));
+    expect(markup).toContain(`min="${date}" max="${through}"`);
   });
 
   it("retains ordinary one-instrument shape and permits at most two for an existing dual 90-minute exception", () => {
