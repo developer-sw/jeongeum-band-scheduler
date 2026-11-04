@@ -2,6 +2,8 @@
 
 갱신일: 2026-10-13 / 기준 시간대: `Asia/Seoul` / 기본 경로: `/api/v1`
 
+2026-11-04 후속 계약: 하루 22블록과 선택 날짜의 간단한 예약 요약을 구현하고 로컬 격리 검증을 완료했다. 새 V13의 실제 DB 적용·새 운영 배포는 미실행이며 [전일 시간·달력 요약](FULL_DAY_BOOKING_CALENDAR.md)의 상태를 따른다. API 경로·JSON 구조·31일 범위·권한·개인별/팀별 일반 60분 일일 120분 한도는 유지한다.
+
 이 문서는 업무 기능의 설계 계약이다. 인증·초대에 가입 전 명단·계정 연결과 회원·팀·팀장·곡 관리를 추가했다. 인증 계약·검증은 [AUTHENTICATION](AUTHENTICATION.md), 명단·팀 DTO·검증은 [MEMBER_TEAM_MANAGEMENT](MEMBER_TEAM_MANAGEMENT.md), 예약 기본의 실제 DTO·재시도·검증은 [RESERVATION_FOUNDATION](RESERVATION_FOUNDATION.md), 반복 배정·날짜 개방은 [RECURRING_ASSIGNMENTS](RECURRING_ASSIGNMENTS.md), 구현한 단건 예약 PATCH는 [RESERVATION_CHANGES](RESERVATION_CHANGES.md)를 따른다. 교환 요청·후보·승인은 [RESERVATION_EXCHANGES](RESERVATION_EXCHANGES.md), 관리자 악기 고장 등록·복구·이력은 [INSTRUMENT_FAULTS](INSTRUMENT_FAULTS.md)를 따른다. 공지·사이트 내 알림함의 구현 계약은 [NOTICES_NOTIFICATIONS](NOTICES_NOTIFICATIONS.md)를 따른다. batch·Push API와 OpenAPI 산출물은 후속 단계의 설계 계약이며 현재 제공하는 API와 구분한다. 사용자 정책은 [PROJECT_CONTEXT](PROJECT_CONTEXT.md)와 [RESERVATION_RULES](RESERVATION_RULES.md), 저장 모델은 [ERD](ERD.md)를 따른다.
 
 Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 반환한다. CSRF는 `data.headerName=X-CSRF-TOKEN`, `data.token`을 반환한다. 두 응답은 공통 `meta`와 `Cache-Control: no-store`를 사용한다. 초기 보안 계층의 CSRF 누락·위조는 `403 CSRF_INVALID`, 미인증 보호 API 접근은 `401 AUTHENTICATION_REQUIRED`다.
@@ -11,7 +13,7 @@ Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 �
 - JSON 요청·응답을 사용한다. 날짜는 `YYYY-MM-DD`, 시각은 offset이 있는 ISO 8601 문자열이다.
 - 외부 식별자는 불투명한 문자열로 취급한다. DB bigint ID는 JSON 문자열로 전달하는 안이며, 예제의 이름형 ID는 실제 값이 아닌 자리표시자다.
 - 날짜·한도·개방 범위는 서버의 서울 날짜로 계산한다. timestamp의 UTC 날짜를 예약일로 사용하지 않는다.
-- 블록 코드는 B01~B10이다. 시작·종료·기간을 클라이언트 입력으로 받지 않는다.
+- 블록 코드는 B01~B22다. 기존 B01~B10의 시각·의미는 보존하고 B11~B22는 00:00~12:00의 60분 블록이다. 00:00~18:00은 총 18개 60분, 18:00~24:00은 기존 4개 90분이다. 시작·종료·기간을 클라이언트 입력으로 받지 않는다. 정확한 시간 매핑과 시간순은 [예약 규칙](RESERVATION_RULES.md#2-운영-시간과-고정-블록)을 따른다.
 - 악기 코드는 `VOCAL`, `KEYBOARD`, `ELECTRIC_GUITAR`, `BASS`, `DRUMS`, `ACOUSTIC_GUITAR`를 제안한다. 표시명은 각각 보컬·건반·일렉기타·베이스·드럼·통기타다.
 - 인증은 서버 세션 쿠키다. 프론트와 API는 같은 origin의 `/api` 경로로 연결한다.
 - 로그인은 마지막 접속 후 90일 동안 유지하고 인증 요청 때 서버 세션·쿠키 만료를 연장한다. `SESSION`은 영속 HttpOnly 쿠키이며 로그아웃·비활성·탈퇴와 만료 시 접근을 해제한다. 요청·응답 JSON 형식이나 별도 갱신 API는 추가하지 않는다. 자세한 계약은 [AUTHENTICATION](AUTHENTICATION.md)을 따른다.
@@ -145,6 +147,10 @@ Health는 실제 DB 상태에 따라 `200`/`503`과 `data.status=UP`/`DOWN`을 �
 - 팀 독점이면 팀명과 예약 상태; 개인 공유이면 악기별 점유 상태
 - 악기별 고장 정보와 신규 개인 선택 가능 여부
 - 본인·팀장·전체 관리자 등 현재 권한에 따른 행동 표시
+
+V13을 반영한 일정의 `days[].blocks`는 실제 시작 시각순 22개다. 최대 포함 31일 조회의 응답 슬롯은 682개이며 코드 문자열 순으로 정렬하지 않는다. 화면에서 `이용 가능 악기 n/6` 문구를 제거해도 기존 `availableInstrumentCodes`·예약/고장·조작 가능 필드와 서버 검증은 유지한다.
+
+PC/모바일 달력 요약은 같은 일정 응답에서 선택 날짜의 `reservations.status=CONFIRMED`만 시간순으로 추출한다. 팀명 또는 개인 악기만 보여주며 같은 시간의 개인 공유는 한 행으로 묶는다. 현재 회원의 모든 팀 소속 ID로 본인 팀만 강조하고 다른 개인의 이름·로그인 ID·연락처·예약 ID를 추가 반환/표시하지 않는다. 새 요약 API나 별도 기기별 요청을 추가하지 않는다. 준비 중·비어 있음·조회 실패 캐시를 구분하며 요약의 클릭/선택 자체로 예약을 생성하지 않는다.
 
 조회 응답을 받은 뒤에도 실제 mutation은 현재 상태를 다시 검사한다. 예약하지 않은 미래 날짜를 조회할 수 있더라도 개방 범위 밖의 생성은 거절한다. 무인증 공개 일정은 현재 설계에 포함하지 않는다. 개인 이름 등 공개 범위는 정책 확정사항과 구분한다.
 
