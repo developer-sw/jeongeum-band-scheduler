@@ -23,7 +23,8 @@ const LABELS = ["org.opencontainers.image.source", "org.opencontainers.image.rev
 const REQUIRED_QA_CHECKS = [
   "random_synthetic_secrets_generated_privately", "resolved_configuration_cannot_mount_or_connect_development_data",
   "backend_nonroot", "frontend_nonroot", "caddy_nonroot", "database_and_application_ports_private",
-  "all_four_workers_and_external_push_disabled", "qa_https_http_bind_only_loopback", "flyway_v1_through_v12_success",
+  "all_four_workers_and_external_push_disabled", "qa_https_http_bind_only_loopback", "flyway_v1_through_v13_success",
+  "canonical_22_time_blocks_preserve_existing_codes",
   "application_database_role_not_cluster_administrator", "https_certificate_trusted_and_database_up",
   "api_health_no_store_and_security_headers", "http_redirects_to_https", "production_frontend_login_page",
   "login_html_no_store_and_security_headers", "actual_next_static_asset_public_and_immutable",
@@ -118,10 +119,10 @@ export async function archiveFingerprint(target) {
 export function qaSummary(raw) {
   insist(object(raw) && raw.passed === true && raw.cleanupVerified === true && raw.resourcesKept === false
     && raw.developmentDatabaseAccessed === false && raw.actualPushSent === false, "RELEASE_QA_NOT_PASSED");
-  insist(Array.isArray(raw.checks) && raw.checks.length === 57
+  insist(Array.isArray(raw.checks) && raw.checks.length === REQUIRED_QA_CHECKS.length
     && raw.checks.every((item) => typeof item === "string" && /^[a-z][a-z0-9_]{0,119}$/.test(item))
     && JSON.stringify([...raw.checks].sort()) === JSON.stringify([...REQUIRED_QA_CHECKS].sort()), "RELEASE_QA_CHECKS_REJECTED");
-  return { passed: true, checkCount: 57, checks: [...raw.checks], cleanupVerified: true, resourcesKept: false,
+  return { passed: true, checkCount: REQUIRED_QA_CHECKS.length, checks: [...raw.checks], cleanupVerified: true, resourcesKept: false,
     developmentDatabaseAccessed: false, actualPushSent: false };
 }
 function imageRepository(component) {

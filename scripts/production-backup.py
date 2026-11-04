@@ -43,7 +43,18 @@ SELECT format('SELECT %L || ''|'' || last_value || ''|'' || CASE WHEN is_called 
 FROM pg_sequences WHERE schemaname='public' ORDER BY sequencename
 \gexec
 """
-FLYWAY_SQL = "SELECT 'flyway|' || string_agg(version || ':' || success::text, ',' ORDER BY installed_rank) FROM public.flyway_schema_history;"
+FLYWAY_SQL = "SELECT 'flyway|' || string_agg(coalesce(version, 'unversioned') || ':' || success::text, ',' ORDER BY installed_rank) FROM public.flyway_schema_history;"
+# V13 only extends the existing time-block mapping; V12 snapshots remain valid.
+# Never accept an arbitrary successful prefix or an unknown later migration.
+SUPPORTED_FLYWAY_HISTORIES = tuple(
+    "flyway|" + ",".join(f"{version}:true" for version in range(1, latest + 1))
+    for latest in (12, 13)
+)
+
+
+def supported_flyway_history(lines):
+    history = [line for line in lines if line.startswith("flyway|")]
+    return len(history) == 1 and history[0] in SUPPORTED_FLYWAY_HISTORIES
 
 
 class BackupError(Exception):
@@ -315,7 +326,7 @@ def capture(runner, workspace, now):
         tables = [line for line in lines if line.startswith("table|")]
         sequences = [line for line in lines if line.startswith("sequence|")]
         need(len(tables) == 39 and len(sequences) == 29, "BACKUP_SCHEMA_COUNTS_REJECTED")
-        need([line for line in lines if line.startswith("flyway|")] == ["flyway|" + ",".join(f"{version}:true" for version in range(1, 13))], "BACKUP_FLYWAY_HISTORY_REJECTED")
+        need(supported_flyway_history(lines), "BACKUP_FLYWAY_HISTORY_REJECTED")
         for line in tables:
             need(re.fullmatch(r"table\|public\.[a-z_][a-z0-9_]*\|[0-9]+\|[a-f0-9]{32}", line), "BACKUP_MANIFEST_REJECTED")
         for line in sequences:

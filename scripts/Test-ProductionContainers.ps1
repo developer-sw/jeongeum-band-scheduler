@@ -80,6 +80,26 @@ function Write-QaResultExport {
     } finally { $stream.Dispose() }
 }
 
+function Assert-QaFlywayHistory {
+    param([Parameter(Mandatory)] [string]$Actual)
+    $expected = ((1..13 | ForEach-Object { "${_}:true" }) -join ',')
+    if ($Actual -cne $expected) { throw 'QA_FLYWAY_HISTORY_INVALID' }
+}
+
+function Assert-QaTimeBlockMapping {
+    param([Parameter(Mandatory)] [string]$Actual)
+    # Chronological order, retaining every published B01~B10 identity.
+    $expected = @(
+        'B11:0:60:60', 'B12:60:120:60', 'B13:120:180:60', 'B14:180:240:60',
+        'B15:240:300:60', 'B16:300:360:60', 'B17:360:420:60', 'B18:420:480:60',
+        'B19:480:540:60', 'B20:540:600:60', 'B21:600:660:60', 'B22:660:720:60',
+        'B01:720:780:60', 'B02:780:840:60', 'B03:840:900:60', 'B04:900:960:60',
+        'B05:960:1020:60', 'B06:1020:1080:60', 'B07:1080:1170:90',
+        'B08:1170:1260:90', 'B09:1260:1350:90', 'B10:1350:1440:90'
+    )
+    if ($Actual -cne ($expected -join '|')) { throw 'QA_TIME_BLOCK_MAPPING_INVALID' }
+}
+
 function Assert-QaScope {
     if ($qaProject -cne "jeongeum-prod-qa-$qaSuffix" -or $qaProject -notmatch '^jeongeum-prod-qa-[a-f0-9]{12}$') {
         throw 'QA_PROJECT_GUARD_REJECTED'
@@ -411,9 +431,12 @@ try {
     }
     $qaChecks.Add('qa_https_http_bind_only_loopback')
     Invoke-QaDocker -Arguments @('cp', "${caddy}:/data/caddy/pki/authorities/local/root.crt", (Join-Path $qaDirectory 'caddy-root.crt'))
-    $versions = Invoke-QaSql -Database $qaDatabase -Sql "SELECT string_agg(version, ',' ORDER BY installed_rank) FROM flyway_schema_history WHERE success AND version IS NOT NULL;"
-    if ($versions -cne '1,2,3,4,5,6,7,8,9,10,11,12') { throw 'QA_FLYWAY_HISTORY_INVALID' }
-    $qaChecks.Add('flyway_v1_through_v12_success')
+    $versions = Invoke-QaSql -Database $qaDatabase -Sql "SELECT string_agg(coalesce(version, 'unversioned') || ':' || success::text, ',' ORDER BY installed_rank) FROM flyway_schema_history;"
+    Assert-QaFlywayHistory -Actual $versions
+    $qaChecks.Add('flyway_v1_through_v13_success')
+    $timeBlocks = Invoke-QaSql -Database $qaDatabase -Sql "SELECT string_agg(code || ':' || start_minute || ':' || end_minute || ':' || duration_minutes, '|' ORDER BY start_minute) FROM time_blocks;"
+    Assert-QaTimeBlockMapping -Actual $timeBlocks
+    $qaChecks.Add('canonical_22_time_blocks_preserve_existing_codes')
     $roleElevated = Invoke-QaSql -Database $qaDatabase -Sql "SELECT rolsuper OR rolcreatedb OR rolcreaterole OR rolreplication FROM pg_roles WHERE rolname='$qaDatabaseUser';"
     if ($roleElevated -cne 'f') { throw 'QA_APPLICATION_DATABASE_ROLE_ELEVATED' }
     $qaChecks.Add('application_database_role_not_cluster_administrator')

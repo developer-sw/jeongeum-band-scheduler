@@ -50,7 +50,9 @@ sudo /usr/bin/python3 -I /opt/jeongeum/backup/production-backup.py metric --conf
 
 `validate`는 로컬 설정·권한·실행 파일만 확인하며 Docker·DB·AWS 명령을 실행하지 않는다. 실제 `backup`은 컨테이너 ID, 프로젝트/서비스 label, DB 볼륨, 이미지 pin, DB 이름/role/테이블 소유권을 확인한다. 개발 DB나 임의 컨테이너를 이름으로 찾아 사용하지 않는다.
 
-하나의 read-only exported snapshot을 pg_dump custom과 테이블 지문 manifest가 공유한다. 시퀀스는 MVCC 대상이 아니므로 dump 전후 값이 달라지면 실패하고 업로드하지 않는다. `is_called`는 SQL `CASE`로 `t/f`를 명시해 문자열 연결의 `true/false` 변환과 구분한다. 이 보수적 정책은 서비스 쓰기 중 백업 재시도가 필요할 수 있다. 39개 테이블·29개 시퀀스·성공한 Flyway V1~V12만 현재 합성 schema로 허용한다. schema 변경은 별도 검토가 필요하다.
+하나의 read-only exported snapshot을 pg_dump custom과 테이블 지문 manifest가 공유한다. 시퀀스는 MVCC 대상이 아니므로 dump 전후 값이 달라지면 실패하고 업로드하지 않는다. `is_called`는 SQL `CASE`로 `t/f`를 명시해 문자열 연결의 `true/false` 변환과 구분한다. 이 보수적 정책은 서비스 쓰기 중 백업 재시도가 필요할 수 있다. 현재 코드의 schema 경계는 39개 테이블·29개 시퀀스와 **모두 성공한 Flyway V1~V12 또는 V1~V13의 두 완전한 이력**이다. 누락·실패·중복·미지의 후속 version을 허용하지 않으며 기존 V12 백업의 형식·출처·내용 검증을 유지한다.
+
+V13 운영 migration **전에** 검토된 최신 백업·복원 실행자와 소스 핀을 먼저 반영하고 V12 백업 호환성과 V13 합성 DB의 독립 복원을 검증해야 한다. 기존 서버 실행자를 자동으로 갱신한 것으로 해석하지 않는다. V13 스키마·새 블록을 이전 Backend가 읽을 수 있다고 가정하지 않으며, 특히 `B11~B22`의 실제 예약 생성 후에는 해당 예약을 처리하지 못하는 이전 이미지로 단순 롤백하지 않는다. 데이터를 삭제하지 않는 적용·복구 경계는 [전일 시간 블록 변경](../../docs/FULL_DAY_BOOKING_CALENDAR.md)을 따른다.
 
 암호화된 archive는 정확히 `database.dump`, `database.private.manifest`, `backup-manifest.json` 3개 regular file이다. manifest에는 파일 SHA/크기, 원본 QA 프로젝트·DB·소스 SHA·이미지 pins와 snapshot 시각이 들어 있다. 이전 수동 백업의 4파일 복원 계약이나 별도 시험 세션 상태 파일과 동일한 형식이 아니다.
 

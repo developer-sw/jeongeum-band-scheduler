@@ -1,5 +1,5 @@
 #requires -Version 7.2
-# Path/export unit checks only. The QA entry point, Docker and DB are never run.
+# Path/export and block-map unit checks only. The QA entry point, Docker and DB are never run.
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $repositoryRoot = [IO.Path]::GetFullPath((Split-Path -Parent $PSScriptRoot))
@@ -8,7 +8,7 @@ $tokens = $null
 $parseErrors = $null
 $sourceAst = [Management.Automation.Language.Parser]::ParseFile($sourcePath, [ref]$tokens, [ref]$parseErrors)
 if ($parseErrors.Count) { throw 'QA_EXPORT_SOURCE_PARSE_FAILED' }
-foreach ($name in @('Assert-QaResultPath', 'Write-QaResultExport')) {
+foreach ($name in @('Assert-QaResultPath', 'Write-QaResultExport', 'Assert-QaFlywayHistory', 'Assert-QaTimeBlockMapping')) {
     $definition = $sourceAst.Find({ param($item) $item -is [Management.Automation.Language.FunctionDefinitionAst] -and $item.Name -ceq $name }, $true)
     if ($null -eq $definition) { throw 'QA_EXPORT_FUNCTION_MISSING' }
     . ([scriptblock]::Create($definition.Extent.Text))
@@ -32,6 +32,28 @@ function Assert-Rejected {
     Assert-Check $Name $rejected
 }
 try {
+    $history = ((1..13 | ForEach-Object { "${_}:true" }) -join ',')
+    Assert-QaFlywayHistory -Actual $history
+    Assert-Check 'all_thirteen_migrations_succeeded' $true
+    Assert-Rejected 'failed_future_migration_not_hidden' { Assert-QaFlywayHistory -Actual ($history + ',14:false') }
+    Assert-Rejected 'failed_v13_rejected' { Assert-QaFlywayHistory -Actual ($history.Replace('13:true', '13:false')) }
+    Assert-Rejected 'missing_v12_rejected' { Assert-QaFlywayHistory -Actual ($history.Replace(',12:true', '')) }
+    Assert-Rejected 'unversioned_migration_rejected' { Assert-QaFlywayHistory -Actual ($history + ',unversioned:true') }
+    # Build the expected schedule independently from hourly/evening arithmetic.
+    $blocks = @(foreach ($hour in 0..17) {
+        $number = if ($hour -lt 12) { $hour + 11 } else { $hour - 11 }
+        'B{0:00}:{1}:{2}:60' -f $number, ($hour * 60), (($hour + 1) * 60)
+    }) + @(foreach ($evening in 0..3) {
+        'B{0:00}:{1}:{2}:90' -f ($evening + 7), (1080 + $evening * 90), (1170 + $evening * 90)
+    })
+    $mapping = $blocks -join '|'
+    Assert-QaTimeBlockMapping -Actual $mapping
+    Assert-Check 'full_day_22_blocks_keep_legacy_codes' $true
+    Assert-Rejected 'missing_midnight_block_rejected' { Assert-QaTimeBlockMapping -Actual (($blocks | Select-Object -Skip 1) -join '|') }
+    Assert-Rejected 'duplicate_block_rejected' { Assert-QaTimeBlockMapping -Actual ($mapping + '|B01:720:780:60') }
+    Assert-Rejected 'legacy_code_renumbering_rejected' { Assert-QaTimeBlockMapping -Actual ($mapping.Replace('B01:720:780:60', 'B23:720:780:60')) }
+    Assert-Rejected 'evening_duration_change_rejected' { Assert-QaTimeBlockMapping -Actual ($mapping.Replace('B07:1080:1170:90', 'B07:1080:1170:60')) }
+    Assert-Rejected 'midnight_offset_change_rejected' { Assert-QaTimeBlockMapping -Actual ($mapping.Replace('B11:0:60:60', 'B11:1:61:60')) }
     [void](New-Item -ItemType Directory -Path (Join-Path $testRoot '.local'))
     $destination = Join-Path $testRoot ".local/production-image-release-qa-$([Guid]::NewGuid().ToString()).json"
     Assert-Check 'optional_destination_is_empty' ($null -eq (Assert-QaResultPath -RepositoryRoot $testRoot))

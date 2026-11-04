@@ -7,6 +7,8 @@ import io
 import json
 import os
 from pathlib import Path
+import re
+import sqlite3
 import stat
 import sys
 import tempfile
@@ -54,6 +56,8 @@ class FakeRunner:
         self.version_missing, self.head_bad, self.get_bad, self.account_bad = False, False, False, False
         self.failure, self.dump_failures, self.inspect_override, self.role_bad = None, 0, None, False
         self.metric_payload = None
+        self.flyway_history = None
+        self.unversioned_success = None
 
     def run(self, arguments, **_kwargs):
         self.calls.append(("run", *arguments));return b"v1.3.2\n"
@@ -84,9 +88,18 @@ class FakeRunner:
         statement = (data or b"").decode()
         if "current_database()" in statement:
             return (self.cfg["database"] + "|postgres\n0\nt\n" + ("t" if self.role_bad else "f") + "\n").encode()
-        if "string_agg(version" in statement:
+        if b.FLYWAY_SQL in statement:
             tables = [f"table|public.table_{index}|1|{'a' * 32}" for index in range(self.tables)]
-            flyway = "flyway|" + ",".join(f"{v}:{'false' if self.flyway_bad and v == 12 else 'true'}" for v in range(1, 13))
+            flyway = self.flyway_history or "flyway|" + ",".join(f"{v}:{'false' if self.flyway_bad and v == 12 else 'true'}" for v in range(1, 13))
+            if self.unversioned_success is not None:
+                # Model the actual version expression so removing COALESCE
+                # would hide this source row and make the guard tests fail.
+                expression = re.search(r"string_agg\((.+), ',' ORDER BY installed_rank\)", b.FLYWAY_SQL)[1]
+                expression = expression.replace("success::text", "success")
+                with contextlib.closing(sqlite3.connect(":memory:")) as database:
+                    row = database.execute("SELECT " + expression + " FROM (SELECT NULL AS version, ? AS success)",
+                                           ("true" if self.unversioned_success else "false",)).fetchone()[0]
+                if row is not None: flyway += "," + row
             return ("\n".join(tables + self.sequences() + [flyway]) + "\n").encode()
         sequences = self.sequences()
         if self.change_sequence: sequences[0] = "sequence|public.seq_0|9999|t"
@@ -318,6 +331,42 @@ class OperationalTests(unittest.TestCase):
             with self.subTest(field=field), self.assertRaises(o.BackupError):self.backup()
             self.assertEqual(sum(call[0] == "snapshot" for call in self.runner.calls), 1)
             self.assertEqual(self.runner.objects, {})
+
+    def test_v13_capture_preserves_schema_two_and_legacy_v12_support(self):
+        self.assertTrue(self.backup()["successUpdated"])
+        self.runner.flyway_history = "flyway|" + ",".join(f"{v}:true" for v in range(1, 14))
+        self.assertTrue(self.backup()["successUpdated"])
+        self.assertEqual(self.state()["schemaVersion"], 2)
+
+    def test_unknown_missing_failed_or_duplicate_v13_history_never_dumps_or_uploads(self):
+        valid = "flyway|" + ",".join(f"{v}:true" for v in range(1, 14))
+        for invalid in (valid + ",14:true", valid.replace(",12:true", ""),
+                        valid.replace("13:true", "13:false"), valid + ",13:true", valid + "\n" + valid):
+            self.runner = FakeRunner(self.cfg)
+            self.runner.flyway_history = invalid
+            with self.subTest(history=invalid), self.assertRaisesRegex(o.BackupError, "OPERATIONAL_FLYWAY_HISTORY_REJECTED"):
+                self.backup()
+            self.assertFalse(any("pg_dump" in call for call in self.runner.calls))
+            self.assertEqual(self.runner.objects, {})
+            self.assertFalse((self.directory / "last-success.json").exists())
+
+    def assert_null_version_source_rejected(self, success):
+        for latest in (12, 13):
+            self.runner = FakeRunner(self.cfg)
+            self.runner.flyway_history = "flyway|" + ",".join(f"{v}:true" for v in range(1, latest + 1))
+            self.runner.unversioned_success = success
+            with self.subTest(latest=latest, success=success), self.assertRaisesRegex(o.BackupError, "OPERATIONAL_FLYWAY_HISTORY_REJECTED"):
+                self.backup()
+            self.assertFalse(any("pg_dump" in call for call in self.runner.calls))
+            self.assertFalse(any(call[0] == "run" for call in self.runner.calls))
+            self.assertEqual(self.runner.objects, {})
+            self.assertFalse((self.directory / "last-success.json").exists())
+
+    def test_successful_null_version_source_never_dumps_encrypts_or_uploads(self):
+        self.assert_null_version_source_rejected(True)
+
+    def test_failed_null_version_source_never_dumps_encrypts_or_uploads(self):
+        self.assert_null_version_source_rejected(False)
 
     def test_incomplete_dump_is_rejected_without_upload(self):
         self.runner.dump_bad = True
