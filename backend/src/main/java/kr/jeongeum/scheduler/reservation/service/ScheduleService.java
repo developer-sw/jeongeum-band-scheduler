@@ -90,7 +90,7 @@ public class ScheduleService {
             return new ScheduleResponse.TeamQuota(membership.teamId(), membership.teamName(), used, Math.max(0, 120 - used));
         }).toList();
         List<ScheduleResponse.Block> blocks = new ArrayList<>();
-        for (TimeBlock block : TimeBlock.values()) {
+        for (TimeBlock block : TimeBlock.chronological()) {
             List<Reservation> occupancies = confirmed.stream().filter(reservation -> block.name().equals(reservation.blockCode())).toList();
             Set<String> occupiedCodes = occupancies.stream().flatMap(reservation -> codes.getOrDefault(reservation.id(), List.of()).stream())
                     .collect(Collectors.toSet());

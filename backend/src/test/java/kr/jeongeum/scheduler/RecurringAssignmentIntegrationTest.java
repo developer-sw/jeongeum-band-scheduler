@@ -102,6 +102,26 @@ class RecurringAssignmentIntegrationTest {
     }
 
     @Test
+    void midnightFixedAssignmentUsesItsSeoulDateAndIsNotRecreatedOnRepeatedOpening() throws Exception {
+        LocalDate date = TODAY.plusDays(1);
+        clock.set(TODAY + "T23:30:00+09:00");
+        long group = team("REGULAR");
+        success(createAssignment(assignment(group, date.getDayOfWeek().getValue(), "B11", date)), 201);
+        JsonNode midnight = fixed(group, date, "B11");
+        assertEquals(date.atStartOfDay(ZoneId.of("Asia/Seoul")).toInstant(), Instant.parse(midnight.get("startsAt").asString()));
+        assertEquals(6, claims(id(midnight)));
+        assertTrue(midnight.get("quotaExempt").asBoolean());
+        assertEquals(0, quota(group, date));
+        long before = fixedCount(group);
+        opening.prepareDate(date);
+        clock.set(date + "T00:00:00+09:00");
+        opening.prepareDate(date);
+        assertEquals(before, fixedCount(group));
+        assertEquals(1, activeAt(group, date, "B11"));
+        assertEquals("IN_PROGRESS", fixed(group, date, "B11").get("phase").asString());
+    }
+
+    @Test
     void onlyCurrentGlobalAdministratorCanManageAssignmentsAndCsrfRemainsRequired() throws Exception {
         Person ordinary = person("MEMBER");
         Person leader = person("MEMBER");

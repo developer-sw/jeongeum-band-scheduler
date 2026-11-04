@@ -348,7 +348,7 @@ class RosterSignupRoleIntegrationTest {
             List<String> historyBefore = query(connection,
                     "SELECT to_jsonb(h)::text FROM " + schema + ".flyway_schema_history h ORDER BY installed_rank");
             Flyway.configure().dataSource(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword())
-                    .schemas(schema).defaultSchema(schema).locations("classpath:db/migration").load().migrate();
+                    .schemas(schema).defaultSchema(schema).locations("classpath:db/migration").target("12").load().migrate();
             assertEquals(rowsBefore, snapshot(connection, schema));
             assertEquals(sequencesBefore, query(connection,
                     "SELECT sequencename||':'||COALESCE(last_value::text,'null') FROM pg_sequences WHERE schemaname='"

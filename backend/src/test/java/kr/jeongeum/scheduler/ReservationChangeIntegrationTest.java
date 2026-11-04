@@ -108,6 +108,25 @@ class ReservationChangeIntegrationTest {
     }
 
     @Test
+    void changeIntoNewMidnightBlockPreservesOriginalOwnerHistoryAndRechecksOccupancy() throws Exception {
+        Person owner = person("MEMBER"), other = person("MEMBER");
+        LocalDate date = TODAY.plusDays(1);
+        JsonNode source = success(create(owner.client(), personal(date, "B01", "DRUMS")), 201);
+        JsonNode occupied = success(create(other.client(), personal(date, "B11", "DRUMS")), 201);
+        assertUnchangedFailure(owner.client(), source, changeBody(source, date, "B11", List.of("DRUMS")),
+                409, "RESERVATION_CONFLICT");
+        JsonNode moved = changed(owner.client(), source, date, "B11", List.of("VOCAL"));
+        assertEquals(source.get("ownerUserId"), moved.get("ownerUserId"));
+        assertEquals(source.get("creatorUserId"), moved.get("creatorUserId"));
+        assertEquals("B11", moved.get("blockCode").asString());
+        assertEquals(60, moved.get("quotaMinutes").asInt());
+        assertEquals(60, quota(owner, null, date));
+        assertEquals("REPLACED", detail(owner.client(), source).get("status").asString());
+        assertEquals(1, claims(id(moved)));
+        assertEquals(1, claims(id(occupied)));
+    }
+
+    @Test
     void personalChangePreservesOwnerCreatorAndHistoryAndLinksOneSuccessorToItsActualActor() throws Exception {
         Person owner = person("MEMBER");
         JsonNode source = success(create(owner.client(), personal(TODAY, "B01", "DRUMS")), 201);
@@ -320,7 +339,7 @@ class ReservationChangeIntegrationTest {
         badDate.put("date", "2026-02-30");
         invalid.add(badDate);
         for (Map<String, Object> body : invalid) { assertUnchangedFailure(owner.client(), source, body, 400, "INVALID_INPUT"); }
-        assertUnchangedFailure(owner.client(), source, changeBody(source, TODAY, "B11", List.of("DRUMS")), 400, "INVALID_BLOCK");
+        assertUnchangedFailure(owner.client(), source, changeBody(source, TODAY, "B23", List.of("DRUMS")), 400, "INVALID_BLOCK");
         Map<String, String> before = snapshots();
         assertError(owner.client().mutate("PATCH", reservationPath(source), changeBody(source, TODAY, "B08", List.of("DRUMS"))), 400, "INVALID_INPUT");
         assertError(change(owner.client(), source, changeBody(source, TODAY, "B08", List.of("DRUMS")), "short"), 400, "INVALID_INPUT");

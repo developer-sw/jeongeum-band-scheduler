@@ -161,6 +161,23 @@ class ExchangeIntegrationTest {
     }
 
     @Test
+    void hourlyBundleCrossesTheNewElevenToNoonCodeBoundaryInTimeOrder() throws Exception {
+        Person owner = person("MEMBER"), target = person("MEMBER");
+        LocalDate date = TODAY.plusDays(1);
+        JsonNode eleven = personal(owner, date, "B22", "DRUMS"), noon = personal(owner, date, "B01", "VOCAL");
+        JsonNode ninety = personal(target, date, "B07", "BASS");
+        approve(target.client(), request(owner.client(), List.of(noon, eleven), List.of(ninety)));
+        JsonNode merged = successor(eleven);
+        assertEquals(id(merged), id(successor(noon)));
+        assertSuccessor(eleven, merged, date, "B07", Set.of("DRUMS", "VOCAL"));
+        assertTrue(merged.get("dualAssetException").asBoolean());
+        assertEquals(Set.of("B22", "B01"), successors(ninety).stream()
+                .map(value -> value.get("blockCode").asString()).collect(java.util.stream.Collectors.toSet()));
+        assertEquals(120, quota(target, null, date));
+        assertEquals(0, quota(owner, null, date));
+    }
+
+    @Test
     void differentInstrumentHourlyBundleMergesIntoOneDualNinetyWithOwnerOnlyLineage() throws Exception {
         Person a = person("MEMBER"), b = person("MEMBER");
         JsonNode first = personal(a, TODAY, "B01", "DRUMS"), second = personal(a, TODAY, "B02", "VOCAL");

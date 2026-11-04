@@ -61,7 +61,7 @@ public class ReservationRepository {
         return jdbc.query("SELECT * FROM reservations WHERE id = ? FOR UPDATE", RESERVATION, id).stream().findFirst();
     }
     public List<Reservation> between(LocalDate from, LocalDate to) {
-        return jdbc.query("SELECT * FROM reservations WHERE reservation_date BETWEEN ? AND ? ORDER BY reservation_date, time_block_code, id",
+        return jdbc.query("SELECT * FROM reservations WHERE reservation_date BETWEEN ? AND ? ORDER BY reservation_date, block_start_minute, id",
                 RESERVATION, from, to);
     }
     public boolean personalOverlap(long userId, LocalDate date, String blockCode) {
