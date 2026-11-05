@@ -1,16 +1,19 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { bookingWindowLabel, dateLabel } from "@/features/reservations/time";
+import { useState } from "react";
+import type { Member } from "@/features/auth/types";
+import { dateLabel } from "@/features/reservations/time";
 import type { ScheduleDay } from "@/features/reservations/types";
 import { inBookingRange, monthCells, monthLabel, moveMonth, weekdays, weekDates } from "./calendar";
+import { CalendarDaySummary } from "./calendar-day-summary-view";
 
 interface CalendarProps {
   selected: string; today: string; through: string; days: ScheduleDay[]; disabled: boolean;
   onSelect: (date: string) => void; onUnavailable: () => void;
+  member?: Pick<Member, "teamMemberships">; stale?: boolean; refreshing?: boolean;
 }
 
-function MonthCalendar({ selected, today, through, days, disabled, onSelect, onUnavailable }: CalendarProps) {
+function MonthCalendar({ selected, today, through, days, disabled, onSelect, onUnavailable, member, stale, refreshing }: CalendarProps) {
   const [month, setMonth] = useState(selected.slice(0, 7));
   const week = new Set(weekDates(selected));
   const available = new Set(days.map((day) => day.date));
@@ -31,7 +34,7 @@ function MonthCalendar({ selected, today, through, days, disabled, onSelect, onU
     })}</div>
     <button type="button" className="diary-calendar-today" disabled={disabled} onClick={() => { setMonth(today.slice(0, 7)); onSelect(today); }}>오늘로 돌아가기</button>
     <div className="diary-calendar-key"><span>● 오늘</span><span>골드: 선택 날짜</span><span>옅은 골드: 선택 주</span><span>밑줄: 예약 기간</span></div>
-    <p className="diary-small">{bookingWindowLabel(today, through)}.<br />이전 기록은 예약·이력에서 확인해요.</p>
+    <CalendarDaySummary selected={selected} day={days.find((day) => day.date === selected)} member={member} stale={stale} refreshing={refreshing} />
   </div>;
 }
 
@@ -40,9 +43,8 @@ export function CalendarSidebar(props: CalendarProps) {
 }
 
 export function CalendarPopup(props: CalendarProps) {
-  const details = useRef<HTMLDetailsElement>(null);
-  return <details ref={details} className="diary-calendar-popup"><summary>전체 달력 열기 <span aria-hidden="true">⌄</span></summary>
-    <div className="diary-calendar-popover diary-card"><MonthCalendar key={props.selected.slice(0, 7)} {...props} onSelect={(date) => { props.onSelect(date); if (details.current) details.current.open = false; }} /></div>
+  return <details className="diary-calendar-popup"><summary>전체 달력 열기 <span aria-hidden="true">⌄</span></summary>
+    <div className="diary-calendar-popover diary-card"><MonthCalendar key={props.selected.slice(0, 7)} {...props} /></div>
   </details>;
 }
 

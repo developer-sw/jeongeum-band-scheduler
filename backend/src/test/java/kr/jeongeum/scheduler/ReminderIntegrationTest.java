@@ -84,6 +84,18 @@ class ReminderIntegrationTest {
         assertEquals(1,reminders()); assertEquals(1,plans("COMPLETED")); assertEquals(0,processor.drain(50));
         assertEquals(id(booking),jdbc.queryForObject("SELECT reservation_id FROM notifications WHERE event_type='START_REMINDER'",Long.class));
     }
+    @Test void midnightReservationReminderIsDueAtElevenOnThePreviousSeoulDate() {
+        Person owner=person("MEMBER");
+        var booking=reservations.create(owner.id(),key(),new ReservationRequests.Create("PERSONAL",null,
+                TODAY.plusDays(1).toString(),"B11",List.of("DRUMS"))).reservation();
+        assertEquals(Instant.parse("2026-10-30T14:00:00Z"),jdbc.queryForObject(
+                "SELECT scheduled_at FROM notification_jobs WHERE reservation_id=? AND job_kind='REMINDER_PLAN'",
+                java.sql.Timestamp.class,id(booking)).toInstant());
+        clock.set("2026-10-30T22:59:59+09:00");assertEquals(0,processor.drain(50));
+        clock.set("2026-10-30T23:00:00+09:00");assertEquals(1,processor.drain(50));
+        assertEquals(1,reminders());assertEquals(0,processor.drain(50));
+        assertEquals(id(booking),jdbc.queryForObject("SELECT reservation_id FROM notifications WHERE event_type='START_REMINDER'",Long.class));
+    }
     @Test void passedOrExactlyCurrentDueNeverRegistersRetroactivePlan() {
         clock.set("2026-10-30T17:00:00+09:00"); personal(person("MEMBER"),"B07","DRUMS");
         clock.set("2026-10-30T17:30:00+09:00"); personal(person("MEMBER"),"B07","VOCAL");

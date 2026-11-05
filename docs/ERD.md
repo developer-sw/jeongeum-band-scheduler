@@ -2,11 +2,13 @@
 
 기준일: 2026-10-12 (Asia/Seoul)
 
+2026-11-04 개정 계약: 시간 블록을 22개로 확장하는 새 **V13**과 달력의 기존 schedule 재사용 요약을 구현하고 로컬 격리 검증을 완료했다. 기존 V1~V12·B01~B10·회원/예약 참조를 보존한다. 이 문서의 22블록은 새 목표 계약이며 **V13 실제 개발/운영 적용은 미실행**이다. 정확한 매핑·실제 로컬 검증 결과는 [전일 시간·달력 요약](FULL_DAY_BOOKING_CALENDAR.md)을 따른다. 아래 날짜별 migration 적용 기록은 각 시점의 이력이다.
+
 업무 정책의 기준은 [PROJECT_CONTEXT.md](PROJECT_CONTEXT.md), [RESERVATION_RULES.md](RESERVATION_RULES.md)다. 이 문서의 업무 테이블·컬럼·상태·잠금은 정책을 구현하는 **기술 설계 권고안**이다. Flyway V1은 Spring Session JDBC, V2는 `users`·`invitation_codes`·`auth_bootstrap_guard`다. V3는 가입 전 명단·팀·소속·곡과 명단 연결용 초대 FK·잠금·역할 변경 이력을 추가했다. V4는 블록·악기·예약 날짜·예약·점유·한도 ledger·작업 이력·재시도 키를 추가했으며 실제 계약은 [RESERVATION_FOUNDATION.md](RESERVATION_FOUNDATION.md)을 따른다. V5는 반복 배정·패턴 revision·주차 회차·예약 연결·패턴 guard·관리 재시도 키와 날짜의 `recurring_prepared` 표식을 추가했고 실제 계약은 [RECURRING_ASSIGNMENTS.md](RECURRING_ASSIGNMENTS.md)를 따른다. V6는 단건 변경의 `reservation_lineage`와 인덱스만 추가하며 기존 V1~V5 파일과 업무 데이터를 수정하지 않는다. 실제 V6 계약·검증은 [RESERVATION_CHANGES.md](RESERVATION_CHANGES.md)를 따른다. V7 교환 요청·항목·배분·재시도 모델은 [RESERVATION_EXCHANGES](RESERVATION_EXCHANGES.md)에서 개발·격리 검증한다. V8 악기 고장 이력은 [INSTRUMENT_FAULTS](INSTRUMENT_FAULTS.md), V9 전체 공지·사이트 내 알림함의 신규 3개 테이블은 [NOTICES_NOTIFICATIONS](NOTICES_NOTIFICATIONS.md)를 따른다. 시작 알림 계획·Push·발송 작업 모델은 후속 구현이며 아래 전체 ERD와 적용된 migration 목록을 구분한다. 인증 검증은 [AUTHENTICATION.md](AUTHENTICATION.md), 명단·팀 계약은 [MEMBER_TEAM_MANAGEMENT.md](MEMBER_TEAM_MANAGEMENT.md)를 따른다.
 
 ## 1. 핵심 설계 선택
 
-1. 단일 동아리·단일 합주실과 서로 겹치지 않는 열 블록을 모델링한다. 별도 다중 동아리 구조나 30분 atomic slot을 추가하지 않는다.
+1. 단일 동아리·단일 합주실과 서로 겹치지 않는 22개 블록을 모델링한다. 별도 다중 동아리 구조나 30분 atomic slot을 추가하지 않는다.
 2. 예약 한 행은 날짜별 고정 블록 한 개다. 120분은 인접한 60분 예약 두 행이다.
 3. 팀 예약은 여섯 자원을 모두, 개인은 한 자원을 점유한다. 교환으로 생성한 개인 90분만 두 자원을 허용한다.
 4. 자원 점유와 장비 고장은 별도 의미다. 고장이 팀의 방 독점 예약을 차단해서는 안 된다.
@@ -327,8 +329,9 @@ erDiagram
 
 V8의 관리자 고장·복구·재시도 모델은 [INSTRUMENT_FAULTS](INSTRUMENT_FAULTS.md)에서 구현·격리 검증했다. 이후 사용자 승인으로 실제 개발 DB 백업·V8 한 건 적용·기존 업무 데이터 보존을 확인했다. 실제 고장 등록·복구 검증은 임시 DB의 합성 데이터에서 수행한 결과와 구분한다.
 
-- `time_blocks`: B01~B10, start_minute, end_minute, duration_minutes. [고정 열 블록](RESERVATION_RULES.md#2-운영-시간과-고정-블록)의 매핑을 그대로 저장한다.
+- `time_blocks`: B01~B22, start_minute, end_minute, duration_minutes. [고정 22블록](RESERVATION_RULES.md#2-운영-시간과-고정-블록)의 매핑을 저장한다. B01~B10 기존 행/시각은 보존하고 V13은 00:00~12:00의 B11~B22를 추가한다. 조회·인접 판정은 코드순 대신 start_minute/end_minute를 사용한다.
 - 운영 앱은 블록을 수정·추가하지 않는다. FK와 코드별 정확한 시각 매핑, `end-start=duration`을 개념 제약으로 둔다.
+- V13을 적용할 때 기존 예약·고정 회차·계보·점유·한도·세션을 초기화하지 않는다. 18개 60분과 기존 4개 90분의 정확한 코드 매핑을 DB와 서버가 함께 검증한다. 달력 요약용 테이블·개인 식별 컬럼은 추가하지 않는다.
 - `assets`: 보컬·건반·일렉기타·베이스·드럼·통기타의 여섯 자원 코드와 표시 이름, 현재 `NORMAL/FAULTY`, version.
 - V8 `asset_incidents`: 악기, OPEN/RESOLVED, 사유, ADMIN/LEGACY, 등록자·등록 시각, 복구자·복구 시각·선택 메모, version. 악기별 열린 고장 partial unique와 FK를 유지하며 활성 고장 상태·악기 버전·이력 갱신은 같은 트랜잭션이다. LEGACY 등록자는 null이며 시각은 V8 도입 시 기존 상태 확인 시각이다. V1~V7 및 기존 assets 상태·버전을 수정하지 않는다.
 - V8 `instrument_fault_idempotency_requests`: 실행자·키 digest unique, 경로·정규화 본문 fingerprint, 응답 코드·결과 이력 ID. 성공한 등록·복구와 함께 확정하며 현재 관리자 권한으로 재확인한다. 실제 기술 계약과 검증은 [INSTRUMENT_FAULTS](INSTRUMENT_FAULTS.md)를 따른다.
@@ -526,7 +529,7 @@ READ COMMITTED에서 날짜 mutex와 unique를 사용하는 것으로 시작한�
 
 | 불변조건 | 보장 위치 |
 |---|---|
-| 예약은 열 고정 블록 중 하나 | block FK, 정적 mapping, 서버 입력 검증 |
+| 예약은 22개 고정 블록 중 하나 | block FK, 정적 mapping, 서버 입력 검증 |
 | 같은 악기 활성 점유 한 건 | reservation_assets partial unique |
 | 개인 같은 시간 예약 한 건 | reservations 개인 CONFIRMED partial unique |
 | 팀은 전체 독점 / 개인 예외 최대 두 | 서버가 정확한 claim 집합 생성 + 날짜 mutex + 전체 rollback |

@@ -23,7 +23,8 @@ const options = () => ({ phase: "prepare", version, directory: "release-artifact
 const containerChecks = [
   "random_synthetic_secrets_generated_privately", "resolved_configuration_cannot_mount_or_connect_development_data",
   "backend_nonroot", "frontend_nonroot", "caddy_nonroot", "database_and_application_ports_private",
-  "all_four_workers_and_external_push_disabled", "qa_https_http_bind_only_loopback", "flyway_v1_through_v12_success",
+  "all_four_workers_and_external_push_disabled", "qa_https_http_bind_only_loopback", "flyway_v1_through_v13_success",
+  "canonical_22_time_blocks_preserve_existing_codes",
   "application_database_role_not_cluster_administrator", "https_certificate_trusted_and_database_up",
   "api_health_no_store_and_security_headers", "http_redirects_to_https", "production_frontend_login_page",
   "login_html_no_store_and_security_headers", "actual_next_static_asset_public_and_immutable",
@@ -207,15 +208,15 @@ test("output directory refuses symlinks or Windows junctions", async (t) => {
 });
 test("QA export allowlist excludes private project, paths and secret fields", () => {
   const safe = qaSummary(qa());
-  assert.equal(safe.checkCount, 57);
+  assert.equal(safe.checkCount, 58);
   assert.equal(JSON.stringify(safe).includes("must-not-be-exported"), false);
   assert.equal("project" in safe, false);
   for (const patch of [{ passed: false }, { cleanupVerified: false }, { resourcesKept: true }, { actualPushSent: true }, { developmentDatabaseAccessed: true },
     { checks: qa().checks.slice(1) }, { checks: [...qa().checks.slice(1), "bad/path"] },
     { checks: [...qa().checks.slice(1), "backend_nonroot"] },
-    { checks: Array(57).fill("backend_nonroot") }]) assert.throws(() => qaSummary({ ...qa(), ...patch }));
+    { checks: Array(58).fill("backend_nonroot") }]) assert.throws(() => qaSummary({ ...qa(), ...patch }));
   assert.equal(qa().checks.filter((name) => name === "administrator_session_survives_restart").length, 2);
-  assert.equal(qaSummary({ ...qa(), checks: qa().checks.reverse() }).checkCount, 57);
+  assert.equal(qaSummary({ ...qa(), checks: qa().checks.reverse() }).checkCount, 58);
 });
 test("image metadata rejects root, wrong architecture, revision and mutable repositories", () => {
   assert.equal(imageSummary("backend", rawImage("backend"), context(), version).repository, `ghcr.io/${REPOSITORY}/backend`);

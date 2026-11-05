@@ -23,10 +23,10 @@ SOURCE = {"mode": "qualification", "sourceProject": "jeongeum-ops-qa-" + SUFFIX,
                      + "@sha256:" + "b" * 64 for name in r.IMAGE_KEYS}}
 
 
-def private_manifest():
+def private_manifest(latest=12):
     tables = [f"table|public.table_{index}|{index}|{'a' * 32}" for index in range(39)]
     sequences = [f"sequence|public.seq_{index}|{index}|{'t' if index % 2 else 'f'}" for index in range(29)]
-    flyway = "flyway|" + ",".join(f"{index}:true" for index in range(1, 13))
+    flyway = "flyway|" + ",".join(f"{index}:true" for index in range(1, latest + 1))
     return ("\n".join(tables + sequences + [flyway]) + "\n").encode()
 
 
@@ -58,6 +58,7 @@ class FakeRunner:
         self.inspect_change = None
         self.preexisting, self.bad_role, self.bad_fingerprint, self.restore_fails = False, False, False, False
         self.user_objects = "0"
+        self.manifest = private_manifest()
 
     def run(self, arguments, **kwargs):
         self.calls.append(("run", arguments))
@@ -94,7 +95,7 @@ class FakeRunner:
             count = ["39", "29"] if self.restored else (["1", "0"] if self.preexisting else ["0", "0"])
             role = "true|false|false|false|false" if self.bad_role else "false|false|false|false|false"
             return "\n".join([self.cfg["database"] + "|postgres", "t", role, "0", *count, "t"]) + "\n"
-        result = private_manifest().decode()
+        result = self.manifest.decode()
         return result.replace("|0|", "|999|", 1) if self.bad_fingerprint else result
 
 
@@ -141,6 +142,28 @@ class RestoreTests(unittest.TestCase):
         for argument in ("--single-transaction", "--no-owner", "--no-acl", "--exit-on-error", "--role"):
             self.assertIn(argument, command)
         self.assertNotIn("--clean", command)
+
+    def test_v13_archive_restores_with_exact_fingerprint_and_v12_stays_supported(self):
+        for latest in (12, 13):
+            self.assertEqual(len(r.validate_private_manifest(private_manifest(latest))), 69)
+        self.runner.manifest = private_manifest(13)
+        contents = {"database.dump": b"PGDMP" + b"FAKE-DUMP-ONLY" * 20,
+                    "database.private.manifest": self.runner.manifest}
+        self.runner.plain = archive(meta=metadata(contents), contents=contents)
+        self.assertTrue(self.restore()["ok"])
+
+    def test_unreviewed_or_incomplete_v13_history_rejected_before_database(self):
+        valid = private_manifest(13)
+        for invalid in (valid.replace(b",13:true", b",13:false"),
+                        valid.replace(b",12:true", b""),
+                        valid.replace(b",13:true", b",13:true,14:true"),
+                        valid.replace(b",13:true", b",13:true,13:true")):
+            contents = {"database.dump": b"PGDMP" + b"FAKE-DUMP-ONLY" * 20,
+                        "database.private.manifest": invalid}
+            self.runner.plain = archive(meta=metadata(contents), contents=contents)
+            with self.subTest(manifest=invalid), self.assertRaisesRegex(r.RestoreError, "OPRESTORE_PRIVATE_MANIFEST_REJECTED"):
+                self.restore()
+            self.assert_no_database()
 
     def test_production_source_can_only_restore_into_qualification_target(self):
         source = {**SOURCE, "mode": "production", "sourceProject": "jeongeum-production-v1",

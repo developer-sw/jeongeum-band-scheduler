@@ -42,7 +42,8 @@ describe("diary calendar uses canonical server dates", () => {
     expect(markup).toContain("2027년 1월");
     expect(markup).toContain('aria-label="1월 14일 (목) · 예약 가능 날짜"');
     expect(markup).toContain('aria-label="1월 15일 (금) · 예약 기간 밖"');
-    expect(markup).toContain("서울 기준 오늘부터 30일 뒤까지 (오늘 포함 31일)");
+    expect(markup).not.toContain("서울 기준 오늘부터 30일 뒤까지 (오늘 포함 31일)");
+    expect(markup).toContain("예약된 시간이 없어요.");
     expect(markup).not.toContain("14일 뒤까지");
     expect(markup.match(/aria-pressed="true"/g)).toHaveLength(1);
   });

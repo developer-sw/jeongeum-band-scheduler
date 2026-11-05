@@ -5,12 +5,12 @@ import { useState } from "react";
 import { Field, FormError, inputClass, primaryButton, secondaryButton } from "@/components/auth-ui";
 import type { Member } from "@/features/auth/types";
 import { blockLabel, dateLabel } from "@/features/reservations/time";
-import type { BlockCode, InstrumentCode, ReservationDetail } from "@/features/reservations/types";
+import { blockTimes } from "@/features/reservations/blocks";
+import type { InstrumentCode, ReservationDetail } from "@/features/reservations/types";
 import { instrumentLabels, instrumentNames, subjectLabel } from "@/features/reservations/view";
 import { allocationInput, exchangeStatusLabels, pendingExchange } from "./selection";
 import type { ExchangeIntent, ExchangePlacement, ExchangeResponse } from "./types";
 
-const blockTimes: Record<BlockCode, string> = { B01: "12:00~13:00", B02: "13:00~14:00", B03: "14:00~15:00", B04: "15:00~16:00", B05: "16:00~17:00", B06: "17:00~18:00", B07: "18:00~19:30", B08: "19:30~21:00", B09: "21:00~22:30", B10: "22:30~24:00" };
 const instantLabel = (value: string) => new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(value));
 const stateReasons: Record<string, string> = { RESERVATION_CHANGED: "관련 예약이 변경됐어요.", RESERVATION_CANCELED: "관련 예약이 취소됐어요.", SOURCE_CHANGED: "원본 예약의 상태가 바뀌었어요.", REQUESTER_PERMISSION_LOST: "요청자의 현재 권한이 바뀌었어요.", EXCHANGE_COMPLETED: "다른 교환에서 원본 예약이 처리됐어요.", RESERVATION_STARTED: "가장 이른 예약의 시작 시각이 지났어요.", EARLIEST_START_REACHED: "가장 이른 예약의 시작 시각이 지났어요.", SUBJECT_INACTIVE: "예약 주체가 비활성 상태로 바뀌었어요." };
 

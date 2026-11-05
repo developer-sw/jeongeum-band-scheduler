@@ -264,7 +264,7 @@ def capture(runner, workspace, now):
         lines = manifest.strip().splitlines()
         tables, sequences = [x for x in lines if x.startswith("table|")], [x for x in lines if x.startswith("sequence|")]
         need(len(tables) == 39 and len(sequences) == 29, "OPERATIONAL_SCHEMA_COUNTS_REJECTED")
-        need([x for x in lines if x.startswith("flyway|")] == ["flyway|" + ",".join(f"{v}:true" for v in range(1, 13))], "OPERATIONAL_FLYWAY_HISTORY_REJECTED")
+        need(core().supported_flyway_history(lines), "OPERATIONAL_FLYWAY_HISTORY_REJECTED")
         need(all(match(r"table\|public\.[a-z_][a-z0-9_]*\|[0-9]+\|[a-f0-9]{32}", x) for x in tables)
              and all(match(r"sequence\|public\.[a-z_][a-z0-9_]*\|[0-9]+\|[tf]", x) for x in sequences)
              and len(lines) == 69, "OPERATIONAL_PRIVATE_MANIFEST_REJECTED")

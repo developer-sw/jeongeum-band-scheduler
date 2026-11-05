@@ -67,6 +67,8 @@ class FakeRunner:
         self.version_missing, self.head_wrong, self.get_corrupt = False, False, False
         self.account_wrong, self.inspect_wrong = False, False
         self.metric_payload = None
+        self.flyway_history = None
+        self.unversioned_success = None
 
     def run(self, arguments, **_kwargs):
         self.calls.append(arguments)
@@ -97,11 +99,21 @@ class FakeRunner:
         statement = (data or b"").decode()
         if "current_database()" in statement:
             return f"{self.cfg['database']}|postgres\n0\nt\n".encode()
-        if "string_agg(version" in statement:
+        if b.FLYWAY_SQL in statement:
             if self.failure == "manifest":
                 raise b.BackupError("BACKUP_COMMAND_FAILED")
             tables = [f"table|public.table_{index}|1|{'a' * 32}" for index in range(self.table_count)]
-            return ("\n".join(tables + self.sequences() + ["flyway|" + ",".join(f"{v}:true" for v in range(1, 13))]) + "\n").encode()
+            history = self.flyway_history or "flyway|" + ",".join(f"{v}:true" for v in range(1, 13))
+            if self.unversioned_success is not None:
+                # Exercise the real version expression, including SQL NULL
+                # propagation. This is an in-memory SQL model, not PostgreSQL.
+                expression = re.search(r"string_agg\((.+), ',' ORDER BY installed_rank\)", b.FLYWAY_SQL)[1]
+                expression = expression.replace("success::text", "success")
+                with contextlib.closing(sqlite3.connect(":memory:")) as database:
+                    row = database.execute("SELECT " + expression + " FROM (SELECT NULL AS version, ? AS success)",
+                                           ("true" if self.unversioned_success else "false",)).fetchone()[0]
+                if row is not None: history += "," + row
+            return ("\n".join(tables + self.sequences() + [history]) + "\n").encode()
         sequences = self.sequences()
         if self.sequence_changed:
             sequences[0] = "sequence|public.seq_0|999|t"
@@ -196,6 +208,41 @@ class BackupTests(unittest.TestCase):
         with self.assertRaises(b.BackupError): self.run_backup()
         self.assertFalse(any("pg_dump" in call for call in self.runner.calls))
         self.assert_no_success()
+
+    def test_v13_snapshot_is_captured_without_changing_archive_format(self):
+        self.runner.flyway_history = "flyway|" + ",".join(f"{v}:true" for v in range(1, 14))
+        self.assertTrue(self.run_backup()["successUpdated"])
+        self.assertEqual(len(self.runner.objects), 2)
+
+    def test_unknown_missing_failed_or_duplicate_flyway_history_never_dumps(self):
+        valid = "flyway|" + ",".join(f"{v}:true" for v in range(1, 14))
+        for invalid in (valid + ",14:true", valid.replace(",12:true", ""),
+                        valid.replace("13:true", "13:false"), valid + ",13:true",
+                        valid + "\n" + valid):
+            self.runner.flyway_history = invalid
+            with self.subTest(history=invalid), self.assertRaisesRegex(b.BackupError, "BACKUP_FLYWAY_HISTORY_REJECTED"):
+                self.run_backup()
+            self.assertFalse(any("pg_dump" in call for call in self.runner.calls))
+            self.assertEqual(self.runner.objects, {})
+            self.assert_no_success()
+
+    def assert_null_version_source_rejected(self, success):
+        for latest in (12, 13):
+            self.runner = FakeRunner(self.cfg)
+            self.runner.flyway_history = "flyway|" + ",".join(f"{v}:true" for v in range(1, latest + 1))
+            self.runner.unversioned_success = success
+            with self.subTest(latest=latest, success=success), self.assertRaisesRegex(b.BackupError, "BACKUP_FLYWAY_HISTORY_REJECTED"):
+                self.run_backup()
+            self.assertFalse(any("pg_dump" in call for call in self.runner.calls))
+            self.assertEqual(self.runner.objects, {})
+            self.assertEqual(FakeAge.calls, [])
+            self.assert_no_success()
+
+    def test_successful_null_version_source_never_dumps_encrypts_or_uploads(self):
+        self.assert_null_version_source_rejected(True)
+
+    def test_failed_null_version_source_never_dumps_encrypts_or_uploads(self):
+        self.assert_null_version_source_rejected(False)
 
     def test_incomplete_schema_and_sequence_change_prevent_upload(self):
         for option in ("schema", "sequence"):

@@ -21,9 +21,8 @@ function SlotContents({ day, block, member, now, highlight, mobile = false }: {
     {(mobile || view.team) && <span className="diary-slot-type">{view.typeLabel}</span>}<strong className="diary-slot-title">{view.title}</strong>
     {(view.myTeam || view.mine) && <span className="diary-slot-own">{view.myTeam ? "내 공연조" : "내 개인 예약"}</span>}
     {view.team?.quotaExempt && <span className="diary-slot-note">60분 한도 면제</span>}
-    {(mobile || view.phase !== "FUTURE") && <span className="diary-slot-note">{view.timeStatus}</span>}
+    {(mobile || view.phase !== "FUTURE") && <span className="diary-slot-note diary-slot-phase">{view.timeStatus}</span>}
     {block.faultyInstrumentCodes.length > 0 && <span className="diary-slot-note">고장 {block.faultyInstrumentCodes.length}종</span>}
-    {!view.team && day.openingStatus === "OPEN" && <span className="diary-slot-note">이용 가능 악기 {block.availableInstrumentCodes.length}/6</span>}
     <span className="diary-slot-action">{mobile ? `${view.actionLabel} →` : view.actionLabel}</span>
   </>;
 }

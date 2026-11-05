@@ -5,12 +5,12 @@ import { useId } from "react";
 import { secondaryButton } from "@/components/auth-ui";
 import { teamKindLabel } from "@/components/directory-ui";
 import { dateLabel } from "@/features/reservations/time";
-import type { BlockCode } from "@/features/reservations/types";
+import { blockNames } from "@/features/reservations/blocks";
+export { blockNames } from "@/features/reservations/blocks";
 import { nextRevisionAfter } from "./assignment-input";
 import type { Assignment, AssignmentConflict, AssignmentPreview, OccurrenceState, Weekday } from "./types";
 
 export const weekdayNames: Record<Weekday, string> = { 1: "월요일", 2: "화요일", 3: "수요일", 4: "목요일", 5: "금요일", 6: "토요일", 7: "일요일" };
-export const blockNames: Record<BlockCode, string> = { B01: "12:00~13:00 · 60분", B02: "13:00~14:00 · 60분", B03: "14:00~15:00 · 60분", B04: "15:00~16:00 · 60분", B05: "16:00~17:00 · 60분", B06: "17:00~18:00 · 60분", B07: "18:00~19:30 · 90분", B08: "19:30~21:00 · 90분", B09: "21:00~22:30 · 90분", B10: "22:30~24:00 · 90분" };
 export const occurrenceNames: Record<OccurrenceState, string> = { PLANNED: "생성 예정", MATERIALIZED: "고정 예약 생성됨", CANCELED_EXCEPTION: "개별 취소 · 예외 유지", CHANGED_EXCEPTION: "개별 변경 · 예외 유지", EXCHANGED_EXCEPTION: "개별 교환 · 예외 유지", ENDED: "회차 종료" };
 
 export function ConflictList({ conflicts }: { conflicts: AssignmentConflict[] }) {

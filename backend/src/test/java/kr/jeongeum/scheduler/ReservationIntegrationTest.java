@@ -103,6 +103,7 @@ class ReservationIntegrationTest {
 
     @Test
     void scheduleUsesCanonicalBlocksOnWeekdaysAndWeekendsAndHidesOtherPersonalIdentity() throws Exception {
+        clock.set(TODAY + "T00:00:00+09:00");
         Person owner = person("MEMBER");
         Person observer = person("MEMBER");
         JsonNode booking = success(create(owner.client(), personal(TODAY, "B07", "DRUMS")), 201);
@@ -112,21 +113,24 @@ class ReservationIntegrationTest {
         assertEquals("Asia/Seoul", schedule.get("timeZone").asString());
         assertEquals(clock.instant(), Instant.parse(schedule.get("serverTime").asString()));
         assertEquals(INSTRUMENTS, strings(schedule.get("instruments"), "code"));
-        int[] starts = {720, 780, 840, 900, 960, 1020, 1080, 1170, 1260, 1350};
+        int[] starts = {0, 60, 120, 180, 240, 300, 360, 420, 480, 540, 600, 660,
+                720, 780, 840, 900, 960, 1020, 1080, 1170, 1260, 1350};
+        String[] codes = {"B11", "B12", "B13", "B14", "B15", "B16", "B17", "B18", "B19", "B20", "B21", "B22",
+                "B01", "B02", "B03", "B04", "B05", "B06", "B07", "B08", "B09", "B10"};
         for (int dayIndex = 0; dayIndex < 2; dayIndex++) {
             JsonNode day = schedule.get("days").get(dayIndex);
             assertEquals(TODAY.plusDays(dayIndex).toString(), day.get("date").asString());
             assertEquals("OPEN", day.get("openingStatus").asString());
-            assertEquals(10, day.get("blocks").size());
-            for (int i = 0; i < 10; i++) {
+            assertEquals(22, day.get("blocks").size());
+            for (int i = 0; i < 22; i++) {
                 JsonNode block = day.get("blocks").get(i);
-                int duration = i < 6 ? 60 : 90;
-                assertEquals("B%02d".formatted(i + 1), block.get("blockCode").asString());
+                int duration = i < 18 ? 60 : 90;
+                assertEquals(codes[i], block.get("blockCode").asString());
                 assertEquals(duration, block.get("durationMinutes").asInt());
                 Instant start = TODAY.plusDays(dayIndex).atStartOfDay(SEOUL).plusMinutes(starts[i]).toInstant();
                 assertEquals(start, Instant.parse(block.get("startsAt").asString()));
                 assertEquals(start.plusSeconds(duration * 60L), Instant.parse(block.get("endsAt").asString()));
-                assertEquals("FUTURE", block.get("phase").asString());
+                assertEquals(dayIndex == 0 && i == 0 ? "IN_PROGRESS" : "FUTURE", block.get("phase").asString());
             }
         }
         JsonNode summary = block(schedule.get("days").get(0), "B07").get("reservations").get(0);
@@ -141,6 +145,49 @@ class ReservationIntegrationTest {
         assertEquals(0, success(administrator.client().get("/api/v1/reservations?scope=mine"), 200).size(),
                 "Administrator's mine list must not become a directory of all personal bookings");
         assertEquals(booking.get("id").asString(), success(administrator.client().get(reservationPath(booking)), 200).get("id").asString());
+    }
+
+    @Test
+    void earlyHoursShareTheOriginalDailyLimitsAndAssetExclusivityRules() throws Exception {
+        Person owner = person("MEMBER"), other = person("MEMBER");
+        LocalDate date = TODAY.plusDays(1);
+        long group = team("REGULAR");
+        join(group, owner, true);
+        success(create(owner.client(), personal(date, "B11", "DRUMS")), 201);
+        assertError(create(other.client(), personal(date, "B11", "DRUMS")), 409, "RESERVATION_CONFLICT");
+        success(create(other.client(), personal(date, "B11", "VOCAL")), 201);
+        assertError(create(owner.client(), personal(date, "B11", "BASS")), 409, "PERSONAL_OVERLAP");
+        success(create(owner.client(), personal(date, "B22", "DRUMS")), 201);
+        assertError(create(owner.client(), personal(date, "B01", "DRUMS")), 409, "DAILY_LIMIT_EXCEEDED");
+        success(create(owner.client(), teamBody(date, "B12", group)), 201);
+        assertError(create(other.client(), personal(date, "B12", "DRUMS")), 409, "RESERVATION_CONFLICT");
+        success(create(owner.client(), teamBody(date, "B13", group)), 201);
+        assertError(create(owner.client(), teamBody(date, "B14", group)), 409, "DAILY_LIMIT_EXCEEDED");
+        JsonNode day = success(owner.client().get("/api/v1/schedule?from=" + date + "&to=" + date), 200).get("days").get(0);
+        assertEquals(120, day.at("/personalQuota/usedMinutes").asInt());
+        assertEquals(120, day.at("/teamQuotas/0/usedMinutes").asInt());
+        assertEquals(0, block(day, "B12").get("availableInstrumentCodes").size());
+    }
+
+    @Test
+    void midnightStartsANewQuotaDayAfterTheOriginalLastNinetyMinuteBlock() throws Exception {
+        Person owner = person("MEMBER");
+        clock.set(TODAY + "T23:30:00+09:00");
+        JsonNode night = success(create(owner.client(), personal(TODAY, "B10", "DRUMS")), 201);
+        LocalDate next = TODAY.plusDays(1);
+        JsonNode midnight = success(create(owner.client(), personal(next, "B11", "DRUMS")), 201);
+        assertEquals(night.get("endsAt"), midnight.get("startsAt"));
+        assertEquals(0, night.get("quotaMinutes").asInt());
+        assertEquals(60, midnight.get("quotaMinutes").asInt());
+        clock.set(next + "T00:30:00+09:00");
+        assertEquals("ENDED", success(owner.client().get(reservationPath(night)), 200).get("phase").asString());
+        JsonNode day = success(owner.client().get("/api/v1/schedule?from=" + next + "&to=" + next), 200).get("days").get(0);
+        assertEquals("IN_PROGRESS", block(day, "B11").get("phase").asString());
+        assertEquals(30, block(day, "B11").get("remainingMinutes").asInt());
+        success(create(owner.client(), personal(next, "B12", "DRUMS")), 201);
+        assertError(create(owner.client(), personal(next, "B13", "DRUMS")), 409, "DAILY_LIMIT_EXCEEDED");
+        clock.set(next + "T01:00:00+09:00");
+        assertError(create(person("MEMBER").client(), personal(next, "B11", "VOCAL")), 409, "RESERVATION_FINISHED");
     }
 
     @Test
@@ -216,7 +263,7 @@ class ReservationIntegrationTest {
         Person owner = person("MEMBER");
         JsonNode initial = success(owner.client().get("/api/v1/schedule?from=" + TODAY + "&to=" + TODAY.plusDays(30)), 200);
         assertEquals(31, initial.get("days").size());
-        assertEquals(310, initial.get("days").valueStream().mapToInt(day -> day.get("blocks").size()).sum());
+        assertEquals(682, initial.get("days").valueStream().mapToInt(day -> day.get("blocks").size()).sum());
         assertEquals(TODAY.toString(), initial.get("days").get(0).get("date").asString());
         assertEquals(TODAY.plusDays(30).toString(), initial.get("days").get(30).get("date").asString());
         success(create(owner.client(), personal(TODAY, "B10", "VOCAL")), 201);
@@ -282,7 +329,7 @@ class ReservationIntegrationTest {
             assertEquals(400, create(owner.client(), invalid).statusCode());
         }
         Map<String, Object> invalidBlock = new HashMap<>(ordinary);
-        invalidBlock.put("blockCode", "B11");
+        invalidBlock.put("blockCode", "B23");
         assertError(create(owner.client(), invalidBlock), 400, "INVALID_BLOCK");
         assertEquals(0, count("reservations"));
         assertEquals(0, count("reservation_assets"));

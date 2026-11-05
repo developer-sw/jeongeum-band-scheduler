@@ -144,9 +144,13 @@ def validate_private_manifest(data):
         raise RestoreError("OPRESTORE_PRIVATE_MANIFEST_REJECTED") from None
     tables = [line for line in lines if line.startswith("table|")]
     sequences = [line for line in lines if line.startswith("sequence|")]
-    flyway = ["flyway|" + ",".join(f"{version}:true" for version in range(1, 13))]
+    # Keep previously qualified V12 archives restorable while admitting exactly
+    # the reviewed V13 time-block expansion. No unknown/missing/failed version.
+    supported = tuple("flyway|" + ",".join(f"{version}:true" for version in range(1, latest + 1))
+                      for latest in (12, 13))
+    flyway = [line for line in lines if line.startswith("flyway|")]
     need(len(lines) == 69 and len(tables) == 39 and len(sequences) == 29
-         and [line for line in lines if line.startswith("flyway|")] == flyway,
+         and len(flyway) == 1 and flyway[0] in supported,
          "OPRESTORE_PRIVATE_MANIFEST_REJECTED")
     need(all(re.fullmatch(r"table\|public\.[a-z_][a-z0-9_]*\|[0-9]+\|[a-f0-9]{32}", line) for line in tables)
          and all(re.fullmatch(r"sequence\|public\.[a-z_][a-z0-9_]*\|[0-9]+\|[tf]", line) for line in sequences),

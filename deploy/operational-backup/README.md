@@ -37,7 +37,9 @@ sudo /usr/bin/python3 -I -B /opt/jeongeum/operational-backup/operational-backup.
 
 `production/`에 시간별·주간별 암호문을 저장하고 반환된 정확한 VersionId로 Head/Get·크기/SHA를 확인한다. 성공 기록은 모든 필수 업로드를 검증한 뒤에만 원자적으로 바꾼다. 실패·잠금 중복은 이전 성공을 유지하며 원격 삭제 권한이나 동작을 추가하지 않는다. 최대 두 번 시도하고 재시도는 새 snapshot·새 object UUID를 사용한다. 일부 업로드 후 실패하면 원격 객체가 더 남을 수 있다.
 
-하나의 exported read-only MVCC snapshot을 표 지문과 pg_dump가 공유한다. sequence는 MVCC 대상이 아니므로 전후 값이 달라지면 실패/제한된 재시도로 처리한다. 쓰기 중 항상 백업이 성공한다고 보장하지 않는다. 현재 schema 경계는 39테이블·29시퀀스·성공한 Flyway V1~V12이며 새 migration을 배포하기 전에 이 계약도 갱신해야 한다.
+하나의 exported read-only MVCC snapshot을 표 지문과 pg_dump가 공유한다. sequence는 MVCC 대상이 아니므로 전후 값이 달라지면 실패/제한된 재시도로 처리한다. 쓰기 중 항상 백업이 성공한다고 보장하지 않는다. 현재 코드의 schema 경계는 39테이블·29시퀀스와 **모두 성공한 Flyway V1~V12 또는 V1~V13의 두 완전한 이력**이다. 누락·실패·중복·미지의 후속 version은 거부하며 기존 V12 암호문의 형식·출처·내용/소유권 검증을 유지한다.
+
+V13 운영 migration **전에** 검토된 최신 `operational-backup.py`·공통 `production-backup.py`·`operational-restore.py`와 소스 핀을 먼저 반영하고 V12 백업 호환성과 V13 합성 DB의 독립 복원을 검증해야 한다. 이 문서 변경은 실제 서버 설치 완료를 의미하지 않는다. V13 스키마·새 블록을 이전 Backend가 읽을 수 있다고 가정하지 않으며, 특히 `B11~B22`의 실제 예약 생성 후에는 해당 예약을 처리하지 못하는 이전 이미지로 단순 롤백하지 않는다. 데이터를 삭제하지 않는 적용·복구 경계는 [전일 시간 블록 변경](../../docs/FULL_DAY_BOOKING_CALENDAR.md)을 따른다.
 
 새 unit은 hourly 백업과 별도 5분 감시를 정의한다. 지표는 `JEONGEUM/OperationalBackups` / `RecoverableSnapshotAgeMinutes`, 차원은 `Environment=production`, `Instance=jeongeum-prod-01`, Unit은 `None`이다. 업로드 완료 시각이 아닌 성공한 **snapshot 시작 시각**으로 나이를 계산한다. 없는/손상/다른 원본/미래/뒤집힌 시각의 성공 기록은 stale이며 감시에는 DB/Docker 조회가 필요하지 않다.
 
