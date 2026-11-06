@@ -31,6 +31,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
 import kr.jeongeum.scheduler.member.domain.Member;
 import kr.jeongeum.scheduler.member.repository.MemberRepository;
 import kr.jeongeum.scheduler.recurring.service.RecurringOpeningService;
@@ -39,6 +41,10 @@ import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -119,6 +125,114 @@ class RecurringAssignmentIntegrationTest {
         assertEquals(before, fixedCount(group));
         assertEquals(1, activeAt(group, date, "B11"));
         assertEquals("IN_PROGRESS", fixed(group, date, "B11").get("phase").asString());
+    }
+
+    @ParameterizedTest(name = "{0} {1}: preview, create and revise an hourly fixed assignment")
+    @MethodSource("newHourlyBlocksForEachTeamKind")
+    void everyNewHourlyBlockSupportsRegularAndAdditionalFixedAssignmentFlows(String kind, String code) throws Exception {
+        long group = team(kind);
+        LocalDate originalDate = TODAY.plusDays(1); // All new morning blocks are still in the future.
+        LocalDate revisedDate = originalDate.plusDays(1);
+        var body = assignment(group, originalDate.getDayOfWeek().getValue(), code, originalDate);
+        JsonNode preview = success(administrator.client().mutate("POST", "/api/v1/recurring-assignments/preview", body), 200);
+        assertTrue(preview.get("canApply").asBoolean());
+        assertTrue(preview.get("conflicts").isEmpty());
+        assertTrue(preview.get("plannedOccurrences").valueStream().allMatch(p -> code.equals(p.get("blockCode").asString())));
+        assertEquals(0, count("recurring_assignments"));
+        assertEquals(0, count("reservations"), "A valid preview must not acquire the block");
+
+        JsonNode series = success(createAssignment(body), 201);
+        JsonNode original = fixed(group, originalDate, code);
+        assertNewHourlyFixed(original, group, kind, originalDate, code);
+        assertEquals(5, fixedCount(group));
+        Map<String, String> beforeUpdatePreview = snapshots("recurring_assignments", "recurring_assignment_revisions",
+                "recurring_occurrences", "recurring_occurrence_reservations", "reservations", "reservation_assets",
+                "quota_entries", "reservation_operations");
+        var updatePreview = new HashMap<>(assignment(group, revisedDate.getDayOfWeek().getValue(), code, originalDate));
+        updatePreview.put("assignmentId", series.get("id").asString());
+        updatePreview.put("expectedVersion", series.get("version").asLong());
+        JsonNode revisedPreview = success(administrator.client().mutate("POST", "/api/v1/recurring-assignments/preview", updatePreview), 200);
+        assertTrue(revisedPreview.get("canApply").asBoolean());
+        assertTrue(revisedPreview.get("conflicts").isEmpty());
+        assertEquals(beforeUpdatePreview, snapshots(beforeUpdatePreview.keySet().toArray(String[]::new)));
+
+        JsonNode revised = success(administrator.client().write("PATCH", assignmentPath(series),
+                revision(series, revisedDate.getDayOfWeek().getValue(), code, originalDate), key()), 200);
+        assertEquals(series.get("version").asLong() + 1, revised.get("version").asLong());
+        assertEquals(2, revised.get("revisions").size());
+        JsonNode relocated = fixed(group, revisedDate, code);
+        assertNotEquals(id(original), id(relocated));
+        assertNewHourlyFixed(relocated, group, kind, revisedDate, code);
+        assertEquals("CANCELED", success(administrator.client().get(reservationPath(original)), 200).get("status").asString());
+        assertEquals(0, claims(id(original)));
+        assertEquals(0, activeAt(group, originalDate, code));
+        assertEquals(0, quota(group, originalDate));
+        assertEquals(occurrence(series, originalDate).get("id").asString(), occurrence(revised, revisedDate).get("id").asString(),
+                "Changing the weekday must retain the occurrence's original week identity");
+
+        Map<String, String> afterUpdate = snapshots(beforeUpdatePreview.keySet().toArray(String[]::new));
+        opening.prepareDate(originalDate);
+        opening.prepareDate(revisedDate);
+        opening.prepareDate(revisedDate);
+        opening.openBookableWindow();
+        assertEquals(afterUpdate, snapshots(afterUpdate.keySet().toArray(String[]::new)));
+        assertEquals(1, activeAt(group, revisedDate, code));
+        assertEquals(id(relocated), id(fixed(group, revisedDate, code)));
+        assertEquals(30, activeClaims(), "Five current fixed occurrences must each claim exactly six instruments");
+    }
+
+    @ParameterizedTest(name = "{0}: a B11 revision conflict preserves B22 fixed reservations")
+    @ValueSource(strings = {"REGULAR", "ADDITIONAL"})
+    void newHourlyRevisionConflictPreservesTheOriginalSeriesClaimsAndQuota(String kind) throws Exception {
+        long group = team(kind);
+        LocalDate date = TODAY.plusDays(1);
+        int weekday = date.getDayOfWeek().getValue();
+        JsonNode series = success(createAssignment(assignment(group, weekday, "B22", date)), 201);
+        JsonNode original = fixed(group, date, "B22");
+        Person individual = person("MEMBER");
+        JsonNode occupied = success(createReservation(individual.client(), personal(date.plusDays(7), "B11", "DRUMS")), 201);
+        Map<String, String> before = snapshots("recurring_assignments", "recurring_assignment_revisions",
+                "recurring_occurrences", "recurring_occurrence_reservations", "reservations", "reservation_assets",
+                "quota_entries", "reservation_operations");
+        var proposed = new HashMap<>(assignment(group, weekday, "B11", date));
+        proposed.put("assignmentId", series.get("id").asString());
+        proposed.put("expectedVersion", series.get("version").asLong());
+        JsonNode preview = success(administrator.client().mutate("POST", "/api/v1/recurring-assignments/preview", proposed), 200);
+        assertFalse(preview.get("canApply").asBoolean());
+        assertTrue(preview.get("conflicts").valueStream().anyMatch(conflict ->
+                "B11".equals(conflict.get("blockCode").asString())
+                        && occupied.get("id").asString().equals(conflict.path("reservationId").asString())));
+        assertEquals(before, snapshots(before.keySet().toArray(String[]::new)));
+        assertError(administrator.client().write("PATCH", assignmentPath(series), revision(series, weekday, "B11", date), key()),
+                409, "ASSIGNMENT_CONFLICT");
+        assertEquals(before, snapshots(before.keySet().toArray(String[]::new)));
+        assertEquals(id(original), id(fixed(group, date, "B22")));
+        assertNewHourlyFixed(fixed(group, date, "B22"), group, kind, date, "B22");
+        assertEquals(0, activeAt(group, date, "B11"));
+        assertEquals(1, claims(id(occupied)));
+        assertEquals("CONFIRMED", success(individual.client().get(reservationPath(occupied)), 200).get("status").asString());
+    }
+
+    private static Stream<Arguments> newHourlyBlocksForEachTeamKind() {
+        return Stream.of("REGULAR", "ADDITIONAL").flatMap(kind ->
+                IntStream.rangeClosed(11, 22).mapToObj(number -> Arguments.of(kind, "B%02d".formatted(number))));
+    }
+
+    private void assertNewHourlyFixed(JsonNode booking, long group, String kind, LocalDate date, String code) {
+        assertEquals(code, booking.get("blockCode").asString());
+        assertEquals(kind, booking.get("purpose").asString());
+        assertEquals("FIXED", booking.get("originKind").asString());
+        assertEquals("TEAM", booking.get("subjectType").asString());
+        assertEquals(Long.toString(administrator.member().id()), booking.get("creatorUserId").asString());
+        assertEquals(INSTRUMENTS, strings(booking.get("instrumentCodes")));
+        assertEquals(6, claims(id(booking)));
+        assertTrue(booking.get("quotaExempt").asBoolean());
+        assertEquals(0, booking.get("quotaMinutes").asInt());
+        assertEquals(0, quota(group, date));
+        Instant startsAt = date.atStartOfDay(ZoneId.of("Asia/Seoul"))
+                .plusHours(Integer.parseInt(code.substring(1)) - 11).toInstant();
+        assertEquals(startsAt, Instant.parse(booking.get("startsAt").asString()));
+        assertEquals(startsAt.plusSeconds(3600), Instant.parse(booking.get("endsAt").asString()));
     }
 
     @Test

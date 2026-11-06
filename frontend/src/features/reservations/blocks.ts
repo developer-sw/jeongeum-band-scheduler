@@ -10,6 +10,10 @@ export const blockTimes = {
   B09: "21:00~22:30", B10: "22:30~24:00",
 } satisfies Record<BlockCode, string>;
 
+export function isBlockCode(value: unknown): value is BlockCode {
+  return typeof value === "string" && Object.hasOwn(blockTimes, value);
+}
+
 export const blockNames = Object.fromEntries(Object.entries(blockTimes).map(([code, time]) => [
   code, `${time} · ${["B07", "B08", "B09", "B10"].includes(code) ? 90 : 60}분`,
 ])) as Record<BlockCode, string>;

@@ -1,7 +1,7 @@
 import { ApiError } from "@/lib/api/client";
 import { authErrorMessage } from "@/features/auth/errors";
+import { isBlockCode } from "@/features/reservations/blocks";
 import type { AssignmentConflict, Weekday } from "./types";
-import type { BlockCode } from "@/features/reservations/types";
 
 const messages: Record<string, string> = {
   ASSIGNMENT_CONFLICT: "다른 고정 배정이나 기존 예약과 겹쳐 적용하지 않았어요. 기존 예약·배정·개별 예외는 유지돼요. 충돌 목록을 확인해 주세요.",
@@ -21,9 +21,9 @@ export function assignmentConflicts(error: unknown): AssignmentConflict[] {
   return (error.details.conflicts ?? []).flatMap((value) => {
     if (!value || typeof value !== "object") return [];
     const item = value as Record<string, unknown>;
-    if (!["PATTERN", "RESERVATION"].includes(String(item.type)) || !Number.isInteger(item.weekday) || Number(item.weekday) < 1 || Number(item.weekday) > 7 || typeof item.blockCode !== "string" || !/^B(0[1-9]|10)$/.test(item.blockCode)) return [];
+    if (!["PATTERN", "RESERVATION"].includes(String(item.type)) || !Number.isInteger(item.weekday) || Number(item.weekday) < 1 || Number(item.weekday) > 7 || !isBlockCode(item.blockCode)) return [];
     const safeString = (field: string) => typeof item[field] === "string" ? item[field] as string : null;
     const date = safeString("date");
-    return [{ type: item.type as AssignmentConflict["type"], weekday: item.weekday as Weekday, blockCode: item.blockCode as BlockCode, assignmentId: safeString("assignmentId"), reservationId: safeString("reservationId"), teamId: safeString("teamId"), teamName: safeString("teamName"), date: date && /^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(Date.parse(date)) ? date : null }];
+    return [{ type: item.type as AssignmentConflict["type"], weekday: item.weekday as Weekday, blockCode: item.blockCode, assignmentId: safeString("assignmentId"), reservationId: safeString("reservationId"), teamId: safeString("teamId"), teamName: safeString("teamName"), date: date && /^\d{4}-\d{2}-\d{2}$/.test(date) && !Number.isNaN(Date.parse(date)) ? date : null }];
   });
 }
