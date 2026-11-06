@@ -26,6 +26,7 @@ const teams: Team[] = [{ id: "31", name: "가상 정규조", kind: "REGULAR", st
 const assignment: Assignment = { id: "9007199254740994", teamId: "31", teamName: "가상 정규조", teamKind: "REGULAR", status: "ACTIVE", version: 2, createdByUserId: admin.id, endDate: null, revisions: [{ id: "51", revisionNo: 1, effectiveDate: "2026-10-12", weekday: 1, blockCode: "B01" }, { id: "52", revisionNo: 2, effectiveDate: "2026-11-01", weekday: 3, blockCode: "B07" }], occurrences: [{ id: "61", weekStartDate: "2026-10-12", revisionId: "51", originalScheduledDate: "2026-10-12", originalBlockCode: "B01", state: "CANCELED_EXCEPTION", reservationIds: ["71"] }] };
 const input: AssignmentPreviewInput = { teamId: "31", weekday: 1, blockCode: "B01", effectiveDate: "2026-10-12" };
 const preview: AssignmentPreview = { canApply: true, conflicts: [], plannedOccurrences: [{ weekStartDate: "2026-10-12", date: "2026-10-12", blockCode: "B01", state: "CANCELED_EXCEPTION", preserved: true }, { weekStartDate: "2026-10-19", date: "2026-10-19", blockCode: "B01", state: "PLANNED", preserved: false }] };
+const newHourlyBlocks = ["B11", "B12", "B13", "B14", "B15", "B16", "B17", "B18", "B19", "B20", "B21", "B22"] as const;
 afterEach(() => vi.unstubAllGlobals());
 
 function renderPage(member: Member | null, seed?: (client: QueryClient) => void) {
@@ -85,6 +86,27 @@ describe("recurring assignment API and exact retry", () => {
 });
 
 describe("preview and revision inputs", () => {
+  it.each(teams.filter((team) => team.status === "ACTIVE").flatMap((team) => newHourlyBlocks.map((blockCode) => ({ teamId: team.id, kind: team.kind, blockCode }))))("allows $kind $blockCode through both new and edited assignment preview validation", ({ teamId, blockCode }) => {
+    const candidate: AssignmentPreviewInput = { ...input, teamId, blockCode };
+    expect(assignmentInputError(candidate, "2026-10-12", teams)).toBeNull();
+    expect(assignmentInputError({ ...candidate, assignmentId: assignment.id, expectedVersion: 2 }, "2026-10-12", teams)).toBeNull();
+  });
+  it.each(newHourlyBlocks)("retains both pattern and reservation conflicts for %s", (blockCode) => {
+    const conflicts = [
+      { type: "PATTERN", assignmentId: "82", weekday: 1, blockCode, teamName: "가상 상대조" },
+      { type: "RESERVATION", reservationId: "83", date: "2026-10-19", weekday: 1, blockCode },
+    ];
+    const parsed = assignmentConflicts(new ApiError(409, "ASSIGNMENT_CONFLICT", "", undefined, { conflicts }));
+    expect(parsed).toHaveLength(2);
+    expect(parsed.map((conflict) => conflict.blockCode)).toEqual([blockCode, blockCode]);
+    const markup = renderToStaticMarkup(createElement(ConflictList, { conflicts: parsed }));
+    expect(markup).toContain("고정 배정 #82");
+    expect(markup).toContain("기존 예약 #83");
+  });
+  it.each(["B00", "B23", "B001", "b11", "B11 ", "toString", "__proto__", null, 11, { toString: () => "B11" }])("rejects noncanonical block input and conflict code %j", (blockCode) => {
+    expect(assignmentInputError({ ...input, blockCode } as AssignmentPreviewInput, "2026-10-12", teams)).toBe("정해진 시간 블록을 선택해 주세요.");
+    expect(assignmentConflicts(new ApiError(409, "ASSIGNMENT_CONFLICT", "", undefined, { conflicts: [{ type: "PATTERN", weekday: 1, blockCode }] }))).toEqual([]);
+  });
   it("accepts several kinds of active teams and future dates, rejecting inactive teams, invalid dates and noncanonical blocks", () => {
     expect(assignmentInputError(input, "2026-10-12", teams)).toBeNull();
     expect(assignmentInputError({ ...input, teamId: "32", effectiveDate: "2026-12-11" }, "2026-10-12", teams)).toBeNull();

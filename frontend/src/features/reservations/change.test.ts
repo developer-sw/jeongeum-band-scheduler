@@ -13,7 +13,7 @@ import { SuccessorLinks } from "./detail-panel";
 import { reservationActionErrorMessage } from "./errors";
 import { myReservationsQuery, refreshReservations, reservationQuery, scheduleQuery } from "./queries";
 import { ReservationRequestState } from "./request-state";
-import type { ChangeReservationResult, InstrumentCode, ReservationDetail, ReservationIntent, ScheduleBlock, ScheduleDay, ScheduleSnapshot } from "./types";
+import type { BlockCode, ChangeReservationResult, InstrumentCode, ReservationDetail, ReservationIntent, ScheduleBlock, ScheduleDay, ScheduleSnapshot } from "./types";
 import { ReservationCard } from "./view";
 import { addDate } from "./time";
 
@@ -153,6 +153,21 @@ describe("change requests preserve exact identity and unknown outcomes", () => {
     for (const invalid of [null, { replacedReservationIds: [source.id], reservations: [] }, { replacedReservationIds: [], reservations: [successor] }, { replacedReservationIds: ["unrelated"], reservations: [successor] }, { replacedReservationIds: [source.id], reservations: [successor, source] }, { replacedReservationIds: [source.id], reservations: [{ id: successor.id }] }]) {
       expect(() => changedReservation(invalid as unknown as ChangeReservationResult, source.id)).toThrowError(expect.objectContaining({ code: "INVALID_RESPONSE" }));
     }
+  });
+
+  it.each(["B11", "B12", "B13", "B14", "B15", "B16", "B17", "B18", "B19", "B20", "B21", "B22"] as const)("confirms a changed reservation and no-op at the new hourly block %s", (blockCode) => {
+    const hour = Number(blockCode.slice(1)) - 11;
+    const startsAt = `${date}T${String(hour).padStart(2, "0")}:00:00+09:00`;
+    const endsAt = `${date}T${String(hour + 1).padStart(2, "0")}:00:00+09:00`;
+    const changed = { ...successor, blockCode, startsAt, endsAt, usableFrom: startsAt };
+    const unchanged = { ...source, blockCode, startsAt, endsAt, usableFrom: startsAt };
+    expect(changedReservation({ replacedReservationIds: [source.id], reservations: [changed] }, source.id)).toEqual(changed);
+    expect(changedReservation({ replacedReservationIds: [], reservations: [unchanged] }, source.id)).toEqual(unchanged);
+  });
+
+  it.each(["B00", "B23", "B001", "b11", "constructor", { toString: () => "B11" }, null])("keeps invalid block input %j uncertain after a change", (blockCode) => {
+    const malformed = { ...successor, blockCode: blockCode as BlockCode };
+    expect(() => changedReservation({ replacedReservationIds: [source.id], reservations: [malformed] }, source.id)).toThrowError(expect.objectContaining({ code: "INVALID_RESPONSE" }));
   });
 
   it("keeps a malformed post-write response uncertain and refuses a different body, reservation or operation", async () => {

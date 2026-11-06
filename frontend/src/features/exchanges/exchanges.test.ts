@@ -6,7 +6,7 @@ import type { Member } from "@/features/auth/types";
 import { memberQueryKey, replaceSessionCache } from "@/features/auth/session-cache";
 import { directoryScope, pruneDirectoryCache, refreshDirectory } from "@/features/directory/queries";
 import { myReservationsQuery, refreshReservations, reservationQuery, scheduleQuery } from "@/features/reservations/queries";
-import type { InstrumentCode, ReservationDetail } from "@/features/reservations/types";
+import type { BlockCode, InstrumentCode, ReservationDetail } from "@/features/reservations/types";
 import { ApiError } from "@/lib/api/client";
 import { IdempotentRequestState } from "@/lib/api/idempotent-request-state";
 import { checkedExchange, getExchangeCandidates, submitExchangeIntent } from "./api";
@@ -98,6 +98,37 @@ describe("exchange API identity, uncertainty and offline behavior", () => {
     expect(checkedExchange(completed, { kind: "APPROVE", id: request.id, input: { expectedVersion: 0 } })).toEqual(completed);
     for (const invalid of [null, { ...request, id: "" }, { ...request, offered: [] }, { ...request, preview: [{}] }, { ...request, requested: [{ ...counterpart, id: "unrelated" }] }, { ...completed, reservations: [completed.reservations[0]] }, { ...completed, replacedReservationIds: [source.id] }]) expect(() => checkedExchange(invalid as ExchangeResponse, createIntent)).toThrowError(expect.objectContaining({ code: "INVALID_RESPONSE" }));
     expect(() => checkedExchange(request, { kind: "APPROVE", id: request.id, input: { expectedVersion: 0 } })).toThrowError(expect.objectContaining({ code: "INVALID_RESPONSE" }));
+  });
+  it.each(["B11", "B12", "B13", "B14", "B15", "B16", "B17", "B18", "B19", "B20", "B21", "B22"] as const)("confirms %s in offered/requested reservations, arrival preview and atomic exchange results", (blockCode) => {
+    const hour = Number(blockCode.slice(1)) - 11;
+    const startsAt = `${date}T${String(hour).padStart(2, "0")}:00:00+09:00`;
+    const endsAt = `${date}T${String(hour + 1).padStart(2, "0")}:00:00+09:00`;
+    const hourly = { ...source, blockCode, startsAt, endsAt, usableFrom: startsAt };
+    const pending = { ...request, offered: [hourly], preview: [request.preview[0], { ...request.preview[1], blockCode }] };
+    expect(checkedExchange(pending, createIntent)).toEqual(pending);
+    const completed: ExchangeResponse = { ...pending, status: "COMPLETED", replacedReservationIds: [source.id, counterpart.id], reservations: [
+      { ...hourly, id: "new-source", blockCode: counterpart.blockCode, startsAt: counterpart.startsAt, endsAt: counterpart.endsAt, usableFrom: counterpart.usableFrom, originKind: "EXCHANGE", quotaMinutes: 0 },
+      { ...counterpart, id: "new-target", blockCode, startsAt, endsAt, usableFrom: startsAt, originKind: "EXCHANGE", quotaMinutes: 60 },
+    ] };
+    const approve: ExchangeIntent = { kind: "APPROVE", id: request.id, input: { expectedVersion: 0 } };
+    expect(checkedExchange(completed, approve)).toEqual(completed);
+    const reversed: ExchangeResponse = { ...completed, offered: completed.requested, requested: completed.offered,
+      preview: completed.preview.map((item) => ({ ...item, side: item.side === "REQUESTER" ? "COUNTERPART" : "REQUESTER" })),
+    };
+    expect(checkedExchange(reversed, approve)).toEqual(reversed);
+  });
+  it.each(["B00", "B23", "B001", "b11", "constructor", { toString: () => "B11" }, null])("rejects invalid block %j in each exchange response location", (blockCode) => {
+    const invalidCode = blockCode as BlockCode;
+    const completed: ExchangeResponse = { ...request, status: "COMPLETED", replacedReservationIds: [source.id, counterpart.id], reservations: [
+      { ...source, id: "new-source", originKind: "EXCHANGE" }, { ...counterpart, id: "new-target", originKind: "EXCHANGE" },
+    ] };
+    const approve: ExchangeIntent = { kind: "APPROVE", id: request.id, input: { expectedVersion: 0 } };
+    for (const invalid of [
+      { ...completed, offered: [{ ...source, blockCode: invalidCode }] },
+      { ...completed, requested: [{ ...counterpart, blockCode: invalidCode }] },
+      { ...completed, preview: [{ ...completed.preview[0], blockCode: invalidCode }, completed.preview[1]] },
+      { ...completed, reservations: [{ ...completed.reservations[0], blockCode: invalidCode }, completed.reservations[1]] },
+    ]) expect(() => checkedExchange(invalid, approve)).toThrowError(expect.objectContaining({ code: "INVALID_RESPONSE" }));
   });
   it("retains the exact key/body on transport loss and forbids a new request until definitive resolution", () => {
     const state = new IdempotentRequestState<ExchangeIntent>(() => "immutable-exchange-key"); const mutable = structuredClone(createIntent); const prepared = state.prepare(mutable)!;

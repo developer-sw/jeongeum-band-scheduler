@@ -1,4 +1,5 @@
 import { ApiError, apiRequest } from "@/lib/api/client";
+import { isBlockCode } from "./blocks";
 import type { CreateReservationInput, CancelReservationInput, ChangeReservationInput, ChangeReservationResult, ReservationDetail, ReservationIntent, Schedule, ScheduleSnapshot } from "./types";
 
 async function data<T>(request: ReturnType<typeof apiRequest<T>>): Promise<T> {
@@ -25,7 +26,7 @@ export function changedReservation(result: ChangeReservationResult, sourceId: st
   if (!Array.isArray(result?.replacedReservationIds) || !Array.isArray(result?.reservations) || result.reservations.length !== 1
     || !detail || typeof detail.id !== "string" || !detail.id || !Number.isInteger(detail.version) || detail.version < 0
     || typeof detail.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(detail.date)
-    || !/^B(0[1-9]|10)$/.test(detail.blockCode) || !Number.isFinite(Date.parse(detail.startsAt)) || !Number.isFinite(Date.parse(detail.endsAt)) || Date.parse(detail.endsAt) <= Date.parse(detail.startsAt)
+    || !isBlockCode(detail.blockCode) || !Number.isFinite(Date.parse(detail.startsAt)) || !Number.isFinite(Date.parse(detail.endsAt)) || Date.parse(detail.endsAt) <= Date.parse(detail.startsAt)
     || !["CONFIRMED", "CANCELED", "REPLACED"].includes(detail.status)
     || !["PERSONAL", "TEAM"].includes(detail.subjectType) || !["PERSONAL", "REGULAR", "ADDITIONAL"].includes(detail.purpose)
     || !["FUTURE", "IN_PROGRESS", "ENDED"].includes(detail.phase) || !["MANUAL", "FIXED", "CHANGE", "EXCHANGE"].includes(detail.originKind)
