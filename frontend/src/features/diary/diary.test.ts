@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 import type { Member } from "@/features/auth/types";
 import type { ReservationSummary, ScheduleBlock, ScheduleDay } from "@/features/reservations/types";
 import { addDate, bookingWindowLabel } from "@/features/reservations/time";
-import { inBookingRange, monthCells, moveMonth, visibleDays, weekDates, weekTarget } from "./calendar";
-import { CalendarSidebar, DateStrip } from "./calendar-view";
+import { calendarWeekdays, inBookingRange, monthCells, moveMonth, visibleDays, weekdays, weekDates, weekTarget } from "./calendar";
+import { CalendarPopup, CalendarSidebar, DateStrip } from "./calendar-view";
 import { slotView } from "./slot";
 import { Timetable } from "./timetable";
 
@@ -50,6 +50,36 @@ describe("diary calendar uses canonical server dates", () => {
   it("starts Monday and includes Sunday across month/year boundaries", () => {
     expect(weekDates("2026-11-01")).toEqual(["2026-10-26", "2026-10-27", "2026-10-28", "2026-10-29", "2026-10-30", "2026-10-31", "2026-11-01"]);
     expect(weekDates("2027-01-01")[0]).toBe("2026-12-28");
+  });
+  it.each([
+    ["2026-11", "2026-11-01"],
+    ["2026-10", "2026-09-27"],
+    ["2027-01", "2026-12-27"],
+    ["2028-02", "2028-01-30"],
+  ])("aligns the month grid to Sunday for %s without changing booking weeks", (month, firstSunday) => {
+    const cells = monthCells(month);
+    expect(cells).toEqual(Array.from({ length: 42 }, (_, index) => addDate(firstSunday, index)));
+    expect(cells.filter((_, index) => index % 7 === 0).every((date) => new Date(`${date}T00:00:00Z`).getUTCDay() === 0)).toBe(true);
+    expect(calendarWeekdays).toEqual(["일", "월", "화", "수", "목", "금", "토"]);
+    expect(weekdays).toEqual(["월", "화", "수", "목", "금", "토", "일"]);
+  });
+  it("uses the same calendar label, date-free SVG and Sunday-first headings in desktop and popup calendars", () => {
+    const props = { selected: "2026-11-14", today: "2026-11-14", through: "2026-12-14", days: [], disabled: false, onSelect: () => {}, onUnavailable: () => {} };
+    const desktop = renderToStaticMarkup(createElement(CalendarSidebar, props));
+    const popup = renderToStaticMarkup(createElement(CalendarPopup, props));
+    for (const markup of [desktop, popup]) {
+      expect(markup.match(/MONTHLY NOTE/g)).toHaveLength(1);
+      expect(markup.indexOf("MONTHLY NOTE")).toBeLessThan(markup.indexOf("<h2>"));
+      expect(markup).not.toContain("📅");
+      expect(markup.match(/<span class="diary-weekday">(.*?)<\/span>/g)).toEqual(calendarWeekdays.map((label) => `<span class="diary-weekday">${label}</span>`));
+      expect(markup).toContain('class="diary-calendar-icon"');
+    }
+    expect(desktop.match(/<svg.*?<\/svg>/)?.[0]).toBe(popup.match(/<svg.*?<\/svg>/)?.[0]);
+  });
+  it("retains actual weekday labels in the mobile date strip after changing calendar columns", () => {
+    const days = Array.from({ length: 7 }, (_, index) => ({ ...day, date: addDate("2026-11-01", index) }));
+    const markup = renderToStaticMarkup(createElement(DateStrip, { days, selected: days[0].date, today: "2026-11-14", disabled: false, onSelect: () => {} }));
+    expect(markup.match(/<span>(일|월|화|수|목|금|토)<\/span>/g)).toEqual(calendarWeekdays.map((label) => `<span>${label}</span>`));
   });
   it("includes leap day without overflowing when browsing from a month's last day", () => {
     const cells = monthCells("2028-02");

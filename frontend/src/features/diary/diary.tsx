@@ -98,7 +98,7 @@ export function Diary({ member, scope }: { member: Member; scope: string }) {
     {query.isPending && <div className="diary-loading diary-card" role="status">합주실 다이어리를 펼치고 있어요…</div>}
     {query.isError && <div className="diary-query-error"><FormError message={reservationErrorMessage(query.error)} /><button type="button" className={secondaryButton} onClick={() => void workspace.refresh()}>시간표 다시 불러오기</button>{schedule && <p>마지막으로 확인한 일정이에요. 연결을 확인한 뒤 예약해 주세요.</p>}</div>}
     {schedule && now && <>
-      <p className="diary-range">예약 가능 {dateLabel(today)} ~ {dateLabel(schedule.bookableThrough)} <span>서울 기준 · 20초마다 갱신</span></p>
+      <p className="diary-range">예약 가능 {dateLabel(today)} ~ {dateLabel(schedule.bookableThrough)} <span>20초마다 갱신</span></p>
       {!days.length ? <div className="diary-card diary-info" role="status">새 날짜의 시간표를 확인하고 있어요. 잠시 후 다시 불러와 주세요.<button className={secondaryButton} type="button" onClick={() => void workspace.refresh()}>시간표 갱신</button></div> : <div className="diary-layout">
         <CalendarSidebar member={member} stale={query.isError} refreshing={query.isFetching} selected={selectedDate} today={today} through={schedule.bookableThrough} days={days} disabled={busy} onSelect={selectDate} onUnavailable={() => setCalendarNotice(`예약은 ${bookingWindowLabel(today, schedule.bookableThrough)} 가능해요. 과거 기록은 예약·이력에서 확인해 주세요.`)} />
         <section className="diary-timetable diary-card" aria-labelledby="diary-timetable-title">
