@@ -1,5 +1,15 @@
 # 테스트 및 운영 검증 계획
 
+## 2026-11-14 컨테이너 CI의 JDK revision 복구
+
+PR #42 최초 HEAD `572a01c`의 합성 컨테이너 CI는 이미지 빌드에서 공통 exit 오류로 두 번 실패했다. 같은 Backend Dockerfile을 별도 진단 태그에 `docker build --no-cache`로 실행해 고정 JDK revision `21.0.12.1+1-1~22.04.4` 미존재·APT exit 100을 재현했다. 공개 원격 로그에 상세 APT 오류가 있었다고 주장하지 않으며, 이 원인 확인은 캐시 없는 로컬 재현에 근거한다.
+
+기존 pinned base의 실제 APT policy와 [Ubuntu 공식 보안 공지](https://ubuntu.com/security/notices/USN-9015-1)에 일치하는 `21.0.13.0.3+1-1~22.04.1`로 builder pin을 갱신했다. **캐시 없는 전체 Backend Docker 빌드·Java 21 컴파일·bootJar·비root runtime 이미지 생성이 종료 코드 0으로 성공**했다. 실제 DB·기존 볼륨·운영 서버는 사용하거나 변경하지 않았다. 이 빌드는 서버 기동·실제 DB migration 검증을 뜻하지 않는다.
+
+QA 실행기에는 build exit에만 적용되는 순수 고정 코드 분류를 추가했다. AST로 함수를 가져오는 `production-qa-result-export.test.ps1`의 **42개 isolated 검사**가 통과했다. 구·신 JDK revision 미존재, BuildKit 접두사/CRLF, 알 수 없는 오류·다른 패키지·불완전한 진단·비문자열 입력과 비밀 sentinel을 포함하며 모든 출력 stream에 고정 코드 한 개만 나오는지 확인한다. 비빌드 exit·start/timeout·릴리스 export 7필드·기존 58개 통합 검사 계약은 유지한다. 상세 Docker 출력의 공개·QA 폴더 artifact 업로드는 추가하지 않았다.
+
+로컬 진단 로그는 ignored `.local/ci-container-build-20261114/`에 보관한다. 수정 커밋의 새 원격 Backend/Frontend·합성 컨테이너·백업 회귀 결과는 PR #42의 동일 HEAD CI에서 확인한다. 최초 UI 커밋의 6개 성공 결과를 새 수정의 전체 CI 성공으로 대신하지 않는다. main 병합·이미지 발행·운영 배포는 별도 단계다.
+
 ## 2026-11-14 달력 표시와 iOS 날짜 입력 폭
 
 모바일 라벨 여백 후속 조정은 CSS만 변경했다. production webpack 빌드를 통과했고 최신 합성 미리보기의 실제 320/393/430px에서 카드 테두리 포함 위·왼쪽 19px(안쪽 padding 18px), 라벨~월 제목 4px, 44×44px 월 이동 버튼과 제목 비겹침·가로 넘침 없음을 확인했다. 1440px에서는 기존 위 21px·왼쪽 17px·제목 간격 18px 배치를 유지했다. 측정 요청 직후 이전 320px 상태가 반환된 한 건은 중복 증빙에서 제외하고, 393px는 실제 적용 폭을 재확인했다. `calendar-mobile-spaced-393.png`와 `calendar-spacing-checks.private.json`을 같은 ignored 폴더에 보관한다. 단순 CSS 간격 조정에는 새 테스트를 추가하거나 기존 441건을 다시 실행하지 않았으며, 아래 441건은 직전 아이콘·라벨 수정의 실행 결과다.

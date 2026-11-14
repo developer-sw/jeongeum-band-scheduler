@@ -1,5 +1,5 @@
 #requires -Version 7.2
-# Path/export and block-map unit checks only. The QA entry point, Docker and DB are never run.
+# Path/export, block-map and safe failure-code unit checks only. The QA entry point, Docker and DB are never run.
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $repositoryRoot = [IO.Path]::GetFullPath((Split-Path -Parent $PSScriptRoot))
@@ -8,7 +8,7 @@ $tokens = $null
 $parseErrors = $null
 $sourceAst = [Management.Automation.Language.Parser]::ParseFile($sourcePath, [ref]$tokens, [ref]$parseErrors)
 if ($parseErrors.Count) { throw 'QA_EXPORT_SOURCE_PARSE_FAILED' }
-foreach ($name in @('Assert-QaResultPath', 'Write-QaResultExport', 'Assert-QaFlywayHistory', 'Assert-QaTimeBlockMapping')) {
+foreach ($name in @('Assert-QaResultPath', 'Write-QaResultExport', 'Assert-QaFlywayHistory', 'Assert-QaTimeBlockMapping', 'Get-QaProcessExitFailureCode')) {
     $definition = $sourceAst.Find({ param($item) $item -is [Management.Automation.Language.FunctionDefinitionAst] -and $item.Name -ceq $name }, $true)
     if ($null -eq $definition) { throw 'QA_EXPORT_FUNCTION_MISSING' }
     . ([scriptblock]::Create($definition.Extent.Text))
@@ -31,7 +31,31 @@ function Assert-Rejected {
     try { & $Action | Out-Null } catch { $rejected = $true }
     Assert-Check $Name $rejected
 }
+function Assert-FailureCode {
+    param([string]$Name, [hashtable]$Parameters, [string]$Expected)
+    # Capture every output stream: only the fixed code may leave the classifier.
+    $output = @(& { Get-QaProcessExitFailureCode @Parameters } *>&1)
+    Assert-Check $Name ($output.Count -eq 1 -and $output[0] -is [string] -and $output[0] -ceq $Expected)
+}
 try {
+    $secretSentinel = 'QA_TEST_SECRET_MUST_NEVER_BE_PRINTED'
+    $missingJdkRevision = "E: Version '21.0.12.1+1-1~22.04.4' for 'openjdk-21-jdk-headless' was not found"
+    Assert-FailureCode 'apt_missing_pinned_jdk_revision_stderr' @{ ImageBuild = $true; StandardError = $missingJdkRevision } 'QA_BUILD_JDK_REVISION_UNAVAILABLE'
+    Assert-FailureCode 'apt_missing_updated_jdk_revision_stderr' @{ ImageBuild = $true; StandardError = $missingJdkRevision.Replace('21.0.12.1+1-1~22.04.4', '21.0.13.0.3+1-1~22.04.1') } 'QA_BUILD_JDK_REVISION_UNAVAILABLE'
+    Assert-FailureCode 'buildkit_missing_pinned_jdk_revision_stdout' @{ ImageBuild = $true; StandardOutput = "#12 8.427 $missingJdkRevision" } 'QA_BUILD_JDK_REVISION_UNAVAILABLE'
+    Assert-FailureCode 'crlf_build_output_emits_code_only' @{ ImageBuild = $true; StandardError = "$secretSentinel`r`n#12 8.427 $missingJdkRevision`r`n$secretSentinel" } 'QA_BUILD_JDK_REVISION_UNAVAILABLE'
+    Assert-FailureCode 'unknown_build_failure_emits_code_only' @{ ImageBuild = $true; StandardOutput = $secretSentinel; StandardError = "arbitrary build exception: $secretSentinel" } 'QA_IMAGE_BUILD_FAILED'
+    Assert-FailureCode 'empty_build_output_is_generic' @{ ImageBuild = $true; StandardOutput = ''; StandardError = '' } 'QA_IMAGE_BUILD_FAILED'
+    Assert-FailureCode 'null_build_output_is_generic' @{ ImageBuild = $true; StandardOutput = $null; StandardError = $null } 'QA_IMAGE_BUILD_FAILED'
+    Assert-FailureCode 'malformed_array_output_is_generic' @{ ImageBuild = $true; StandardOutput = @($missingJdkRevision, $secretSentinel) } 'QA_IMAGE_BUILD_FAILED'
+    Assert-FailureCode 'malformed_object_output_is_generic' @{ ImageBuild = $true; StandardError = [pscustomobject]@{ message = $missingJdkRevision; secret = $secretSentinel } } 'QA_IMAGE_BUILD_FAILED'
+    Assert-FailureCode 'different_package_is_generic' @{ ImageBuild = $true; StandardError = $missingJdkRevision.Replace('openjdk-21-jdk-headless', 'openjdk-17-jdk-headless') } 'QA_IMAGE_BUILD_FAILED'
+    Assert-FailureCode 'malformed_revision_is_generic' @{ ImageBuild = $true; StandardError = $missingJdkRevision.Replace('21.0.12.1+1-1~22.04.4', $secretSentinel) } 'QA_IMAGE_BUILD_FAILED'
+    Assert-FailureCode 'command_line_pin_alone_is_generic' @{ ImageBuild = $true; StandardError = "apt-get install openjdk-21-jdk-headless=21.0.12.1+1-1~22.04.4 $secretSentinel" } 'QA_IMAGE_BUILD_FAILED'
+    Assert-FailureCode 'quoted_diagnostic_is_generic' @{ ImageBuild = $true; StandardError = "command argument: $missingJdkRevision" } 'QA_IMAGE_BUILD_FAILED'
+    Assert-FailureCode 'incomplete_apt_diagnostic_is_generic' @{ ImageBuild = $true; StandardError = $missingJdkRevision.Replace(' was not found', '') } 'QA_IMAGE_BUILD_FAILED'
+    Assert-FailureCode 'nonbuild_missing_jdk_diagnostic_keeps_process_code' @{ StandardError = $missingJdkRevision } 'QA_PROCESS_EXIT_FAILED'
+    Assert-FailureCode 'nonbuild_unknown_failure_keeps_process_code' @{ StandardOutput = $secretSentinel; StandardError = $secretSentinel } 'QA_PROCESS_EXIT_FAILED'
     $history = ((1..13 | ForEach-Object { "${_}:true" }) -join ',')
     Assert-QaFlywayHistory -Actual $history
     Assert-Check 'all_thirteen_migrations_succeeded' $true

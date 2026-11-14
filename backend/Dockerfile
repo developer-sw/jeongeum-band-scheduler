@@ -3,7 +3,7 @@ FROM eclipse-temurin:21-jre-jammy@sha256:f04fb34e053148344e83317976114ec3f37e4b8
 # Use Ubuntu's signature-verified Java 21 packages on the pinned base. An unavailable
 # fixed package revision must fail the build rather than silently selecting another JDK.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends openjdk-21-jdk-headless=21.0.12.1+1-1~22.04.4 \
+    && apt-get install -y --no-install-recommends openjdk-21-jdk-headless=21.0.13.0.3+1-1~22.04.1 \
     && ln -s "$(dirname "$(dirname "$(readlink -f /usr/bin/javac)")")" /opt/build-jdk \
     && /opt/build-jdk/bin/javac -version \
     && rm -rf /var/lib/apt/lists/*

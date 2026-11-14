@@ -120,12 +120,26 @@ function Assert-QaScope {
     }
 }
 
+function Get-QaProcessExitFailureCode {
+    param([switch]$ImageBuild, [AllowNull()] [object]$StandardOutput, [AllowNull()] [object]$StandardError)
+    if (-not $ImageBuild) { return 'QA_PROCESS_EXIT_FAILED' }
+    # Inspect captured text internally, returning only fixed allowlisted codes.
+    # Require APT's complete diagnostic for this package, optionally prefixed by
+    # BuildKit's step/time fields. A command line containing the pin is not evidence.
+    $missingJdkRevision = '(?m)^(?:#[0-9]+[ \t]+[0-9]+(?:\.[0-9]+)?[ \t]+)?E: Version ''21(?:\.[0-9]+){1,4}\+[0-9]+-[0-9]+~22\.04\.[0-9]+'' for ''openjdk-21-jdk-headless'' was not found\r?$'
+    foreach ($captured in @($StandardOutput, $StandardError)) {
+        if ($captured -is [string] -and $captured -cmatch $missingJdkRevision) { return 'QA_BUILD_JDK_REVISION_UNAVAILABLE' }
+    }
+    return 'QA_IMAGE_BUILD_FAILED'
+}
+
 function Invoke-QaProcess {
     param(
         [Parameter(Mandatory)] [string]$File,
         [Parameter(Mandatory)] [string[]]$Arguments,
         [string]$InputText,
         [switch]$Capture,
+        [switch]$ImageBuild,
         [int]$TimeoutSeconds = 1200
     )
     Assert-QaScope
@@ -159,14 +173,16 @@ function Invoke-QaProcess {
         $stdout = $outputTask.GetAwaiter().GetResult()
         $stderr = $errorTask.GetAwaiter().GetResult()
         [IO.File]::AppendAllText($qaLogFile, "`n--- private process output ---`n$stdout`n$stderr`n", [Text.UTF8Encoding]::new($false))
-        if ($process.ExitCode -ne 0) { throw 'QA_PROCESS_EXIT_FAILED' }
+        if ($process.ExitCode -ne 0) {
+            throw (Get-QaProcessExitFailureCode -ImageBuild:$ImageBuild -StandardOutput $stdout -StandardError $stderr)
+        }
         if ($Capture) { return $stdout.Trim() }
     } finally { $process.Dispose() }
 }
 
 function Invoke-QaDocker {
-    param([Parameter(Mandatory)] [string[]]$Arguments, [string]$InputText, [switch]$Capture, [int]$TimeoutSeconds = 1200)
-    $parameters = @{ File = 'docker'; Arguments = $Arguments; Capture = $Capture; TimeoutSeconds = $TimeoutSeconds }
+    param([Parameter(Mandatory)] [string[]]$Arguments, [string]$InputText, [switch]$Capture, [switch]$ImageBuild, [int]$TimeoutSeconds = 1200)
+    $parameters = @{ File = 'docker'; Arguments = $Arguments; Capture = $Capture; ImageBuild = $ImageBuild; TimeoutSeconds = $TimeoutSeconds }
     if ($PSBoundParameters.ContainsKey('InputText')) { $parameters.InputText = $InputText }
     Invoke-QaProcess @parameters
 }
@@ -177,7 +193,8 @@ function Invoke-QaCompose {
     if (-not (Test-Path -LiteralPath $qaEnvironmentFile -PathType Leaf)) { throw 'QA_ENV_FILE_MISSING' }
     $prefix = @('compose', '--project-directory', (Split-Path -Parent $qaProductionCompose), '--env-file', $qaEnvironmentFile,
         '--project-name', $qaProject, '-f', $qaProductionCompose, '-f', $qaOverrideCompose)
-    Invoke-QaDocker -Arguments ($prefix + $Arguments) -Capture:$Capture -TimeoutSeconds $TimeoutSeconds
+    $imageBuild = $Arguments.Count -gt 0 -and $Arguments[0] -ceq 'build'
+    Invoke-QaDocker -Arguments ($prefix + $Arguments) -Capture:$Capture -ImageBuild:$imageBuild -TimeoutSeconds $TimeoutSeconds
 }
 
 function Assert-QaContainer {
