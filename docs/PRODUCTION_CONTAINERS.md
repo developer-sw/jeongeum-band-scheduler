@@ -1,5 +1,13 @@
 # 운영 컨테이너 구현과 합성 통합 검증
 
+## 2026-11-14 컨테이너 CI 빌드 복구
+
+PR #42의 UI 커밋 `572a01c`에서 앱 검사 등 6개 CI job은 성공했지만 합성 컨테이너 job은 재실행에서도 이미지 빌드 중 `QA_PROCESS_EXIT_FAILED`로 종료됐다. 당시 공개 로그에는 상세 Docker 출력이 없어 원인을 직접 확인할 수 없었다. 동일 Backend Dockerfile을 별도 로컬 태그로 **캐시 없이** 빌드한 결과, Ubuntu 저장소에서 고정한 `openjdk-21-jdk-headless=21.0.12.1+1-1~22.04.4`를 찾지 못하는 APT exit 100을 재현했다. 이는 UI·예약 코드 컴파일 이전의 설치 실패다.
+
+실제 pinned base의 서명 검증 APT 조회와 [Ubuntu USN-9015-1](https://ubuntu.com/security/notices/USN-9015-1)의 22.04 항목이 일치하는 **`21.0.13.0.3+1-1~22.04.1`**로 builder의 정확한 revision만 갱신한다. 임의 최신 버전을 선택하지 않으며 base/runtime digest·Java 21·Gradle wrapper checksum·서명 검증·비root 실행과 기존 데이터 경계는 유지한다. 실제 운영 이미지 발행·서버 반영은 이 CI 수정과 별도다.
+
+QA 실행기는 `compose build`의 비정상 exit에서만 captured stdout/stderr를 내부적으로 분류한다. APT의 해당 패키지·정확한 revision 미존재 진단은 `QA_BUILD_JDK_REVISION_UNAVAILABLE`, 그 외 빌드 실패는 `QA_IMAGE_BUILD_FAILED`를 반환한다. 비빌드 exit·프로세스 시작·timeout 코드는 유지한다. 공개 로그에 원문·명령 인자·비밀값을 추가하거나 QA 디렉터리를 artifact로 올리지 않으며, 릴리스 결과 export의 기존 7필드·58개 통합 검사 계약을 유지한다. 로컬·원격 검증 결과는 [검증 기록](TEST_PLAN.md)을 따른다.
+
 최신 후속(2026-10-18): PR #24/#25의 main `8b24285`에서 `v1.0.0-rc.2` 공개 이미지 3개와 최종 artifact/digest를 검증했다. [릴리스 기록](PRODUCTION_IMAGE_RELEASE.md)을 재사용하며 아래 registry 미발행 문구는 구현 당시 기록이다. 사용자가 생성한 서울 Lightsail 4GB의 고정 IP·Docker/Compose·SSH/443 방화벽 준비를 완료했다. [AWS_LIGHTSAIL_DEPLOYMENT](AWS_LIGHTSAIL_DEPLOYMENT.md)의 실제 결과/비용·Free Plan 제약을 따르며 OS 보안 패치·공개 HTTPS·앱/DB 이전/배포·외부 백업 복구는 후속 범위다.
 
 기준일: 2026-10-17, Asia/Seoul. 기반 main `bf2a474`, 작업 브랜치 `codex/production-containers`. 앞선 미커밋 사전 점검 문서와 사용자 UI·DB를 보존한다.
@@ -28,7 +36,7 @@
 
 개발 `compose.yaml`과 Start-Backend/Frontend는 바꾸지 않는다. 기반 이미지는 버전과 공개 manifest digest를 고정하고 실제 비밀값 없이 빌드한다. 앱에는 실행 시 `/run/secrets` 파일만 선택적으로 제공하며 Frontend/Caddy에는 DB·VAPID 비밀 파일을 주지 않는다. Backend entrypoint가 secret 파일을 프로세스 환경으로 읽지만 값은 argv·이미지·로그에 쓰지 않는다.
 
-Backend의 Linux builder는 고정 Temurin JRE 기반에서 Ubuntu 서명 검증 저장소의 `openjdk-21-jdk-headless=21.0.12.1+1-1~22.04.4`를 설치한다. 공식 JDK 이미지의 대용량 레이어 전송이 반복 정체되어 선택한 경로이며, 최종 runtime은 고정 Temurin JRE다. 고정 APT revision이 저장소에서 사라지면 빌드는 실패하므로 갱신 때 새 revision과 이미지의 재검증이 필요하다. Gradle 다운로드 시간 제한·재시도 조정은 Docker builder 안의 복사본에만 적용하며 저장소 wrapper의 배포 URL·checksum은 유지한다.
+Backend의 Linux builder는 고정 Temurin JRE 기반에서 Ubuntu 서명 검증 저장소의 `openjdk-21-jdk-headless=21.0.13.0.3+1-1~22.04.1`를 설치한다(2026-11-14 revision 갱신; 이전 `21.0.12.1+1-1~22.04.4` 소실은 위 재현 기록 참조). 공식 JDK 이미지의 대용량 레이어 전송이 반복 정체되어 선택한 경로이며, 최종 runtime은 고정 Temurin JRE다. 고정 APT revision이 저장소에서 사라지면 빌드는 실패하므로 갱신 때 새 revision과 이미지의 재검증이 필요하다. Gradle 다운로드 시간 제한·재시도 조정은 Docker builder 안의 복사본에만 적용하며 저장소 wrapper의 배포 URL·checksum은 유지한다.
 
 PostgreSQL 관리 암호와 앱 암호를 분리한다. init 스크립트는 이미 초기화된 볼륨에서는 재실행되지 않으므로 파일 변경만으로 기존 DB 암호가 회전하지 않는다. Java·Next·Caddy root filesystem은 read-only이며 필요한 `/tmp`, Next cache와 DB/인증서 볼륨만 쓰기를 허용한다. health 명령의 curl/Node/wget은 각 이미지에 실제로 포함한다.
 

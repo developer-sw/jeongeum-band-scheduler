@@ -1,5 +1,32 @@
 # 테스트 및 운영 검증 계획
 
+## 2026-11-14 컨테이너 CI의 JDK revision 복구
+
+PR #42 최초 HEAD `572a01c`의 합성 컨테이너 CI는 이미지 빌드에서 공통 exit 오류로 두 번 실패했다. 같은 Backend Dockerfile을 별도 진단 태그에 `docker build --no-cache`로 실행해 고정 JDK revision `21.0.12.1+1-1~22.04.4` 미존재·APT exit 100을 재현했다. 공개 원격 로그에 상세 APT 오류가 있었다고 주장하지 않으며, 이 원인 확인은 캐시 없는 로컬 재현에 근거한다.
+
+기존 pinned base의 실제 APT policy와 [Ubuntu 공식 보안 공지](https://ubuntu.com/security/notices/USN-9015-1)에 일치하는 `21.0.13.0.3+1-1~22.04.1`로 builder pin을 갱신했다. **캐시 없는 전체 Backend Docker 빌드·Java 21 컴파일·bootJar·비root runtime 이미지 생성이 종료 코드 0으로 성공**했다. 실제 DB·기존 볼륨·운영 서버는 사용하거나 변경하지 않았다. 이 빌드는 서버 기동·실제 DB migration 검증을 뜻하지 않는다.
+
+QA 실행기에는 build exit에만 적용되는 순수 고정 코드 분류를 추가했다. AST로 함수를 가져오는 `production-qa-result-export.test.ps1`의 **42개 isolated 검사**가 통과했다. 구·신 JDK revision 미존재, BuildKit 접두사/CRLF, 알 수 없는 오류·다른 패키지·불완전한 진단·비문자열 입력과 비밀 sentinel을 포함하며 모든 출력 stream에 고정 코드 한 개만 나오는지 확인한다. 비빌드 exit·start/timeout·릴리스 export 7필드·기존 58개 통합 검사 계약은 유지한다. 상세 Docker 출력의 공개·QA 폴더 artifact 업로드는 추가하지 않았다.
+
+로컬 진단 로그는 ignored `.local/ci-container-build-20261114/`에 보관한다. 수정 커밋의 새 원격 Backend/Frontend·합성 컨테이너·백업 회귀 결과는 PR #42의 동일 HEAD CI에서 확인한다. 최초 UI 커밋의 6개 성공 결과를 새 수정의 전체 CI 성공으로 대신하지 않는다. main 병합·이미지 발행·운영 배포는 별도 단계다.
+
+## 2026-11-14 달력 표시와 iOS 날짜 입력 폭
+
+모바일 라벨 여백 후속 조정은 CSS만 변경했다. production webpack 빌드를 통과했고 최신 합성 미리보기의 실제 320/393/430px에서 카드 테두리 포함 위·왼쪽 19px(안쪽 padding 18px), 라벨~월 제목 4px, 44×44px 월 이동 버튼과 제목 비겹침·가로 넘침 없음을 확인했다. 1440px에서는 기존 위 21px·왼쪽 17px·제목 간격 18px 배치를 유지했다. 측정 요청 직후 이전 320px 상태가 반환된 한 건은 중복 증빙에서 제외하고, 393px는 실제 적용 폭을 재확인했다. `calendar-mobile-spaced-393.png`와 `calendar-spacing-checks.private.json`을 같은 ignored 폴더에 보관한다. 단순 CSS 간격 조정에는 새 테스트를 추가하거나 기존 441건을 다시 실행하지 않았으며, 아래 441건은 직전 아이콘·라벨 수정의 실행 결과다.
+
+후속 시각 정정에서는 밝은 하늘색 상단·연한 격자·네모 바디의 SVG로 바꾸고 `MONTHLY NOTE`를 공통 월간 컴포넌트로 옮겼다. 같은 441건·타입·lint·production webpack 빌드를 다시 통과했으며, 최신 loopback 빌드의 393px 펼친 달력과 1440px PC 달력에서 동일 아이콘·월 제목 위 라벨 1회 표시를 확인했다. 새 캡처는 같은 ignored 폴더의 `calendar-mobile-corrected-393.png`와 `calendar-desktop-corrected-1440.png`다. 실기기/운영 반영 범위는 아래와 동일하다.
+
+프론트 타입 검사·lint·전체 Vitest **26파일 441건**과 production webpack 빌드 **20 routes**를 통과했다. 월간 달력의 일요일 시작을 월/연도 경계·윤년으로 확인하며, 같은 SVG의 PC/모바일 사용과 날짜 스트립의 실제 요일·월요일 기준 주간 계산 보존을 검사한다. UI 전용 수정으로 Backend·DB migration·업무 정책·API는 변경하지 않았고 백엔드 테스트는 재실행하지 않았다.
+
+실제 frontend standalone 빌드에 loopback의 **GET 전용 합성 API**를 연결해 PC/모바일 브라우저에서 확인했다. 실제 개발/운영 DB·계정·세션·예약은 사용하지 않았으며 합성 API는 모든 쓰기를 405로 차단한다.
+
+- 320/375/393/412/430px: 연습 날짜 입력의 좌우 끝과 아래 이전/다음 버튼 전체 폭이 일치했다. 두 날짜 입력은 `appearance: none`·`border-box`·최소 폭 0이며 이력 입력은 카드의 padding 안쪽에 들어갔다. 문서 가로 넘침은 없었다.
+- 768/1440px: 날짜와 두 이동 버튼의 기존 한 줄 배치를 유지하고, 이력 입력도 카드 안쪽에 들어갔다.
+- PC 월간 달력·모바일 펼친 달력: 공통 SVG, 일~토 머리글, 2026년 11월 1일의 일요일 열을 확인했다. 모바일에서 11월 15일 선택 후 열린 달력의 해당 날짜·내 공연조 고정 예약 요약을 확인했다. 메인 기간 아래에는 `20초마다 갱신`만 표시했다.
+- 이전 날의 첫날 비활성화·다음 날 이동·이전 날 복귀를 확인했다. 브라우저 자동화의 네이티브 date `fill`은 표시값을 바꾸지만 React 상태에 확정되지 않아, 이 방식의 마지막 날짜 버튼 경계와 이력 날짜 변경을 통과로 기록하지 않는다. 기존 `type=date`·min/max·onChange는 소스 대조로 보존을 확인했다.
+
+ignored 증빙은 `.local/mobile-calendar-date-2026-11-14/`의 폭별 측정 JSON·날짜 동작 기록·PC/모바일 PNG에 보관한다. **Chromium의 반응형 폭 검증이며 실제 iPhone Safari/홈 화면 앱·Android 실기기 확인을 대신하지 않는다.** iPhone의 OS 날짜 입력 기본 렌더링과 기존 `width: 100%`의 조합을 넘침 원인으로 판단해 폭 규약을 명시했으나, 실기기 최종 확인은 남아 있다. 해당 기기에서 연습 날짜와 이력 날짜 선택창 열기·선택 확정·이전/다음 이동 및 카드 양쪽 여백을 확인한다. GitHub 게시·운영 반영은 이번 로컬 수정 뒤의 별도 단계다.
+
 ## 2026-11-06 새벽·오전 반복 고정 배정 검증 수정
 
 [반복 고정 배정](RECURRING_ASSIGNMENTS.md)의 B11~B22 클라이언트 거절 회귀를 추가했다. 수정 전 신규 입력/충돌 36건과 예약 변경/교환 응답 24건이 실패하는 것을 재현하고, 수정 후 Frontend 전체 435건·타입/lint/production 빌드를 통과했다. 유효한 새 코드와 잘못된 코드·객체·프로토타입 키를 함께 검사한다.

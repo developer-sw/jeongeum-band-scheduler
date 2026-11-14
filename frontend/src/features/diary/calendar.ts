@@ -2,6 +2,8 @@ import { addDate } from "@/features/reservations/time";
 import type { ScheduleDay } from "@/features/reservations/types";
 
 export const weekdays = ["월", "화", "수", "목", "금", "토", "일"] as const;
+// The month view is Sunday-first; booking weeks and the weekly timetable stay Monday-first.
+export const calendarWeekdays = ["일", "월", "화", "수", "목", "금", "토"] as const;
 
 // Calendar arithmetic stays in UTC; reservation dates themselves are Seoul dates
 // supplied by the server. Browser timezone must not move a calendar cell.
@@ -13,7 +15,7 @@ export function weekDates(date: string): string[] {
 
 export function monthCells(month: string): string[] {
   const first = `${month.slice(0, 7)}-01`;
-  const start = weekDates(first)[0];
+  const start = addDate(first, -new Date(`${first}T00:00:00Z`).getUTCDay());
   return Array.from({ length: 42 }, (_, index) => addDate(start, index));
 }
 
