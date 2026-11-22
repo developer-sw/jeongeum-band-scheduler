@@ -703,6 +703,13 @@ class ReservationChangeIntegrationTest {
         assertEquals(60, quota(owner, null, TODAY));
         assertEquals(changed ? 0 : 60, quota(other, null, TODAY));
         assertEquals(2, count("reservations"));
+        assertEquals(changed ? 1 : 0, count("reservation_lineage"));
+        long confirmed = jdbc.queryForObject("SELECT count(*) FROM reservations WHERE status = 'CONFIRMED'", Long.class);
+        assertEquals(changed ? 1 : 2, confirmed);
+        System.out.printf(java.util.Locale.ROOT,
+                "RESERVATION_RACE_EVIDENCE case=change_vs_create repetitions=1 requests=2 success=1 conflict=1 unexpected=0 winner=%s reservations=%d confirmed=%d activeClaims=%d ledgerEntries=%d quotaMinutes=%d lineage=%d%n",
+                changed ? "change" : "create", count("reservations"), confirmed, activeClaims(), count("quota_entries"),
+                quota(owner, null, TODAY) + quota(other, null, TODAY), count("reservation_lineage"));
     }
 
     @Test
