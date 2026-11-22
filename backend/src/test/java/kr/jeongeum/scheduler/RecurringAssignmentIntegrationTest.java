@@ -23,6 +23,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -791,6 +792,66 @@ class RecurringAssignmentIntegrationTest {
         assertEquals(1, count("reservations"));
         assertEquals(1, activeClaims());
         assertEquals("CONFIRMED", success(individual.client().get(reservationPath(original)), 200).get("status").asString());
+    }
+
+    @Test
+    void concurrentFixedSeriesAndManualCreateDoNotLeavePartialWeeklyClaims() throws Exception {
+        long group = team("REGULAR");
+        Person individual = person("MEMBER");
+        var fixedBody = assignment(group, TODAY.getDayOfWeek().getValue(), "B01", TODAY);
+        var manualBody = personal(TODAY, "B01", "DRUMS");
+        // Prepare dates before racing, so the observed guard wait is for each booking write.
+        opening.openBookableWindow();
+
+        List<HttpResponse<String>> responses = race(
+                () -> createAssignment(fixedBody),
+                () -> createReservation(individual.client(), manualBody));
+        assertEquals(List.of(201, 409), statuses(responses));
+        boolean fixedWon = responses.getFirst().statusCode() == 201;
+        if (fixedWon) {
+            success(responses.getFirst(), 201);
+            assertError(responses.getLast(), 409, "RESERVATION_CONFLICT");
+            assertEquals(1, count("recurring_assignments"));
+            assertEquals(1, count("recurring_assignment_revisions"));
+            assertEquals(1, count("recurring_idempotency_requests"));
+            assertEquals(0, count("idempotency_requests"));
+            long missingClaims = jdbc.queryForObject("""
+                    SELECT count(*) FROM reservations r
+                    WHERE r.origin_kind <> 'FIXED' OR NOT r.quota_exempt OR r.status <> 'CONFIRMED' OR (
+                        SELECT count(*) FROM reservation_assets a
+                        WHERE a.reservation_id=r.id AND a.released_at IS NULL
+                    ) <> 6
+                    """, Long.class);
+            assertEquals(0, missingClaims);
+            assertEquals(1, activeAt(group, TODAY, "B01"));
+            assertEquals(5, jdbc.queryForObject(
+                    "SELECT count(*) FROM recurring_occurrences WHERE state='MATERIALIZED'", Long.class));
+        } else {
+            assertError(responses.getFirst(), 409, "ASSIGNMENT_CONFLICT");
+            JsonNode manual = success(responses.getLast(), 201);
+            assertEquals(1, claims(id(manual)));
+            assertEquals(0, count("recurring_assignments"));
+            assertEquals(0, count("recurring_assignment_revisions"));
+            assertEquals(0, count("recurring_idempotency_requests"));
+            assertEquals(1, count("idempotency_requests"));
+        }
+        long reservations = count("reservations");
+        long occurrences = count("recurring_occurrences");
+        long links = count("recurring_occurrence_reservations");
+        long claims = activeClaims();
+        long quotaEntries = count("quota_entries");
+        int totalQuota = jdbc.queryForObject("SELECT SUM(amount_minutes)::integer FROM quota_entries", Integer.class);
+        assertEquals(fixedWon ? 5 : 1, reservations);
+        assertEquals(fixedWon ? 5 : 0, occurrences);
+        assertEquals(occurrences, links);
+        assertEquals(reservations, quotaEntries);
+        assertEquals(fixedWon ? 30 : 1, claims);
+        assertEquals(fixedWon ? 0 : 60, totalQuota);
+        System.out.printf(Locale.ROOT, "RESERVATION_RACE_EVIDENCE case=fixed-vs-create repetitions=1 requests=2 success=1 "
+                        + "conflict=1 unexpected=0 winner=%s conflictCode=%s reservations=%d occurrences=%d "
+                        + "activeClaims=%d quotaEntries=%d quotaMinutes=%d%n", fixedWon ? "fixed" : "create",
+                fixedWon ? "RESERVATION_CONFLICT" : "ASSIGNMENT_CONFLICT", reservations, occurrences, claims, quotaEntries,
+                totalQuota);
     }
 
     @Test

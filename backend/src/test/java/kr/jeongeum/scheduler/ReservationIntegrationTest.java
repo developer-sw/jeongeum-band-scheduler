@@ -22,12 +22,17 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -39,6 +44,8 @@ import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -63,6 +70,8 @@ import tools.jackson.databind.ObjectMapper;
 @Import(ReservationIntegrationTest.TestTime.class)
 @Timeout(90)
 class ReservationIntegrationTest {
+    private static final int RACE_ROUNDS = 20;
+    private static final int MAX_RACE_REQUESTS = 30;
     private static final LocalDate TODAY = LocalDate.of(2026, 10, 30);
     private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
     private static final Set<String> INSTRUMENTS = Set.of(
@@ -538,6 +547,137 @@ class ReservationIntegrationTest {
         assertEquals(4, count("idempotency_requests"));
     }
 
+    @ParameterizedTest(name = "same slot with {0} concurrent members")
+    @ValueSource(ints = {2, 10, 30})
+    @Timeout(240)
+    void repeatedSameSlotRaceCommitsOneReservationPerRound(int members) throws Exception {
+        List<Client> clients = new ArrayList<>();
+        for (int i = 0; i < members; i++) { clients.add(person("MEMBER").client()); }
+        List<JsonNode> tokens = new ArrayList<>();
+        for (Client client : clients) { tokens.add(client.csrf()); }
+        prepareRaceDates();
+        int successes = 0;
+        int conflicts = 0;
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            for (int round = 0; round < RACE_ROUNDS; round++) {
+                LocalDate date = TODAY.plusDays(round);
+                var body = personal(date, "B01", "DRUMS");
+                List<Request> requests = new ArrayList<>();
+                for (int i = 0; i < members; i++) {
+                    Client client = clients.get(i);
+                    JsonNode csrf = tokens.get(i);
+                    String requestKey = key();
+                    requests.add(() -> client.send("POST", "/api/v1/reservations", body, csrf, requestKey));
+                }
+                var responses = burst(executor, requests);
+                List<Long> winners = new ArrayList<>();
+                for (var response : responses) {
+                    if (response.statusCode() == 201) {
+                        winners.add(id(success(response, 201)));
+                        successes++;
+                    } else {
+                        assertError(response, 409, "RESERVATION_CONFLICT");
+                        conflicts++;
+                    }
+                }
+                assertEquals(1, winners.size(), "unique winner per round");
+                assertEquals(winners, confirmedIds(date));
+            }
+        }
+        assertRaceState("same_slot", members, successes, conflicts, RACE_ROUNDS,
+                0, RACE_ROUNDS, 0, RACE_ROUNDS, RACE_ROUNDS * 60, RACE_ROUNDS);
+    }
+
+    @Test
+    @Timeout(180)
+    void repeatedTeamAndPersonalRaceNeverLeavesPartialClaims() throws Exception {
+        Client solo = person("MEMBER").client();
+        Person bandMember = person("MEMBER");
+        long group = team("REGULAR");
+        join(group, bandMember, false);
+        JsonNode soloToken = solo.csrf();
+        JsonNode teamToken = bandMember.client().csrf();
+        prepareRaceDates();
+        int teamWins = 0;
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            for (int round = 0; round < RACE_ROUNDS; round++) {
+                LocalDate date = TODAY.plusDays(round);
+                var responses = burst(executor, List.of(
+                        () -> solo.send("POST", "/api/v1/reservations", personal(date, "B01", "DRUMS"), soloToken, key()),
+                        () -> bandMember.client().send("POST", "/api/v1/reservations", teamBody(date, "B01", group), teamToken, key())));
+                boolean teamWon = responses.get(1).statusCode() == 201;
+                JsonNode winner = success(responses.get(teamWon ? 1 : 0), 201);
+                assertError(responses.get(teamWon ? 0 : 1), 409, "RESERVATION_CONFLICT");
+                assertEquals(teamWon ? "TEAM" : "PERSONAL", winner.get("subjectType").asString());
+                assertEquals(List.of(id(winner)), confirmedIds(date));
+                if (teamWon) { teamWins++; }
+            }
+        }
+        assertRaceState("team_vs_personal", 2, RACE_ROUNDS, RACE_ROUNDS, RACE_ROUNDS,
+                0, RACE_ROUNDS + 5 * teamWins, 0, RACE_ROUNDS, RACE_ROUNDS * 60, RACE_ROUNDS);
+    }
+
+    @Test
+    @Timeout(180)
+    void repeatedCancellationAndNewBookingRacePreservesOriginalHistory() throws Exception {
+        Client owner = person("MEMBER").client();
+        Client challenger = person("MEMBER").client();
+        JsonNode ownerToken = owner.csrf();
+        JsonNode challengerToken = challenger.csrf();
+        prepareRaceDates();
+        int creates = 0;
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            for (int round = 0; round < RACE_ROUNDS; round++) {
+                LocalDate date = TODAY.plusDays(round);
+                var body = personal(date, "B01", "DRUMS");
+                JsonNode original = success(create(owner, body), 201);
+                var responses = burst(executor, List.of(
+                        () -> owner.send("POST", reservationPath(original) + "/cancel",
+                                Map.of("expectedVersion", original.get("version").asLong()), ownerToken, key()),
+                        () -> challenger.send("POST", "/api/v1/reservations", body, challengerToken, key())));
+                assertEquals(id(original), id(success(responses.get(0), 200)));
+                assertEquals("CANCELED", jdbc.queryForObject("SELECT status FROM reservations WHERE id = ?", String.class, id(original)));
+                assertEquals(List.of(60, -60), jdbc.queryForList(
+                        "SELECT amount_minutes FROM quota_entries WHERE reservation_id = ? ORDER BY id", Integer.class, id(original)));
+                var createResponse = responses.get(1);
+                if (createResponse.statusCode() == 201) {
+                    assertEquals(List.of(id(success(createResponse, 201))), confirmedIds(date));
+                    creates++;
+                } else {
+                    assertError(createResponse, 409, "RESERVATION_CONFLICT");
+                    assertEquals(List.of(), confirmedIds(date));
+                }
+            }
+        }
+        assertRaceState("cancel_vs_create", 2, RACE_ROUNDS + creates, RACE_ROUNDS - creates, creates,
+                RACE_ROUNDS, creates, RACE_ROUNDS, 2 * RACE_ROUNDS + creates, creates * 60, 2 * RACE_ROUNDS + creates);
+    }
+
+    @Test
+    @Timeout(180)
+    void repeatedSameKeyReplayReturnsOneIdAndOneCommitPerRound() throws Exception {
+        Person actor = person("MEMBER");
+        Client otherSession = authenticated(actor.member());
+        JsonNode first = actor.client().csrf();
+        JsonNode second = otherSession.csrf();
+        prepareRaceDates();
+        try (ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor()) {
+            for (int round = 0; round < RACE_ROUNDS; round++) {
+                LocalDate date = TODAY.plusDays(round);
+                var body = personal(date, "B01", "DRUMS");
+                String sharedKey = key();
+                var responses = burst(executor, List.of(
+                        () -> actor.client().send("POST", "/api/v1/reservations", body, first, sharedKey),
+                        () -> otherSession.send("POST", "/api/v1/reservations", body, second, sharedKey)));
+                long reservation = id(success(responses.get(0), 201));
+                assertEquals(reservation, id(success(responses.get(1), 201)));
+                assertEquals(List.of(reservation), confirmedIds(date));
+            }
+        }
+        assertRaceState("same_key", 2, 2 * RACE_ROUNDS, 0, RACE_ROUNDS,
+                0, RACE_ROUNDS, 0, RACE_ROUNDS, RACE_ROUNDS * 60, RACE_ROUNDS);
+    }
+
     @Test
     void concurrentTeamAndPersonalClaimsCommitOneWholeReservationWithoutPartialTeamOccupancy() throws Exception {
         Person bandMember = person("MEMBER");
@@ -584,6 +724,7 @@ class ReservationIntegrationTest {
         assertEquals(2, activeClaims());
         assertEquals(2, count("quota_entries"));
         assertEquals(2, count("idempotency_requests"));
+        reportQuotaRace("personal_quota", quota(owner, null));
     }
 
     @Test
@@ -605,6 +746,8 @@ class ReservationIntegrationTest {
         assertEquals(12, activeClaims());
         assertEquals(2, count("reservations"));
         assertEquals(2, count("reservation_operations"));
+        assertEquals(2, count("quota_entries"));
+        reportQuotaRace("team_quota", quota(null, group));
     }
 
     @Test
@@ -1055,6 +1198,100 @@ class ReservationIntegrationTest {
             start.countDown();
             return List.of(a.get(30, TimeUnit.SECONDS), b.get(30, TimeUnit.SECONDS));
         }
+    }
+
+    private List<HttpResponse<String>> burst(ExecutorService executor, List<Request> requests) throws InterruptedException {
+        assertTrue(requests.size() >= 2 && requests.size() <= MAX_RACE_REQUESTS);
+        var start = new CyclicBarrier(requests.size());
+        List<Callable<HttpResponse<String>>> tasks = requests.stream()
+                .<Callable<HttpResponse<String>>>map(request -> () -> {
+                    start.await(5, TimeUnit.SECONDS);
+                    return request.run();
+                }).toList();
+        var completed = executor.invokeAll(tasks, 30, TimeUnit.SECONDS);
+        List<HttpResponse<String>> responses = new ArrayList<>();
+        int transportErrors = 0;
+        for (var future : completed) {
+            if (future.isCancelled()) {
+                transportErrors++;
+            } else {
+                try {
+                    responses.add(future.get());
+                } catch (ExecutionException failure) {
+                    transportErrors++;
+                }
+            }
+        }
+        assertEquals(0, transportErrors, "failed or timed out HTTP requests in batch of " + requests.size());
+        return responses;
+    }
+
+    private void prepareRaceDates() throws Exception {
+        var response = administrator.client().get("/api/v1/schedule?from=" + TODAY + "&to=" + TODAY.plusDays(RACE_ROUNDS - 1));
+        assertEquals(RACE_ROUNDS, success(response, 200).get("days").size());
+    }
+
+    private List<Long> confirmedIds(LocalDate date) {
+        return jdbc.queryForList("SELECT id FROM reservations WHERE reservation_date = ? AND status = 'CONFIRMED' ORDER BY id",
+                Long.class, date);
+    }
+
+    private void assertRaceState(String scenario, int concurrency, int successes, int conflicts, int confirmedExpected,
+            int canceledExpected, int claimsExpected, int releasedExpected, int ledgerExpected, int minutesExpected,
+            int operationsExpected) {
+        long confirmed = jdbc.queryForObject("SELECT count(*) FROM reservations WHERE status = 'CONFIRMED'", Long.class);
+        long canceled = jdbc.queryForObject("SELECT count(*) FROM reservations WHERE status = 'CANCELED'", Long.class);
+        long claims = activeClaims();
+        long released = count("reservation_assets") - claims;
+        long ledgerEntries = count("quota_entries");
+        long minutes = jdbc.queryForObject("SELECT coalesce(sum(amount_minutes), 0) FROM quota_entries", Long.class);
+        long operations = count("reservation_operations");
+        long idempotencyRecords = count("idempotency_requests");
+        long duplicateClaims = jdbc.queryForObject("""
+                SELECT count(*) FROM (
+                    SELECT reservation_date, time_block_code, asset_id FROM reservation_assets
+                    WHERE released_at IS NULL GROUP BY reservation_date, time_block_code, asset_id HAVING count(*) > 1
+                ) violations
+                """, Long.class);
+        long invalidCoverage = jdbc.queryForObject("""
+                SELECT count(*) FROM reservations r WHERE (
+                    SELECT count(*) FROM reservation_assets a WHERE a.reservation_id = r.id AND a.released_at IS NULL
+                ) <> CASE WHEN r.status <> 'CONFIRMED' THEN 0 WHEN r.owner_type = 'TEAM' THEN 6 ELSE 1 END
+                """, Long.class);
+        long quotaViolations = jdbc.queryForObject("""
+                SELECT count(*) FROM (
+                    SELECT quota_date, owner_user_id, team_id FROM quota_entries
+                    GROUP BY quota_date, owner_user_id, team_id HAVING sum(amount_minutes) NOT BETWEEN 0 AND 120
+                ) violations
+                """, Long.class);
+        long quotaMismatches = jdbc.queryForObject("""
+                SELECT count(*) FROM reservations r WHERE (
+                    SELECT coalesce(sum(amount_minutes), 0) FROM quota_entries q WHERE q.reservation_id = r.id
+                ) <> CASE WHEN r.status = 'CONFIRMED' THEN 60 ELSE 0 END
+                """, Long.class);
+        assertEquals(RACE_ROUNDS * concurrency, successes + conflicts);
+        assertEquals(confirmedExpected, confirmed);
+        assertEquals(canceledExpected, canceled);
+        assertEquals(confirmed + canceled, count("reservations"));
+        assertEquals(claimsExpected, claims);
+        assertEquals(releasedExpected, released);
+        assertEquals(ledgerExpected, ledgerEntries);
+        assertEquals(minutesExpected, minutes);
+        assertEquals(operationsExpected, operations);
+        assertEquals(operations, idempotencyRecords);
+        assertEquals(0, duplicateClaims);
+        assertEquals(0, invalidCoverage);
+        assertEquals(0, quotaViolations);
+        assertEquals(0, quotaMismatches);
+        System.out.printf(Locale.ROOT, "RESERVATION_RACE_EVIDENCE case=%s concurrency=%d repetitions=%d requests=%d success=%d conflict=%d unexpected=0 confirmed=%d canceled=%d activeClaims=%d releasedClaims=%d ledgerEntries=%d quotaMinutes=%d operations=%d idempotencyRecords=%d duplicateClaims=%d invalidCoverage=%d quotaViolations=%d quotaMismatches=%d%n",
+                scenario, concurrency, RACE_ROUNDS, successes + conflicts, successes, conflicts, confirmed, canceled, claims,
+                released, ledgerEntries, minutes, operations, idempotencyRecords, duplicateClaims, invalidCoverage,
+                quotaViolations, quotaMismatches);
+    }
+
+    private void reportQuotaRace(String scenario, int minutes) {
+        System.out.printf(Locale.ROOT, "RESERVATION_RACE_EVIDENCE case=%s concurrency=2 repetitions=1 requests=2 success=1 conflict=1 unexpected=0 conflictCode=DAILY_LIMIT_EXCEEDED reservations=%d activeClaims=%d ledgerEntries=%d quotaMinutes=%d%n",
+                scenario, count("reservations"), activeClaims(), count("quota_entries"), minutes);
     }
 
     private List<Integer> statuses(List<HttpResponse<String>> responses) {
