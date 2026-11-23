@@ -1,5 +1,19 @@
 # 운영 컨테이너 구현과 합성 통합 검증
 
+## 2026-11-23 Java 21 빌드와 실행 이미지 갱신
+
+예약 검증 PR #45의 합성 컨테이너 검사는 APT에서 기존 빌드용 고정 버전 `21.0.13.0.3+1-1~22.04.1`을 찾지 못해 `QA_BUILD_JDK_REVISION_UNAVAILABLE`로 종료됐다. 새 베이스에서 `apt-get update` 후 `apt-cache policy openjdk-21-jdk-headless`와 정확한 버전의 설치 모의 실행을 확인했다. Jammy 저장소가 제공하는 `21.0.13.1+2-1~22.04.1`을 고정한다. [기존 CI 로그](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/45058508960/job/137318985695) · [Ubuntu 보안 공지 USN-9156-1](https://ubuntu.com/security/notices/USN-9156-1)
+
+최종 실행 단계는 Docker 공식 `21.0.13.1_2-jre-jammy`의 manifest 목록 digest `sha256:cdbc48132dd37b9e65cfccf2417c5668ac75046c4168af5486526eb9788f0e8f`를 사용한다. 이 목록의 `linux/amd64` 이미지 digest는 `sha256:04bcffe1d3d31b0829c827e2c5c30c82f1768e16eae880d11961910c33db7456`이며, 격리된 실행에서 `java -version`은 Temurin `21.0.13.1+2`를 반환했다. 빌드 단계도 같은 베이스를 사용하며 컴파일러는 APT로 설치한 `/opt/build-jdk/bin/javac`다. 검증 대상은 릴리스가 사용하는 `linux/amd64`다. [Docker 공식 이미지](https://hub.docker.com/layers/library/eclipse-temurin/21.0.13.1_2-jre-jammy/images/sha256-04bcffe1d3d31b0829c827e2c5c30c82f1768e16eae880d11961910c33db7456) · [Adoptium 보안 공지](https://adoptium.net/news/2026/11/temurin-november-2026-cspu-java4shell)
+
+로컬에서 `docker build --no-cache --platform linux/amd64 --tag jeongeum-java21-security:local ./backend`를 실행해 `javac 21.0.13.1`, `bootJar`, 최종 이미지 빌드를 확인했다. 최종 이미지는 네트워크 없이 UID `10001`로 실행해 JAR 읽기, 헬스체크에 필요한 `curl`, Temurin `21.0.13.1+2`를 확인했다. 고정한 manifest 목록에는 `linux/arm64`가 없으므로 다른 아키텍처에서 빌드할 때도 이번 릴리스 재현에는 `--platform linux/amd64`가 필요하다.
+
+배포 기록에 나온 Backend rc.6의 GHCR digest `sha256:e344176a5e8355e38d54952b30275cdc4b1ec800147e5f2c2c5e709ada4c4e39`에서는 이미지 메타데이터와 격리 로컬 실행 모두 Temurin `21.0.12.1+1`을 확인했다. 해당 버전은 CVE-2026-114938의 수정 전 버전이다. 실제 영향 판단에는 x64 운영 CPU가 노출하는 AVX-512 VBMI 지원과 JVM 옵션, 영향을 받는 JVM 경로의 도달 가능성을 함께 확인해야 한다. 배포 기록만으로 운영 호스트의 CPU와 실제 실행 옵션은 알 수 없다. 운영 상태를 확인할 때는 기존 Backend 컨테이너의 이미지 ID와 digest, 해당 컨테이너의 `/opt/java/openjdk/bin/java -version`, 호스트의 `avx512vbmi` 지원 여부, 실행 중인 JVM의 관련 옵션 적용 여부만 조회한다. 컨테이너 환경변수나 프로세스 인자 전체는 출력하지 않는다. [Backend rc.6 발행 기록](https://github.com/developer-sw/jeongeum-band-scheduler/actions/runs/41970970067) · [OpenJDK 보안 공지](https://openjdk.org/groups/vulnerability/advisories/2026-11-17)
+
+보안 PR의 CI와 예약 검증 커밋을 결합한 별도 브랜치의 CI에서 각각 7개 작업을 확인한다. 승인 후 보안 PR을 먼저 `main`에 병합하고, 새 `main`의 성공한 push CI를 확인한다. 이후 PR #45를 새 `main` 기준으로 갱신해 원래 PR에도 최신 CI 결과를 남길 수 있다.
+
+실제 반영은 별도 승인 후 같은 `main` SHA의 릴리스 검증과 공개 digest 대조부터 진행한다. 현재 이미지·설정과 복구 가능한 백업을 확인하고, Backend와 같은 이미지를 사용하는 실행 서비스의 범위를 먼저 식별한다. 해당 서비스만 새 digest로 교체한 다음 JVM 버전, 내부·외부 health, 예약 조회, worker, 백업 복구 가능성을 확인한다. PostgreSQL과 기존 볼륨은 보존한다. 장애 시 사전 확인한 rc.6 digest는 V13과 호환되는 임시 복귀 후보지만 수정 전 JRE를 포함한다. 실제 이미지 발행·교체·서버 재시작에는 별도 승인이 필요하다. [이미지 발행 절차](PRODUCTION_IMAGE_RELEASE.md) · [운영 백업 절차](OPERATIONS_BACKUP_PLAN.md)
+
 ## 2026-11-14 컨테이너 CI 빌드 복구
 
 PR #42의 UI 커밋 `572a01c`에서 앱 검사 등 6개 CI job은 성공했지만 합성 컨테이너 job은 재실행에서도 이미지 빌드 중 `QA_PROCESS_EXIT_FAILED`로 종료됐다. 당시 공개 로그에는 상세 Docker 출력이 없어 원인을 직접 확인할 수 없었다. 동일 Backend Dockerfile을 별도 로컬 태그로 **캐시 없이** 빌드한 결과, Ubuntu 저장소에서 고정한 `openjdk-21-jdk-headless=21.0.12.1+1-1~22.04.4`를 찾지 못하는 APT exit 100을 재현했다. 이는 UI·예약 코드 컴파일 이전의 설치 실패다.
@@ -36,7 +50,7 @@ QA 실행기는 `compose build`의 비정상 exit에서만 captured stdout/stder
 
 개발 `compose.yaml`과 Start-Backend/Frontend는 바꾸지 않는다. 기반 이미지는 버전과 공개 manifest digest를 고정하고 실제 비밀값 없이 빌드한다. 앱에는 실행 시 `/run/secrets` 파일만 선택적으로 제공하며 Frontend/Caddy에는 DB·VAPID 비밀 파일을 주지 않는다. Backend entrypoint가 secret 파일을 프로세스 환경으로 읽지만 값은 argv·이미지·로그에 쓰지 않는다.
 
-Backend의 Linux builder는 고정 Temurin JRE 기반에서 Ubuntu 서명 검증 저장소의 `openjdk-21-jdk-headless=21.0.13.0.3+1-1~22.04.1`를 설치한다(2026-11-14 revision 갱신; 이전 `21.0.12.1+1-1~22.04.4` 소실은 위 재현 기록 참조). 공식 JDK 이미지의 대용량 레이어 전송이 반복 정체되어 선택한 경로이며, 최종 runtime은 고정 Temurin JRE다. 고정 APT revision이 저장소에서 사라지면 빌드는 실패하므로 갱신 때 새 revision과 이미지의 재검증이 필요하다. Gradle 다운로드 시간 제한·재시도 조정은 Docker builder 안의 복사본에만 적용하며 저장소 wrapper의 배포 URL·checksum은 유지한다.
+Backend의 Linux builder는 고정 Temurin JRE 기반에서 Ubuntu 서명 검증 저장소의 `openjdk-21-jdk-headless`를 정확한 버전으로 설치한다. 공식 JDK 이미지의 대용량 레이어 전송이 반복 정체되어 선택한 경로이며, 최종 실행 환경에는 Dockerfile에 고정한 Temurin JRE를 사용한다. 고정 APT 버전이 저장소에서 사라지면 빌드가 실패하므로 갱신 시 APT 조회, 캐시 없는 빌드와 최종 JRE 실행을 다시 확인한다. Gradle 다운로드 시간 제한·재시도 조정은 Docker builder 안의 복사본에 적용하며 저장소 wrapper의 배포 URL·checksum을 유지한다.
 
 PostgreSQL 관리 암호와 앱 암호를 분리한다. init 스크립트는 이미 초기화된 볼륨에서는 재실행되지 않으므로 파일 변경만으로 기존 DB 암호가 회전하지 않는다. Java·Next·Caddy root filesystem은 read-only이며 필요한 `/tmp`, Next cache와 DB/인증서 볼륨만 쓰기를 허용한다. health 명령의 curl/Node/wget은 각 이미지에 실제로 포함한다.
 

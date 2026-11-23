@@ -1,9 +1,9 @@
-FROM eclipse-temurin:21-jre-jammy@sha256:f04fb34e053148344e83317976114ec3f37e4b830ec8bdab5a2fe3cecd7d010b AS builder
+FROM eclipse-temurin:21.0.13.1_2-jre-jammy@sha256:cdbc48132dd37b9e65cfccf2417c5668ac75046c4168af5486526eb9788f0e8f AS builder
 
 # Use Ubuntu's signature-verified Java 21 packages on the pinned base. An unavailable
 # fixed package revision must fail the build rather than silently selecting another JDK.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends openjdk-21-jdk-headless=21.0.13.0.3+1-1~22.04.1 \
+    && apt-get install -y --no-install-recommends openjdk-21-jdk-headless=21.0.13.1+2-1~22.04.1 \
     && ln -s "$(dirname "$(dirname "$(readlink -f /usr/bin/javac)")")" /opt/build-jdk \
     && /opt/build-jdk/bin/javac -version \
     && rm -rf /var/lib/apt/lists/*
@@ -21,7 +21,7 @@ RUN --mount=type=cache,id=jeongeum-backend-gradle,target=/root/.gradle,sharing=l
     && test -s build/libs/jeongeum-band-scheduler-backend-0.0.1-SNAPSHOT.jar \
     && sha256sum build/libs/jeongeum-band-scheduler-backend-0.0.1-SNAPSHOT.jar
 
-FROM eclipse-temurin:21-jre-jammy@sha256:f04fb34e053148344e83317976114ec3f37e4b830ec8bdab5a2fe3cecd7d010b AS runtime
+FROM eclipse-temurin:21.0.13.1_2-jre-jammy@sha256:cdbc48132dd37b9e65cfccf2417c5668ac75046c4168af5486526eb9788f0e8f AS runtime
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl \
