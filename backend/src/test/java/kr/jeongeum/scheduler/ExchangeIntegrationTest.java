@@ -23,6 +23,7 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -435,6 +436,67 @@ class ExchangeIntegrationTest {
         assertEquals(before, allSnapshots()); assertEquals("PENDING", state(pending));
         success(cancel(third.client(), extra), 200); success(action(personal.client(), pending, "approve", retryKey), 200);
         assertEquals(6, claims(id(successor(room)))); assertEquals(1, exchangeCount());
+    }
+
+    @Test
+    void concurrentApprovalAndThirdPartyCreateKeepOneWholeDestinationState() throws Exception {
+        Person creator = person("MEMBER");
+        Person counterpart = person("MEMBER");
+        Person thirdParty = person("MEMBER");
+        long group = team("REGULAR");
+        join(group, creator, false);
+        JsonNode room = teamReservation(creator, TODAY, "B01", group);
+        JsonNode target = personal(counterpart, TODAY, "B07", "DRUMS");
+        JsonNode pending = request(creator.client(), List.of(room), List.of(target));
+        Map<String, Object> rival = Map.of("subjectType", "PERSONAL", "date", TODAY.toString(),
+                "blockCode", "B07", "instrumentCodes", List.of("VOCAL"));
+
+        List<HttpResponse<String>> responses = race(
+                () -> action(counterpart.client(), pending, "approve", key()),
+                () -> thirdParty.client().write("POST", "/api/v1/reservations", rival, key()));
+        boolean exchangeWon = responses.getFirst().statusCode() == 200;
+        if (exchangeWon) {
+            success(responses.getFirst(), 200);
+            assertError(responses.getLast(), 409, "RESERVATION_CONFLICT");
+            assertEquals("COMPLETED", state(pending));
+            assertEquals("REPLACED", detail(room).get("status").asString());
+            assertEquals("REPLACED", detail(target).get("status").asString());
+            assertEquals(0, claims(id(room)));
+            assertEquals(0, claims(id(target)));
+            assertEquals(6, claims(id(successor(room))));
+            assertEquals(1, claims(id(successor(target))));
+        } else {
+            assertError(responses.getFirst(), 409, "RESERVATION_CONFLICT");
+            JsonNode created = success(responses.getLast(), 201);
+            assertEquals("PENDING", state(pending));
+            assertEquals("CONFIRMED", detail(room).get("status").asString());
+            assertEquals("CONFIRMED", detail(target).get("status").asString());
+            assertEquals(6, claims(id(room)));
+            assertEquals(1, claims(id(target)));
+            assertEquals(1, claims(id(created)));
+        }
+        long exchangeOperations = exchangeCount();
+        long lineage = count("reservation_lineage");
+        assertEquals(exchangeWon ? 1 : 0, exchangeOperations);
+        assertEquals(exchangeWon ? 2 : 0, lineage);
+        assertEquals(exchangeWon ? 0 : 60, quota(null, group, TODAY));
+        assertEquals(exchangeWon ? 60 : 0, quota(counterpart, null, TODAY));
+        assertEquals(0, quota(thirdParty, null, TODAY));
+        long reservations = count("reservations");
+        long confirmed = jdbc.queryForObject("SELECT count(*) FROM reservations WHERE status='CONFIRMED'", Long.class);
+        long activeClaims = jdbc.queryForObject("SELECT count(*) FROM reservation_assets WHERE released_at IS NULL", Long.class);
+        int totalQuota = jdbc.queryForObject("SELECT SUM(amount_minutes)::integer FROM quota_entries", Integer.class);
+        long quotaEntries = count("quota_entries");
+        assertEquals(exchangeWon ? 4 : 3, reservations);
+        assertEquals(exchangeWon ? 2 : 3, confirmed);
+        assertEquals(exchangeWon ? 7 : 8, activeClaims);
+        assertEquals(60, totalQuota);
+        assertEquals(exchangeWon ? 5 : 3, quotaEntries);
+        System.out.printf(Locale.ROOT, "RESERVATION_RACE_EVIDENCE case=exchange-vs-create repetitions=1 requests=2 success=1 "
+                        + "conflict=1 unexpected=0 winner=%s conflictCode=RESERVATION_CONFLICT reservations=%d "
+                        + "confirmed=%d activeClaims=%d quotaEntries=%d quotaMinutes=%d exchangeOperations=%d lineage=%d%n",
+                exchangeWon ? "exchange" : "create", reservations, confirmed, activeClaims, quotaEntries, totalQuota,
+                exchangeOperations, lineage);
     }
 
     @Test

@@ -56,4 +56,12 @@ tasks.test {
         events("passed", "skipped", "failed")
         showStandardStreams = false
     }
+    // Publish only the synthetic race totals, never the full test streams.
+    val raceEvidence = Regex("RESERVATION_RACE_EVIDENCE(?: [A-Za-z]+=[A-Za-z0-9_-]+)+")
+    addTestOutputListener { _, output ->
+        val line = output.message.trimEnd()
+        if (raceEvidence.matches(line)) {
+            logger.lifecycle(line)
+        }
+    }
 }
